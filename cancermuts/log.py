@@ -36,4 +36,11 @@ def start_logging(logfile=None, level=logging.DEBUG, format=message_format, date
 		logging.basicConfig(                  level=level, format=format, datefmt=datefmt)
 
 	logger = logging.getLogger(logger_name)
-	return logger 
+	return logger
+
+def logger_init(function):
+	def wrapper(*args, **kwargs):
+		function(*args, **kwargs)
+		this_self = args[0]
+		this_self.log = logging.getLogger('.'.join([logger_name, this_self.__class__.__name__]))
+	return wrapper
