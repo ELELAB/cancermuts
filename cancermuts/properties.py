@@ -23,7 +23,6 @@ Classes to handle properties of sequence or positions
 
 """
 
-
 class SequenceProperty(object):
     def __init__(self, name, category, positions=None, sources=None, values=None, metadata=None):
         self.category = category

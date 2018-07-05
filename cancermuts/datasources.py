@@ -29,6 +29,7 @@ from bioservices.uniprot import UniProt as bsUniProt
 from .core import Sequence, Mutation
 from .properties import *
 from .metadata import *
+from .log import *
 import re
 import sys
 import os
@@ -62,17 +63,39 @@ class StaticSource(Source, object):
         super(StaticSource, self).__init__(*args, **kwargs)
 
 class UniProt(DynamicSource, object):
+    @logger_init
     def __init__(self, *args, **kwargs):
         description = "Uniprot knowledge-base"
         super(UniProt, self).__init__(name='UniProt', version='1.0', description=description)
         self._uniprot_service = bsUniProt()
 
-    def get_sequence(self, gene_id):
-        upid = self._uniprot_service.search("gene:%s AND organism:human" % gene_id, columns="entry name").split()[2]
-        sequence = self._uniprot_service.get_fasta_sequence(str(upid))
-        return Sequence(gene_id, sequence, self)
+    def get_sequence(self, gene_id, upid=None):
+        if upid is None:
+            self.log.info("retrieving UniProt ID for human gene %s" % gene_id)
+            upids = self._uniprot_service.search("gene:%s AND organism:human" % gene_id, columns="entry name").split()[2:]
+            upid = upids[0]
+            if len(upids) > 1:
+                self.log.warning("the following UniProt entries were found for gene %s: %s; will use %s" %(gene_id, ', '.join(upids), upid))
+            else:
+                self.log.info("will use Uniprot ID %s" % upid)
+            aliases = {}
+        else:
+            aliases = {'uniprot':upid}
+
+        self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s" % gene_id)
+
+        try:
+            sequence = self._uniprot_service.get_fasta_sequence(str(upid))
+        except:
+            self.log.error("failed retrieving sequence for Uniprot ID %s" % upid)
+            return None
+
+
+
+        return Sequence(gene_id, sequence, self, aliases=aliases)
 
 class cBioPortal(DynamicSource, object):
+    @logger_init
     def __init__(self):
         description = "cBioPortal"
         super(cBioPortal, self).__init__(name='cBioPortal', version='1.0', description=description)
@@ -87,26 +110,27 @@ class cBioPortal(DynamicSource, object):
     def add_mutations(self, sequence, cancer_studies=None, metadata=[], mainisoform=1, mapisoform=None):
         mutations, out_metadata = self._get_profile_data(sequence.gene_id, cancer_studies=cancer_studies, metadata=metadata, mainisoform=mainisoform, mapisoform=mapisoform)
         unique_mutations = list(set(mutations))
-        print "Unique mutations found in %s: %s" % (self.name, ", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1]))))
+        self.log.info("unique mutations found in %s: %s" % (self.name, ", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1])))))
         for m_idx,m in enumerate(unique_mutations):
             wt = m[0]
             mut = m[-1]
             num = int(m[1:-1])
             if wt == mut:
+                self.log.info("synonymous mutation %s discarded" % m)
                 continue
+
             mutation_indices = [i for i,x in enumerate(mutations) if x == m]
+
             try:
                 site_seq_idx = sequence.seq2index(num)
             except:
-                print "WARNING: residue %d out of range %s" % (num, out_metadata)
-                for mi in mutation_indices:
-                    print "£", out_metadata['cancer_study'][mi]
+                self.log.warning("mutation %s is outside the protein sequence; it will be skipped")
                 continue
+
             position = sequence.positions[site_seq_idx]
+
             if position.wt_residue_type != wt:
-                print "WARNING: Skipping %s %s (it's %s in sequence!)" % (m, self.name, position.wt_residue_type)
-                for mi in mutation_indices:
-                    print "£", out_metadata['cancer_study'][mi]
+                self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
                 continue
 
             mutation_obj = Mutation(sequence.positions[site_seq_idx],
@@ -119,10 +143,17 @@ class cBioPortal(DynamicSource, object):
                     this_md = metadata_classes[md](*tmp_md)
                     mutation_obj.metadata[md].append(this_md)
 
+            self.log.debug("adding mutation %s" % str(mutation_obj))
             sequence.positions[site_seq_idx].add_mutation(mutation_obj)
 
     def _get_cancer_types(self):
-        response = rq.post(self._requests_url, {'cmd':'getTypesOfCancer'}).text
+        self.log.info("fetching cancer types")
+        try:
+            response = rq.post(self._requests_url, {'cmd':'getTypesOfCancer'}).text
+        except:
+            self.log.error("failed retrieving cancer types")
+            self._cancer_types = None
+            return    
         tmp = response.split("\n")
         data = []
         for line in tmp[:-1]:
@@ -130,27 +161,39 @@ class cBioPortal(DynamicSource, object):
         self._cancer_types = dict(data)
 
     def _get_cancer_studies(self):
-        if self._cache_cancer_studies is None:
-            self._cache_cancer_studies = []
+        self.log.info("retrieving cancer studies...")
+        self._cache_cancer_studies = []
+        try:
             response = rq.post(self._requests_url, {'cmd':'getCancerStudies'}).text
-            tmp = response.split("\n")
-            for line in tmp[1:]:
-                if line:
-                    tmp2 = line.split("\t")
-                    self._cache_cancer_studies.append(tuple(tmp2))
+        except:
+            self.log.error("failed retrieving cancer studies")
+            self._cache_cancer_studies = None
+            return
+        tmp = response.split("\n")
+        for line in tmp[1:]:
+            if line:
+                tmp2 = line.split("\t")
+                self._cache_cancer_studies.append(tuple(tmp2))
 
     def _get_genetic_profiles(self, cancer_studies=None):
-        if self._cache_cancer_studies is None:
-            if cancer_studies is not None:
-                self._cache_cancer_studies = cancer_studies
-            else:
-                self._get_cancer_studies()
-        
+        self.log.info("retrieving genetic profiles")
+        if cancer_studies is not None:
+            self.log.info("user-provided cancer studies will be used")
+            self._cache_cancer_studies = cancer_studies
+        else:
+            self.log.info("all available cancer studies will be used")
+            self._get_cancer_studies()
+
         self._cache_genetic_profiles = {}
         for cancer_study_id in zip(*self._cache_cancer_studies)[0]:
             self._cache_genetic_profiles[cancer_study_id] = []
-            response = rq.post(self._requests_url, {'cmd':'getGeneticProfiles',
-                                                    'cancer_study_id':cancer_study_id}).text
+            self.log.debug("fetching genetic profiles for cancer study %s" % cancer_study_id)
+            try:
+                response = rq.post(self._requests_url, {'cmd':'getGeneticProfiles',
+                                                        'cancer_study_id':cancer_study_id}).text
+            except:
+                self.log.error("failed to fetch genetic profiles for study %s" % cancer_study_id)
+                continue
             tmp = response.split("\n")
             for line in tmp[1:]:
                 if line:
@@ -159,17 +202,25 @@ class cBioPortal(DynamicSource, object):
                         self._cache_genetic_profiles[cancer_study_id].append((tmp2[0],tmp2[4]))
 
     def _get_case_sets(self, cancer_studies=None):
-        if self._cache_cancer_studies is not None:
-            if cancer_studies is not None:
-                self._cache_cancer_studies = cancer_studies
-            else:
-                self._get_cancer_studies()
+        self.log.info("retrieving case sets")
+        if cancer_studies is not None:
+            self.log.info("user-provided cancer studies will be used")
+            self._cache_cancer_studies = cancer_studies
+        else:
+            self.log.info("all available cancer studies will be used")
+            self._get_cancer_studies()
 
         self._cache_case_sets = {}
         for cancer_study_id in zip(*self._cache_cancer_studies)[0]:
             self._cache_case_sets[cancer_study_id] = []
-            response = rq.post(self._requests_url, {'cmd':'getCaseLists',
-                                                    'cancer_study_id':cancer_study_id}).text
+            self.log.debug("fetching case sets for cancer study %s" % cancer_study_id)
+            try:
+                response = rq.post(self._requests_url, {'cmd':'getCaseLists',
+                                                        'cancer_study_id':cancer_study_id}).text
+            except:
+                self.log.error("failed to fetch case sets for study %s" % cancer_study_id)
+                continue
+
             tmp = response.split("\n")
             for line in tmp[1:]:
                 if line:
@@ -178,21 +229,21 @@ class cBioPortal(DynamicSource, object):
 
     def _get_profile_data(self, gene_id, cancer_studies=None, metadata=[], mapisoform=None, mainisoform=1):
 
+        self.log.info("fetching profile data")
+        mut_regexp = '[A-Z][0-9]+[A-Z]$'
+        mut_prog = re.compile(mut_regexp)
+        split_regexp = '\s+|,'
+        split_prog = re.compile(split_regexp)
+
         out_metadata = dict(zip(metadata, [list() for i in range(len(metadata))]))
 
-        if self._cache_profile_data is None:
-            self._get_genetic_profiles(cancer_studies=cancer_studies)
-        if self._cache_case_sets is None:
-            self._get_case_sets(cancer_studies=cancer_studies)
+        self._get_genetic_profiles(cancer_studies=cancer_studies)
+        self._get_case_sets(cancer_studies=cancer_studies)
 
         if len(self._cache_cancer_studies[0]) == 3:
             for i,c in enumerate(self._cache_cancer_studies):
                 self._cache_cancer_studies[i] = c + tuple([mainisoform])    
 
-        mut_regexp = '[A-Z][0-9]+[A-Z]$'
-        mut_prog = re.compile(mut_regexp)
-        split_regexp = '\s+|,'
-        split_prog = re.compile(split_regexp)
         responses = []
         mutations = []
         do_cancer_type = False
@@ -209,27 +260,35 @@ class cBioPortal(DynamicSource, object):
             do_genomic_coordinates = True
 
         for cancer_study_id, short_desc, long_desc, cancer_study_isoform in self._cache_cancer_studies:
-            print "doing ", cancer_study_id, time.strftime('%x %X')
+            self.log.debug("fetching profile data for study %s" % cancer_study_id)
             if do_cancer_type:
                 cancer_study_suffix = cancer_study_id.split("_")[0]
                 try:
                     cancer_type = self._cancer_types[cancer_study_suffix]
                 except KeyError:
+                    self.log.error("cancer type %s not found - cancer study will be used instead")
                     cancer_type = cancer_study_suffix
+            cancer_study_mutation_ids =     [ x[0] for x in self._cache_genetic_profiles[cancer_study_id] if x[1] == 'MUTATION' ]
+            cancer_study_mutation_ext_ids = [ x[0] for x in self._cache_genetic_profiles[cancer_study_id] if x[1] == 'MUTATION_EXTENDED' ]
+
             for case_set in self._cache_case_sets[cancer_study_id]:
-                print "    doing", case_set, time.strftime('%x %X')
-                cancer_study_mutation_ids = [x[0] for x in self._cache_genetic_profiles[cancer_study_id] if x[1] == 'MUTATION']
+                self.log.debug("doing case set %s for genetic profiles %s" % (case_set, ",".join(cancer_study_mutation_ids)))
                 if len(cancer_study_mutation_ids) > 0:
-                    response = rq.post(self._requests_url, {'cmd':'getProfileData',
-                                                            'case_set_id':case_set,
-                                                            'genetic_profile_id':",".join(cancer_study_mutation_ids),
-                                                            'gene_list':gene_id}).text
+                    try:
+                        response = rq.post(self._requests_url, {'cmd':'getProfileData',
+                                                                'case_set_id':case_set,
+                                                                'genetic_profile_id':",".join(cancer_study_mutation_ids),
+                                                                'gene_list':gene_id}).text
+                    except:
+                        log.error("failed to fetch profile data for these case set and genetic profiles")
+                        return None
 
                     for line in response.strip().split("\n"):
                         if not line.startswith("#") and not line.startswith("GENE_ID"):
                             tmp = split_prog.split(line)[2:]
                             tmp2 = filter(lambda x: x != 'NaN', tmp)
                             tmp3 = filter(lambda x: mut_prog.match(x), tmp2)
+                            fixed_isoform = [self._convert_isoform(m, mainisoform, cancer_study_isoform, mapisoform) for m in tmp3]
                             mutations.extend(tmp3)
                             if do_cancer_type:
                                 out_metadata['cancer_type'].extend([[cancer_type]]*len(tmp3))
@@ -237,14 +296,20 @@ class cBioPortal(DynamicSource, object):
                                 out_metadata['cancer_study'].extend([[cancer_study_id]]*len(tmp3))
                             if do_genomic_coordinates:
                                 out_metadata['genomic_coordinates'].extend([None]*len(tmp3))
+                else:
+                    self.log.debug("no mutations found in this case set")
 
+                self.log.debug("doing case set %s for genetic profiles %s" % (case_set, ",".join(cancer_study_mutation_ids)))
+                if len(cancer_study_mutation_ext_ids) > 0:
+                    try:
+                        response = rq.post(self._requests_url, {'cmd':'getMutationData',
+                                                                'case_set_id':case_set,
+                                                                'genetic_profile_id':",".join(cancer_study_mutation_ext_ids),
+                                                                'gene_list':gene_id}).text
+                    except:
+                        log.error("failed to fetch profile data for these case set and genetic profiles")
+                        return None
 
-                cancer_study_mutation_ids = [x[0] for x in self._cache_genetic_profiles[cancer_study_id] if x[1] == 'MUTATION_EXTENDED']
-                if len(cancer_study_mutation_ids) > 0:
-                    response = rq.post(self._requests_url, {'cmd':'getMutationData',
-                                                            'case_set_id':case_set,
-                                                            'genetic_profile_id':",".join(cancer_study_mutation_ids),
-                                                            'gene_list':gene_id}).text
 
                     for line in response.strip().split("\n"):
                         if not line.startswith("#") and not line.startswith("entrez_gene_id") and line:
@@ -255,16 +320,9 @@ class cBioPortal(DynamicSource, object):
                                     continue
                             except:
                                 pass
-                            if not mut_prog.match(tmp[7]):
-                                continue
+                            if mut_prog.match(tmp[7]):
+                                mutations.append(self._convert_isoform(tmp[7], mainisoform, cancer_study_isoform, mapisoform))
 
-                            if cancer_study_isoform != mainisoform:
-                                resn = int(tmp[7][1:-1])
-                                tmp[7] = "%s%d%s" % (tmp[7][0], 
-                                                    mapisoform[cancer_study_isoform][resn],
-                                                    tmp[7][-1])
-                                print "        converting isoform, %d to %d" % (resn, mapisoform[cancer_study_isoform][resn])
-                            mutations.append(tmp[7])
                             gd = ['hg19', tmp[12], tmp[13], tmp[14], tmp[15]]
 
                             if do_cancer_type:
@@ -276,7 +334,19 @@ class cBioPortal(DynamicSource, object):
 
         return mutations, out_metadata
 
+    def _convert_isoform(self, mutation, main_isoform, alternate_isoform, mapping):
+        if main_isoform == alternate_isoform:
+            return mutation
+        self.log.debug("converting isoform from %d to %d (%s)" % (main_isoform, mainisoform, cancer_study_id, mutation))
+        converted_mutations = []
+        resn = int(mutation[1:-1])
+        converted = "%s%d%s" % (mutation[0], 
+                                mapisoform[cancer_study_isoform][resn],
+                                mutation[-1])
+        return converted
+
 class COSMIC(DynamicSource, object):
+    @logger_init
     def __init__(self, database_files=None, cancer_type=None):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v85', description=description)
@@ -291,6 +361,7 @@ class COSMIC(DynamicSource, object):
             self._mut_prog = re.compile(self._mut_regexp)
 
     def _get_all_cancer_types(self):
+        self.log.info("getting cancer types...")
         cancer_types = set()
         for f in self._database_files:
             with open(f) as fh:
@@ -321,6 +392,7 @@ class COSMIC(DynamicSource, object):
                         continue
 
                     if filter_snps and tmp[25] == 'y':
+                        self.log.info("mutation %s was filtered out as it is classified as SNP" % tmp[18])
                         continue
 
                     mut_str = tmp[18]
@@ -349,26 +421,37 @@ class COSMIC(DynamicSource, object):
 
         if cancer_types is None:
             cancer_types = self._get_all_cancer_types()
+            self.log.info("no cancer type specified; will use all of them")
         if use_alias is not None:
             gene_id = sequence.aliases[use_alias]
+            self.log.info("using alias %s as gene name" % sequence.aliases[use_alias])
         else:
             gene_id = sequence.gene_id
         raw_mutations, out_metadata = self._parse_db_file(gene_id, cancer_types=cancer_types, metadata=metadata)
         mutations = map(lambda x: x[2:], raw_mutations)
         unique_mutations = list(set(mutations))
-
-        print "Unique mutations found in %s: %s" % (self.name, ", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1]))))
+        self.log.info("unique mutations found in %s: %s" % (self.name, ", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1])))))
 
         for m in unique_mutations:
             wt = m[0]
             mut = m[-1]
             num = int(m[1:-1])
+
             if wt == mut:
+                self.log.info("synonymous mutation %s discarded" % m)
                 continue
-            site_seq_idx = sequence.seq2index(num)
+
+            try:
+                site_seq_idx = sequence.seq2index(num)
+            except:
+                self.log.warning("mutation %s is outside the protein sequence; it will be skipped")
+                continue
+
             position = sequence.positions[site_seq_idx]
+
             if position.wt_residue_type != wt:
-                print "WARNING: Skipping %s %s (it's %s in sequence!)" % (m, self.name, position.wt_residue_type)
+                self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
+                continue
 
             mutation_indices = [i for i, x in enumerate(mutations) if x == m]
 
@@ -376,7 +459,6 @@ class COSMIC(DynamicSource, object):
                                     mut,
                                     [self])
 
-            print mutation_indices
             for md in metadata:
                 mutation_obj.metadata[md] = []
                 for mi in mutation_indices:
@@ -386,6 +468,7 @@ class COSMIC(DynamicSource, object):
             position.add_mutation(mutation_obj)
 
 class PhosphoSite(DynamicSource, object):
+    @logger_init
     def __init__(self, database_file=None):
         description = "PhosphoSite Database"
         super(PhosphoSite, self).__init__(name='PhosphoSite', version='1.0', description=description)
@@ -417,7 +500,6 @@ class PhosphoSite(DynamicSource, object):
                     if p_prog.match(p_str):
                         p_sites.append(p_str[:self._ptm_suffix_offsets[ptm_idx]])
             sites[ptm] = p_sites
-
         return sites
 
     def add_position_properties(self, sequence):
@@ -429,15 +511,23 @@ class PhosphoSite(DynamicSource, object):
             for m in unique_p_sites:
                 wt = m[0]
                 site = int(m[1:])
-                site_seq_idx = sequence.seq2index(site)
+
+                try:
+                    site_seq_idx = sequence.seq2index(num)
+                except:
+                    self.log.warning("mutation %s is outside the protein sequence; it will be skipped")
+                    continue
+
                 position = sequence.positions[site_seq_idx]
                 if position.wt_residue_type != wt:
-                    print "Warning: %s is %s in sequence!)" % (m, position.wt_residue_type)
+                    self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
+                    continue
 
                 already_annotated = False
                 for prop in position.properties:
                     if isinstance(prop, position_properties_classes[ptm]):
                         prop.sources.append(self)
+                        self.log.info("site %s already annotated as %s; source will be added" % (m, position_properties_classes[ptm].name))
                         already_annotated = True
                 
                 if not already_annotated:
@@ -445,8 +535,10 @@ class PhosphoSite(DynamicSource, object):
                                                         position=sequence.positions[site_seq_idx]
                                                         )
                     position.add_property(property_obj)
+                    self.log.info("adding %s to site %s" % (m, property_obj.name))
 
 class MyVariant(DynamicSource, object):
+    @logger_init
     def __init__(self):
         description = "MyVariant.Info Database"
         super(MyVariant, self).__init__(name='MyVariant', version='1,0', description=description)
@@ -464,6 +556,7 @@ class MyVariant(DynamicSource, object):
 
     def _get_revel(self, mutation):
         if 'genomic_coordinates' not in mutation.metadata.keys():
+            self.log.warning("no genomic coordiantes for mutation %s; it will be skipped" % mutation)
             return False
 
         mutation.metadata['revel_score'] = list()
@@ -471,57 +564,78 @@ class MyVariant(DynamicSource, object):
         gcs = list(set(mutation.metadata['genomic_coordinates']))
 
         for gc in gcs:
-            print "adding revel to %s" % mutation
             if gc.coord_start != gc.coord_end:
+                self.log.warning("mutation %s has more than one nucleotide change; it will be skipped" % mutation)
                 continue
             if gc.genome_version == 'hg38':
+                self.log.info("mutation %s has genomic data in hg38 assembly - will be converted to hg19" % mutation)
                 converted_coords = self._lo.convert_coordinate('chr%s' % gc.chr, int(gc.coord_start))
                 assert len(converted_coords) == 1
                 converted_coords = (converted_coords[0][0], converted_coords[0][1])
             elif gc.genome_version == 'hg19':
                 converted_coords = ('chr%s' % gc.chr, int(gc.coord_start))
             else:
+                self.log.error("genomic coordinates are not expressed either in hg38 or hg19 for mutation %s; it will be skipped" % mutation)
                 return False
 
             query_str = 'chr%s:%d' % converted_coords
             query = self._mv.query(query_str)
             hits = query['hits']
             if len(hits) < 1:
+                self.log.warning("no DBnsfp hits for mutation %s; it will be skipped" % mutation)
                 continue
-            revel_score = None
+            else:
+                self.log.info("%d DBnsfp hits for mutation %s" % (len(hits), mutation))
+            revel_scores = []
             for hit in hits:
                 try:
-                    if not mutation.sequence_position.sequence_position == hit['dbnsfp']['aa']['pos'] and \
-                        not mutation.sequence_position.wt_residue_type   == hit['dbnsfp']['aa']['ref']:
-                        raise TypeError
+                    hit_pos = hit['dbnsfp']['aa']['pos']
+                    hit_ref = hit['dbnsfp']['aa']['ref']
+                    hit_alt = hit['dbnsfp']['aa']['alt']
                 except KeyError:
+                    self.log.warning("no residue information was found in DBsnfp hit. It will be skipped")
                     continue
-                except TypeError:
+
+                if not mutation.sequence_position.wt_residue_type == hit['dbnsfp']['aa']['ref']:
+                    self.log.warning("reference residue in revel does not correspond; it will be skipped")
+                    continue
+
+                if not mutation.sequence_position.sequence_position == hit_pos:
                     try:
-                        if not mutation.sequence_position.sequence_position in map(int, hit['dbnsfp']['aa']['pos']) and \
-                            not mutation.sequence_position.wt_residue_type   == hit['dbnsfp']['aa']['ref']:
+                        if not mutation.sequence_position.sequence_position in map(int, hit['dbnsfp']['aa']['pos']):
                             raise TypeError
-                    except KeyError:
+                    except:
+                        self.log.warning("sequence position in revel does not correspond for this hit; it will be skipped")
                         continue
-                    except TypeError:
-                        continue
-                
+
+                if mutation.mutated_residue_type != hit_alt:
+                    self.log.info("protein mutation in revel does not correspond for this hit; it will be skipped")
+                    continue
+
                 revel_score = None
-                if mutation.mutated_residue_type == hit['dbnsfp']['aa']['alt']:
-                    try:
-                        revel_score = hit['dbnsfp']['revel']['score']
-                    except KeyError:
-                        continue
+                try:
+                    revel_score = hit['dbnsfp']['revel']['score']
+                except KeyError:
+                    self.log.warning("no revel score found for mutation %s in this hit; it will be skipped" % mutation)
+                    continue
 
-                if revel_score:
-                    break
+                revel_scores.append(revel_score)
 
-            if not revel_score:
+            revel_scores = list(set(revel_scores))
+            if len(revel_scores) > 1:
+                self.log.warning("more than one revel score found; it will be skipped (%s)" % ", ".join(['%.3f' % i for i in revel_scores]))
                 return False
+            elif len(revel_scores) == 0:
+                self.log.warning("no revel found at all for mutation %s" % mutation)
+                return False
+            else:
+                revel_md = DbnsfpRevel(source=self, score=revel_score)
 
-            revel_md = DbnsfpRevel(source=self, score=revel_score)
-            mutation.metadata['revel_score'] = [revel_md]
-            return True
+                mutation.metadata['revel_score'].append(revel_md)
+
+        mutation.metadata['revel_score'] = list(set(mutation.metadata['revel_score']))
+        self.log.info("found revel scores for mutation %s: %s" % (mutation, ", ".join(["%.3f"%i.score for i in mutation.metadata['revel_score']])))
+        return True
 
 class ELMDatabase(DynamicSource, object):
     def __init__(self):
@@ -545,10 +659,10 @@ class ELMDatabase(DynamicSource, object):
         pass
 
 class ELMPredictions(DynamicSource, object):
+    @logger_init
     def __init__(self):
         description = "ELM Prediction"
         super(ELMPredictions, self).__init__(name='ELM', version='1.0', description=description)
-
 
         self._classes_url  = "http://elm.eu.org/elms/"
         self._requests_url = "http://elm.eu.org/start_search/"
@@ -557,8 +671,12 @@ class ELMPredictions(DynamicSource, object):
     def _get_elm_classes(self):
         self._elm_classes = {}
         unquote = lambda x: str.strip(x, '"')
-
-        response = rq.get(self._classes_url+'/elms_index.tsv').text
+        self.log.info("retrieving ELM classes")
+        try:
+            response = rq.get(self._classes_url+'/elms_index.tsv').text
+        except:
+            self.log.error("couldn't retrieve ELM classes")
+            return
         tmp = response.split("\n")
         for line in tmp:
             if line.startswith('"ELME'):
@@ -568,7 +686,12 @@ class ELMPredictions(DynamicSource, object):
                 self._elm_classes[tmp2[1]] = tmp2[2:]
 
     def _get_prediction(self, gene_name):
-        req_url = os.path.join(self._requests_url, gene_name) + ".tsv"
+        self.log.info("retrieving prediction for %s" % gene_name )
+        try:
+            req_url = os.path.join(self._requests_url, gene_name) + ".tsv"
+        except:
+            self.log.error("couldn't fetch ELM predictions")
+            return None
 
         out = []
         response = rq.get(req_url).text
@@ -587,35 +710,36 @@ class ELMPredictions(DynamicSource, object):
         return out
 
     def add_sequence_properties(self, sequence, exclude_elm_classes='{100}', use_alias=None):
-
+        self.log.info("adding ELM predictions to sequence ...")
         if use_alias is None:
             data = self._get_prediction(sequence.gene_id)
         else:
+            self.log.info("will use alias %s as gene name" % sequence.aliases[use_alias])
             data = self._get_prediction(sequence.aliases[use_alias])
 
         for d in data:
             if d[5]:
+                self.log.info("%s was filtered out by ELM")
                 continue
 
             if re.match(exclude_elm_classes, d[0]):
+                self.log.info("%s was filtered out as requested" % d[0])
                 continue
 
             this_positions = []
             for p in range(d[1],d[2]+1):
                 this_positions.append(sequence.positions[sequence.seq2index(p)])
 
-            if True:
-                property_obj = sequence_properties_classes['linear_motif']  (sources=[self],
-                                                             positions=this_positions,
-                                                             lmtype=self._elm_classes[d[0]][0])
+            property_obj = sequence_properties_classes['linear_motif']  (sources=[self],
+                                                                         positions=this_positions,
+                                                                         lmtype=self._elm_classes[d[0]][0])
 
-            else:
-                continue
             property_obj.metadata['function'] = [self._elm_classes[d[0]][0]]
             property_obj.metadata['ref']      = self.description
             sequence.add_property(property_obj)
 
 class ManualAnnotation(StaticSource):
+    @logger_init
     def __init__(self, datafile, csvoptions=None):
         description="Annotations from %s" % datafile
         super(ManualAnnotation, self).__init__(name='Manual annotations', version='', description=description)
@@ -624,17 +748,24 @@ class ManualAnnotation(StaticSource):
         fh = open(self._datafile, 'rb')
         if csvoptions is None:
             csvoptions = {}
-        self._csv = csv.reader(fh, **csvoptions)
+        try:
+            self._csv = csv.reader(fh, **csvoptions)
+        except:
+            log.error("")
         self._table = None
 
     def _parse_datafile(self):
+        self.log.info("Parsing annotations from %s" % self._datafile)
         out = [] # type seq type function ref
         ptm_keywords = ['cleavage', 'phosphorylation', 'ubiquitination', 'acetylation', 'sumoylation', 's-nitrosylation', 'methylation']
         for idx,row in enumerate(self._csv):
+            row_number = idx+1
             if len(row) < 5:
+                self.log.warning("row %d has less than 5 columns and will be skipped. You need at least 5 columns to be present." % row_number)
                 continue
             if   row[2] in ptm_keywords:
                 this_row = [row[2], tuple([int(row[1])]), row[0], row[3], row[4]]
+                self.log.info("added %s from row %d" % (row[2], row_number))
             elif row[2] == 'linear_motif':
                 this_row = [row[2]]
                 if '-' in row[1]:
@@ -642,10 +773,13 @@ class ManualAnnotation(StaticSource):
                     this_row.append(tuple(range(tmp[0], tmp[1]+1)))
                 else:
                     this_row.append( (int(row[1]) ))
+                self.log.info("added %s from row %d" % (row[2], row_number))
                 this_row.extend([row[0], row[3], row[4]])
             elif row[2] == 'mutation':
                 this_row = [ row[2], tuple([int(row[1][1:-1])]), row[1], row[0], row[3], row[4] ]
+                self.log.info("added %s from row %d" % (row[2], row_number))
             else:
+                self.log.warning("no recognized keyword was found in column 3 and row %d will be skipped." % row_number)
                 continue
 
             out.append(tuple(this_row))
@@ -655,22 +789,33 @@ class ManualAnnotation(StaticSource):
     def add_mutations(self, sequence):
         if self._table is None:
             self._parse_datafile()
+        else:
+            self.log.info("datafile information has already been parsed - won't be re-read")
 
         mutations = [d[2] for d in self._table if d[0] == 'mutation']
         unique_mutations = list(set(mutations))
 
-        print "Unique mutations found in %s: %s" % (self.name, ", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1]))))
+        self.log.info("unique mutations found in datafile: %s" % (", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1])))))
 
         for m in unique_mutations:
             wt = m[0]
             mut = m[-1]
             num = int(m[1:-1])
+
             if wt == mut:
+                self.log.info("synonymous mutation %s discarded" % m)
                 continue
-            site_seq_idx = sequence.seq2index(num)
+
+            try:
+                site_seq_idx = sequence.seq2index(num)
+            except:
+                self.log.warning("mutation %s is outside the protein sequence; it will be skipped")
+                continue
+
             position = sequence.positions[site_seq_idx]
+
             if position.wt_residue_type != wt:
-                print "WARNING: Skipping %s %s (it's %s in sequence!)" % (m, self.name, position.wt_residue_type)
+                self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
                 continue
 
             mutation_indices = [i for i, x in enumerate(mutations) if x == m]
@@ -684,6 +829,8 @@ class ManualAnnotation(StaticSource):
     def add_position_properties(self, sequence):
         if self._table is None:
             self._parse_datafile()
+        else:
+            self.log.info("datafile information has already been parsed - won't be re-read")
 
         for d in self._table:
             this_position = sequence.positions[sequence.seq2index(d[1][0])]
@@ -693,6 +840,7 @@ class ManualAnnotation(StaticSource):
                                                                  position=this_position)
                 assert len(d[1]) == 1
             except KeyError:
+                self.log.warning("property %s is not a valid position property; row will be skipped" % d[0])
                 continue
 
             property_obj.metadata['function'] = [d[3]]
@@ -702,6 +850,8 @@ class ManualAnnotation(StaticSource):
     def add_sequence_properties(self, sequence):
         if self._table is None:
             self._parse_datafile()
+        else:
+            self.log.info("datafile information has already been parsed - won't be re-read")
 
         for d in self._table:
             this_positions = []
@@ -713,10 +863,9 @@ class ManualAnnotation(StaticSource):
                                                              positions=this_positions,
                                                              lmtype=d[2])
             except KeyError:
+                self.log.warning("property %s is not a valid sequence property; row will be skipped" % d[0])
                 continue
+
             property_obj.metadata['function'] = [d[3]]
             property_obj.metadata['ref']      = [d[4]]
             sequence.add_property(property_obj)
-
-
-
