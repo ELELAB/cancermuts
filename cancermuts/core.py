@@ -25,13 +25,20 @@ and its mutations.
 """
 
 import csv
+import logging
 from .metadata import *
 from .properties import *
+from .log import logger_init
 
 class Sequence(object):
-    def __init__(self, gene_id, sequence, source):
+
+    @logger_init
+    def __init__(self, gene_id, sequence, source, aliases=None):
         self.gene_id = gene_id
-        self.aliases = {}
+        if aliases is None:
+            self.aliases = {}
+        else:
+            self.aliases = aliases
         self.source = source
         self.sequence = sequence
         self.positions = []
@@ -56,10 +63,16 @@ class Sequence(object):
     def add_property(self, prop):
         if self.properties.has_key(prop.category):
             self.properties[prop.category].append(prop)
+            add_type = "appending"
+            self.log.debug("adding property %s to sequence of %s (appeding)" % (str(prop), self.gene_id))
         else:
             self.properties[prop.category] = [prop]
+            add_type = "new category"
+            self.log.debug("adding property %s to sequence of %s (%s)" % (str(prop), self.gene_id, add_type))
+
 
 class SequencePosition(object):
+    @logger_init
     def __init__(self, wt_residue_type, sequence_position, mutations=None, properties=None):
         self.wt_residue_type = wt_residue_type
         self.sequence_position = sequence_position
@@ -70,20 +83,29 @@ class SequencePosition(object):
     
     def add_mutation(self, mut):
         if mut not in self.mutations:
+
             #print "appendo da capo"
             self.mutations.append(mut)
             #print self.mutations[-1].metadata
+            self.log.info("Adding mutation %s to position %s" % (str(mut), self.__repr__()))
         else:
-            print "aggiungo"
+            self.log.info("Mutation %s already in position %s; will just add sources and metadata" % (str(mut), self.__repr__()))
             pos = self.mutations.index(mut)
             self.mutations[pos].sources.extend(mut.sources)
             for k in mut.metadata.keys():
                 if k in self.mutations[pos].metadata.keys():
                     self.mutations[pos].metadata[k].extend(mut.metadata[k])
+                    self.log.debug("    metadata %s was extended" % k)
                 else:
                     self.mutations[pos].metadata[k] = mut.metadata[k]
+                    self.log.debug("    metadata %s was added anew" % k)
 
     def add_property(self, prop):
+        if prop.category in self.properties.keys():
+            self.log.info("property %s was replaced with %s" % (self.properties[prop.category], prop))
+        else:
+            self.log.info("added property %s" % str(prop))
+
         self.properties[prop.category] = prop
 
     def __repr__(self):
@@ -91,6 +113,7 @@ class SequencePosition(object):
 
 
 class Mutation(object):
+    @logger_init
     def __init__(self, sequence_position, mutated_residue_type, sources=None, metadata=None):
 
         self.sequence_position = sequence_position
@@ -215,7 +238,6 @@ class MetaTable(object):
 
                     for pos in positions:
                         property_rows[property_name][self.sequence.seq2index(pos.sequence_position)].append(cat_str)
-
 
                 for i,p in enumerate(property_rows[property_name]):
                     indices = [j for j, x in enumerate(positions_mutlist) if x == i]
