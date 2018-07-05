@@ -29,7 +29,10 @@ logger_name = 'cancermuts'
 date_format = "%d/%m/%Y,%H:%M"
 message_format = "%(asctime)s %(levelname)s [%(name)s]> %(message)s"
 
-def start_logging(logfile=None, level=logging.DEBUG, format=message_format, datefmt=date_format):
+def start_logging(logfile=None, level=logging.DEBUG, format=message_format, datefmt=date_format, silence_libs=True):
+	if silence_libs:
+		logging.getLogger("urllib3").setLevel(logging.WARNING)
+		logging.getLogger("requests").setLevel(logging.WARNING)
 	if logfile is not None:
 		logging.basicConfig(filename=logfile, level=level, format=format, datefmt=datefmt)
 	else:
@@ -40,7 +43,7 @@ def start_logging(logfile=None, level=logging.DEBUG, format=message_format, date
 
 def logger_init(function):
 	def wrapper(*args, **kwargs):
-		function(*args, **kwargs)
 		this_self = args[0]
 		this_self.log = logging.getLogger('.'.join([logger_name, this_self.__class__.__name__]))
+		function(*args, **kwargs)
 	return wrapper
