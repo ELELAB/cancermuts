@@ -139,9 +139,10 @@ class cBioPortal(DynamicSource, object):
             for md in metadata:
                 mutation_obj.metadata[md] = []
                 for mi in mutation_indices:
-                    tmp_md = [self] + out_metadata[md][mi]
-                    this_md = metadata_classes[md](*tmp_md)
-                    mutation_obj.metadata[md].append(this_md)
+                    if out_metadata[md][mi] is not None:
+                        tmp_md = [self] + out_metadata[md][mi]
+                        this_md = metadata_classes[md](*tmp_md)
+                        mutation_obj.metadata[md].append(this_md)
 
             self.log.debug("adding mutation %s" % str(mutation_obj))
             sequence.positions[site_seq_idx].add_mutation(mutation_obj)
@@ -258,6 +259,10 @@ class cBioPortal(DynamicSource, object):
         if 'genomic_coordinates' in metadata:
             out_metadata['genomic_coordinates'] = []
             do_genomic_coordinates = True
+        do_genomic_mutations = False
+        if 'genomic_mutations' in metadata:
+            out_metadata['genomic_mutations'] = []
+            do_genomic_mutations = True
 
         for cancer_study_id, short_desc, long_desc, cancer_study_isoform in self._cache_cancer_studies:
             self.log.debug("fetching profile data for study %s" % cancer_study_id)
@@ -295,7 +300,9 @@ class cBioPortal(DynamicSource, object):
                             if do_cancer_study:
                                 out_metadata['cancer_study'].extend([[cancer_study_id]]*len(tmp3))
                             if do_genomic_coordinates:
-                                out_metadata['genomic_coordinates'].extend([None]*len(tmp3))
+                                out_metadata['genomic_coordinates'].extend([[None]]*len(tmp3))
+                            if do_genomic_mutations:
+                                out_metadata['genomic_mutations'].extend([[None]]*len(tmp3))
                 else:
                     self.log.debug("no mutations found in this case set")
 
@@ -307,9 +314,8 @@ class cBioPortal(DynamicSource, object):
                                                                 'genetic_profile_id':",".join(cancer_study_mutation_ext_ids),
                                                                 'gene_list':gene_id}).text
                     except:
-                        log.error("failed to fetch profile data for these case set and genetic profiles")
+                        self.log.error("failed to fetch profile data for these case set and genetic profiles")
                         return None
-
 
                     for line in response.strip().split("\n"):
                         if not line.startswith("#") and not line.startswith("entrez_gene_id") and line:
@@ -320,10 +326,17 @@ class cBioPortal(DynamicSource, object):
                                     continue
                             except:
                                 pass
+
                             if mut_prog.match(tmp[7]):
                                 mutations.append(self._convert_isoform(tmp[7], mainisoform, cancer_study_isoform, mapisoform))
 
                             gd = ['hg19', tmp[12], tmp[13], tmp[14], tmp[15]]
+                            
+                            if tmp[13] != tmp[14]:
+                                self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
+                                gm = None
+                            else:
+                                gm = [gd[0], gd[1], gd[2], gd[4], tmp[16]]
 
                             if do_cancer_type:
                                 out_metadata['cancer_type'].append([cancer_type])
@@ -331,6 +344,9 @@ class cBioPortal(DynamicSource, object):
                                 out_metadata['cancer_study'].append([cancer_study_id])
                             if do_genomic_coordinates:
                                 out_metadata['genomic_coordinates'].append(gd)
+                            if do_genomic_mutations:
+                                out_metadata['genomic_mutations'].append(gm)
+
 
         return mutations, out_metadata
 
@@ -382,6 +398,10 @@ class COSMIC(DynamicSource, object):
         do_genomic_coordinates = False
         if 'genomic_coordinates' in metadata:
             do_genomic_coordinates = True
+        do_genomic_mutations = False
+        if 'genomic_mutations' in metadata:
+            do_genomic_mutations = True
+
 
         for f in self._database_files:
             with open(f) as fh:
@@ -400,20 +420,31 @@ class COSMIC(DynamicSource, object):
                         mutations.append(mut_str)
                         if do_cancer_type:
                             out_metadata['cancer_type'].append([tmp[11]])
-                        if do_genomic_coordinates:
+                        if do_genomic_coordinates or do_genomic_mutations:
                             gd = []
                             if tmp[22] == '38':
                                 gd.append('hg38') # genome version
                             elif tmp[22] == '37':
                                 gd.append('hg19')
                             else:
-                                out_metadata['genomic_coordinates'].append(['', '', '', '', ''])
+                                out_metadata['genomic_coordinates'].append(None)
                                 continue
                             tmp2 = tmp[23].split(":")
                             gd.append(tmp2[0]) # chr
                             gd.extend(tmp2[1].split("-")) # [start, end]
                             gd.append(tmp[17][-3]) # ref
+
+                        if do_genomic_coordinates:
                             out_metadata['genomic_coordinates'].append(gd)
+
+                        if do_genomic_mutations:
+                            if gd[2] != gd[3]:
+                                self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
+                                gm = None
+                            else:
+                                gm = [gd[0], gd[1], gd[2], gd[4], tmp[17][-1]]
+                            out_metadata['genomic_mutations'].append(gm)
+
 
         return mutations, out_metadata
 
@@ -462,9 +493,10 @@ class COSMIC(DynamicSource, object):
             for md in metadata:
                 mutation_obj.metadata[md] = []
                 for mi in mutation_indices:
-                    tmp_md = [self] + out_metadata[md][mi]
-                    this_md = metadata_classes[md](*tmp_md)
-                    mutation_obj.metadata[md].append(this_md)
+                    if out_metadata[md][mi] is not None:
+                        tmp_md = [self] + out_metadata[md][mi]
+                        this_md = metadata_classes[md](*tmp_md)
+                        mutation_obj.metadata[md].append(this_md)
             position.add_mutation(mutation_obj)
 
 class PhosphoSite(DynamicSource, object):

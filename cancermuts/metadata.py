@@ -115,6 +115,44 @@ class GenomicCoordinates(Metadata):
     def __hash__(self):
         return hash((self.source, self.chr, self.coord_start, self.coord_end, self.ref, self.genome_version))
 
+class GenomicMutation(Metadata):
+
+    description = "Genomic mutation"
+
+    allowed_bases = ['A', 'C', 'G', 'T']
+
+    def __init__(self, source, genome_version, chromosome, coord, wt, mut):
+        super(GenomicMutation, self).__init__(source)
+        if mut not in self.allowed_bases or wt not in self.allowed_bases:
+            raise TypeError
+        self.genome_version = genome_version
+        self.chr = chromosome
+        self.coord = coord
+        self.wt = wt
+        self.mut = mut
+
+    def get_value(self):
+        return [self.genome_version, self.chr, self.coord, self.wt, self.mut]
+
+    def get_value_str(self):
+        return "%s,chr%s:%s%s>%s" % (self.genome_version, self.chr, self.coord, self.wt, self.mut)
+
+    def __repr__(self):
+        return "<GenomicMutation %s from %s>" % (self.get_value_str(), self.source.name)
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        return self.source == other.source and \
+        self.chr == other.chr and \
+        self.coord == other.coord and \
+        self.wt == other.wt and \
+        self.mut == other.mut
+
+    def __hash__(self):
+        return hash((self.source, self.chr, self.coord, self.wt, self.mut))
+
 class DbnsfpRevel(Metadata):
 
     description = "Revel score"
@@ -143,7 +181,8 @@ class DbnsfpRevel(Metadata):
     def __hash__(self):
         return hash((self.source, self.score))
 
-metadata_classes = {'cancer_type' : CancerType,
-                    'cancer_study' : CancerStudy,
-                    'genomic_coordinates': GenomicCoordinates,
-                    'revel_score' : DbnsfpRevel}
+metadata_classes = {'cancer_type'         : CancerType,
+                    'cancer_study'        : CancerStudy,
+                    'genomic_coordinates' : GenomicCoordinates,
+                    'genomic_mutations'   : GenomicMutation,
+                    'revel_score'         : DbnsfpRevel}
