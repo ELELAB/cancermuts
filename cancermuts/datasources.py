@@ -339,7 +339,6 @@ class cBioPortal(DynamicSource, object):
                                 gm = None
                             else:
                                 gm = [gd[0], gd[1], gd[2], gd[4], tmp[16]]
-                            print gm
 
                             if do_cancer_type:
                                 out_metadata['cancer_type'].append([cancer_type])
@@ -401,6 +400,10 @@ class COSMIC(DynamicSource, object):
         do_genomic_coordinates = False
         if 'genomic_coordinates' in metadata:
             do_genomic_coordinates = True
+        do_genomic_mutations = False
+        if 'genomic_mutations' in metadata:
+            do_genomic_mutations = True
+
 
         for f in self._database_files:
             with open(f) as fh:
@@ -419,20 +422,31 @@ class COSMIC(DynamicSource, object):
                         mutations.append(mut_str)
                         if do_cancer_type:
                             out_metadata['cancer_type'].append([tmp[11]])
-                        if do_genomic_coordinates:
+                        if do_genomic_coordinates or do_genomic_mutations:
                             gd = []
                             if tmp[22] == '38':
                                 gd.append('hg38') # genome version
                             elif tmp[22] == '37':
                                 gd.append('hg19')
                             else:
-                                out_metadata['genomic_coordinates'].append(['', '', '', '', ''])
+                                out_metadata['genomic_coordinates'].append(None)
                                 continue
                             tmp2 = tmp[23].split(":")
                             gd.append(tmp2[0]) # chr
                             gd.extend(tmp2[1].split("-")) # [start, end]
                             gd.append(tmp[17][-3]) # ref
+
+                        if do_genomic_coordinates:
                             out_metadata['genomic_coordinates'].append(gd)
+
+                        if do_genomic_mutations:
+                            if gd[2] != gd[3]:
+                                self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
+                                gm = None
+                            else:
+                                gm = [gd[0], gd[1], gd[2], gd[4], tmp[17][-1]]
+                            out_metadata['genomic_mutations'].append(gm)
+
 
         return mutations, out_metadata
 
@@ -481,9 +495,10 @@ class COSMIC(DynamicSource, object):
             for md in metadata:
                 mutation_obj.metadata[md] = []
                 for mi in mutation_indices:
-                    tmp_md = [self] + out_metadata[md][mi]
-                    this_md = metadata_classes[md](*tmp_md)
-                    mutation_obj.metadata[md].append(this_md)
+                    if out_metadata[md][mi] is not None:
+                        tmp_md = [self] + out_metadata[md][mi]
+                        this_md = metadata_classes[md](*tmp_md)
+                        mutation_obj.metadata[md].append(this_md)
             position.add_mutation(mutation_obj)
 
 class PhosphoSite(DynamicSource, object):
