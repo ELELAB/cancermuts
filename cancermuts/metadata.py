@@ -123,11 +123,11 @@ class GenomicMutation(Metadata):
 
     def __init__(self, source, genome_version, chromosome, coord, wt, mut):
         super(GenomicMutation, self).__init__(source)
+        if mut not in self.allowed_bases or wt not in self.allowed_bases:
+            raise TypeError
         self.genome_version = genome_version
         self.chr = chromosome
         self.coord = coord
-        if self.mut not in allowed_bases or self.wt not in allowed_bases:
-            raise TypeError
         self.wt = wt
         self.mut = mut
 
@@ -181,7 +181,8 @@ class DbnsfpRevel(Metadata):
     def __hash__(self):
         return hash((self.source, self.score))
 
-metadata_classes = {'cancer_type' : CancerType,
-                    'cancer_study' : CancerStudy,
-                    'genomic_coordinates': GenomicCoordinates,
-                    'revel_score' : DbnsfpRevel}
+metadata_classes = {'cancer_type'         : CancerType,
+                    'cancer_study'        : CancerStudy,
+                    'genomic_coordinates' : GenomicCoordinates,
+                    'genomic_mutations'   : GenomicMutation,
+                    'revel_score'         : DbnsfpRevel}
