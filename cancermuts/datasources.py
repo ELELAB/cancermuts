@@ -140,9 +140,7 @@ class cBioPortal(DynamicSource, object):
                 mutation_obj.metadata[md] = []
                 for mi in mutation_indices:
                     if out_metadata[md][mi] is not None:
-                        print out_metadata[md][mi]
                         tmp_md = [self] + out_metadata[md][mi]
-                        print tmp_md
                         this_md = metadata_classes[md](*tmp_md)
                         mutation_obj.metadata[md].append(this_md)
 
