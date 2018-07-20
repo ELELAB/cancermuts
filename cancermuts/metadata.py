@@ -23,6 +23,8 @@ Classes to handle metadata
 
 """
 
+from .log import logger_init
+
 class Metadata(object):
     def __init__(self, source):
         self.source = source
@@ -98,6 +100,9 @@ class GenomicCoordinates(Metadata):
     def get_value_str(self):
         return "%s,chr%s:%s-%s" % (self.genome_version, self.chr, self.coord_start, self.coord_end)
 
+    def get_coord(self):
+        return self.coord_start
+
     def __repr__(self):
         return "<GenomicCoordinates %s:%s-%s in %s from %s>" % (self.chr, self.coord_start, self.coord_end, self.genome_version, self.source.name)
 
@@ -121,7 +126,10 @@ class GenomicMutation(Metadata):
 
     allowed_bases = ['A', 'C', 'G', 'T']
 
-    def __init__(self, source, genome_version, chromosome, coord, wt, mut):
+    complementarity = {'A':'T', 'C':'G', 'G':'C', 'T':'A'}
+
+    @logger_init
+    def __init__(self, source, genome_version, chromosome, strand, coord, wt, mut):
         super(GenomicMutation, self).__init__(source)
         if mut not in self.allowed_bases or wt not in self.allowed_bases:
             raise TypeError
@@ -130,12 +138,31 @@ class GenomicMutation(Metadata):
         self.coord = coord
         self.wt = wt
         self.mut = mut
+        if strand == '':
+            self.log.info("strand will be defaulted to + for %s" % self)
+            strand = '+'
+        self.strand = strand
 
     def get_value(self):
-        return [self.genome_version, self.chr, self.coord, self.wt, self.mut]
+        return [self.genome_version, self.chr, self.coord, self.strand, self.wt, self.mut]
 
     def get_value_str(self):
-        return "%s,chr%s:%s%s>%s" % (self.genome_version, self.chr, self.coord, self.wt, self.mut)
+        return "%s,chr%s:%s%s>%s" % (self.genome_version, self.chr, self.coord, self.get_sense_wt(), self.get_sense_mut())
+
+    def get_coord(self):
+        return self.coord
+
+    def get_sense_wt(self):
+        return self._get_sense_base(self.wt)
+
+    def get_sense_mut(self):
+        return self._get_sense_base(self.mut)
+
+    def _get_sense_base(self, base):
+        if self.strand == '+':
+            return base
+        elif self.strand == '-':
+            return self.complementarity[base]
 
     def __repr__(self):
         return "<GenomicMutation %s from %s>" % (self.get_value_str(), self.source.name)
@@ -146,12 +173,13 @@ class GenomicMutation(Metadata):
     def __eq__(self, other):
         return self.source == other.source and \
         self.chr == other.chr and \
+        self.strand == other.strand and \
         self.coord == other.coord and \
         self.wt == other.wt and \
         self.mut == other.mut
 
     def __hash__(self):
-        return hash((self.source, self.chr, self.coord, self.wt, self.mut))
+        return hash((self.source, self.chr, self.strand, self.coord, self.wt, self.mut))
 
 class DbnsfpRevel(Metadata):
 
