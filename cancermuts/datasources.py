@@ -95,10 +95,15 @@ class UniProt(DynamicSource, object):
         return Sequence(gene_id, sequence, self, aliases=aliases)
 
 class cBioPortal(DynamicSource, object):
+
+    default_strand = '+'
+    
     @logger_init
     def __init__(self):
         description = "cBioPortal"
+
         super(cBioPortal, self).__init__(name='cBioPortal', version='1.0', description=description)
+
         self._requests_url = 'http://www.cbioportal.org/webservice.do'
         self._cache_cancer_studies = None
         self._cache_genetic_profiles = None
@@ -330,21 +335,19 @@ class cBioPortal(DynamicSource, object):
                             if mut_prog.match(tmp[7]):
                                 mutations.append(self._convert_isoform(tmp[7], mainisoform, cancer_study_isoform, mapisoform))
 
-                            gd = ['hg19', tmp[12], tmp[13], tmp[14], tmp[15]]
-                            
-                            if tmp[13] != tmp[14]:
-                                self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
-                                gm = None
-                            else:
-                                gm = [gd[0], gd[1], gd[2], gd[4], tmp[16]]
-
                             if do_cancer_type:
                                 out_metadata['cancer_type'].append([cancer_type])
                             if do_cancer_study:
                                 out_metadata['cancer_study'].append([cancer_study_id])
                             if do_genomic_coordinates:
+                                gd = ['hg19', tmp[12], tmp[13], tmp[14], tmp[15]]
                                 out_metadata['genomic_coordinates'].append(gd)
                             if do_genomic_mutations:
+                                if tmp[13] != tmp[14]:
+                                    self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
+                                    gm = None
+                                else:
+                                    gm = ['hg19', tmp[12], self.default_strand, gd[2], gd[4], tmp[16]]
                                 out_metadata['genomic_mutations'].append(gm)
 
 
@@ -442,7 +445,7 @@ class COSMIC(DynamicSource, object):
                                 self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
                                 gm = None
                             else:
-                                gm = [gd[0], gd[1], gd[2], gd[4], tmp[17][-1]]
+                                gm = [gd[0], gd[1], tmp[24], gd[2], gd[4], tmp[17][-1]]
                             out_metadata['genomic_mutations'].append(gm)
 
 
@@ -578,6 +581,7 @@ class MyVariant(DynamicSource, object):
         self._mv = myvariant.MyVariantInfo()
         self._lo = pyliftover.LiftOver('hg38', 'hg19')
 
+
     def add_metadata(self, sequence, md_type='revel'):
         if md_type == 'revel':
             add_this_metadata = self._get_revel
@@ -586,88 +590,157 @@ class MyVariant(DynamicSource, object):
             for mut in pos.mutations:
                 add_this_metadata(mut)
 
+
     def _get_revel(self, mutation):
-        if 'genomic_coordinates' not in mutation.metadata.keys():
-            self.log.warning("no genomic coordiantes for mutation %s; it will be skipped" % mutation)
-            return False
+
+        revel_score = None
 
         mutation.metadata['revel_score'] = list()
 
-        gcs = list(set(mutation.metadata['genomic_coordinates']))
+        if 'genomic_coordinates' not in mutation.metadata.keys() and 'genomic_mutations' not in mutation.metadata.keys():
+            self.log.warning("no genomic coordinates or genomic mutations data for mutation %s; it will be skipped" % mutation)
+            return False
 
-        for gc in gcs:
-            if gc.coord_start != gc.coord_end:
-                self.log.warning("mutation %s has more than one nucleotide change; it will be skipped" % mutation)
-                continue
-            if gc.genome_version == 'hg38':
-                self.log.info("mutation %s has genomic data in hg38 assembly - will be converted to hg19" % mutation)
-                converted_coords = self._lo.convert_coordinate('chr%s' % gc.chr, int(gc.coord_start))
-                assert len(converted_coords) == 1
-                converted_coords = (converted_coords[0][0], converted_coords[0][1])
-            elif gc.genome_version == 'hg19':
-                converted_coords = ('chr%s' % gc.chr, int(gc.coord_start))
-            else:
-                self.log.error("genomic coordinates are not expressed either in hg38 or hg19 for mutation %s; it will be skipped" % mutation)
+        if 'genomic_coordinates' in mutation.metadata.keys():
+            gcs = mutation.metadata['genomic_coordinates']
+        else:
+            self.log.warning("no genomic coordinates available for revel score, mutation %s" % mutation)
+            gcs = [None] * len(mutation.metadata['genomic_mutations'])
+
+        if 'genomic_mutations' in mutation.metadata.keys():
+            gms = mutation.metadata['genomic_mutations']
+        else:
+            self.log.warning("no genomic mutations available for revel score, mutation %s" % mutation)
+            gcs = [None] * len(mutation.metadata['genomic_coordinates'])
+
+        gcs_gms = zip(gcs, gms)
+
+        for gc,gm in gcs_gms:
+            if gm is not None:
+                self.log.info("genomic mutation will be used to retrieve revel score for mutation %s" % mutation)
+                revel_score = self._get_revel_from_gm(mutation, gm)
+            if gc is not None and revel_score is None:
+                self.log.info("genomic coordinates will be used to retrieve revel score for mutation %s" % mutation)
+                revel_score = self._get_revel_from_gc(mutation, gm)
+            if revel_score is None:
+                self.log.warning("mutations %s has no genomic coordinates or genomic mutation available; it will be skipped" % mutation)
+                return
+
+            mutation.metadata['revel_score'].append(revel_score)
+
+    def _validate_revel_hit(self, mutation, hit):
+
+        try:
+            hit_pos = hit['dbnsfp']['aa']['pos']
+            hit_ref = hit['dbnsfp']['aa']['ref']
+            hit_alt = hit['dbnsfp']['aa']['alt']
+        except KeyError:
+            self.log.warning("no residue information was found in the variant information; it will be skipped")
+            return False
+
+        if not mutation.sequence_position.wt_residue_type == hit['dbnsfp']['aa']['ref']:
+            self.log.warning("reference residue in revel does not correspond; it will be skipped")
+            return False
+
+        if not mutation.sequence_position.sequence_position == hit_pos:
+            try:
+                if not mutation.sequence_position.sequence_position in map(int, hit['dbnsfp']['aa']['pos']):
+                    raise TypeError
+            except:
+                self.log.warning("sequence position in revel does not correspond for this hit; it will be skipped")
                 return False
 
-            query_str = 'chr%s:%d' % converted_coords
-            query = self._mv.query(query_str)
-            hits = query['hits']
-            if len(hits) < 1:
-                self.log.warning("no DBnsfp hits for mutation %s; it will be skipped" % mutation)
-                continue
-            else:
-                self.log.info("%d DBnsfp hits for mutation %s" % (len(hits), mutation))
-            revel_scores = []
-            for hit in hits:
-                try:
-                    hit_pos = hit['dbnsfp']['aa']['pos']
-                    hit_ref = hit['dbnsfp']['aa']['ref']
-                    hit_alt = hit['dbnsfp']['aa']['alt']
-                except KeyError:
-                    self.log.warning("no residue information was found in DBsnfp hit. It will be skipped")
-                    continue
+        if mutation.mutated_residue_type != hit_alt:
+            self.log.info("protein mutation in revel does not correspond for this hit; it will be skipped")
+            return False
 
-                if not mutation.sequence_position.wt_residue_type == hit['dbnsfp']['aa']['ref']:
-                    self.log.warning("reference residue in revel does not correspond; it will be skipped")
-                    continue
-
-                if not mutation.sequence_position.sequence_position == hit_pos:
-                    try:
-                        if not mutation.sequence_position.sequence_position in map(int, hit['dbnsfp']['aa']['pos']):
-                            raise TypeError
-                    except:
-                        self.log.warning("sequence position in revel does not correspond for this hit; it will be skipped")
-                        continue
-
-                if mutation.mutated_residue_type != hit_alt:
-                    self.log.info("protein mutation in revel does not correspond for this hit; it will be skipped")
-                    continue
-
-                revel_score = None
-                try:
-                    revel_score = hit['dbnsfp']['revel']['score']
-                except KeyError:
-                    self.log.warning("no revel score found for mutation %s in this hit; it will be skipped" % mutation)
-                    continue
-
-                revel_scores.append(revel_score)
-
-            revel_scores = list(set(revel_scores))
-            if len(revel_scores) > 1:
-                self.log.warning("more than one revel score found; it will be skipped (%s)" % ", ".join(['%.3f' % i for i in revel_scores]))
-                return False
-            elif len(revel_scores) == 0:
-                self.log.warning("no revel found at all for mutation %s" % mutation)
-                return False
-            else:
-                revel_md = DbnsfpRevel(source=self, score=revel_score)
-
-                mutation.metadata['revel_score'].append(revel_md)
-
-        mutation.metadata['revel_score'] = list(set(mutation.metadata['revel_score']))
-        self.log.info("found revel scores for mutation %s: %s" % (mutation, ", ".join(["%.3f"%i.score for i in mutation.metadata['revel_score']])))
         return True
+
+    def _convert_hg38_to_hg19(self, gc):
+        if gc.genome_version == 'hg38':
+            self.log.info("%s has genomic data in hg38 assembly - will be converted to hg19" % gc)
+            converted_coords = self._lo.convert_coordinate('chr%s' % gc.chr, int(gc.get_coord()))
+            assert len(converted_coords) == 1
+            converted_coords = (converted_coords[0][0], converted_coords[0][1])
+        elif gc.genome_version == 'hg19':
+            converted_coords = ('chr%s' % gc.chr, int(gc.get_coord()))
+        else:
+            self.log.error("genomic coordinates are not expressed either in hg38 or hg19 for %s; it will be skipped" % gc)
+            converted_coords = None
+        return converted_coords
+
+    def _get_revel_from_gm(self, mutation, gm):
+
+        converted_coords = self._convert_hg38_to_hg19(gm)
+        if converted_coords is None:
+            return None
+
+        query_str = '%s:g.%d%s>%s' % (converted_coords[0], converted_coords[1], gm.get_sense_wt(), gm.get_sense_mut())
+
+        hit = self._mv.getvariant(query_str)
+
+        if hit is None:
+            self.log.error("variant %s was not found in MyVariant!" % query_str)
+            return None
+
+        if not self._validate_revel_hit(mutation, hit):
+            return None
+        
+        try:
+            revel_score = hit['dbnsfp']['revel']['score']
+        except KeyError:
+            self.log.warning("no revel score found for mutation %s in this hit; it will be skipped" % mutation)
+            return None
+
+        return DbnsfpRevel(source=self, score=revel_score)
+
+    def _get_revel_from_gc(self, mutation, gc):
+
+        found_scores = []
+
+        if gc.coord_start != gc.coord_end:
+            self.log.warning("mutation %s has more than one nucleotide change; it will be skipped" % mutation)
+            return None
+
+        converted_coords = self._convert_hg38_to_hg19(gm)
+        if converted_coords is None:
+            return None
+
+        query_str = 'chr%s:%d' % converted_coords
+        query = self._mv.query(query_str)
+        hits = query['hits']
+        if len(hits) < 1:
+            self.log.warning("no DBnsfp hits for mutation %s; it will be skipped" % mutation)
+            return None
+        else:
+            self.log.info("%d DBnsfp hits for mutation %s" % (len(hits), mutation))
+        revel_scores = []
+ 
+        for hit in hits:
+
+            revel_score = None
+
+            if not self._validate_revel_hit(mutation, hit):
+                continue
+
+            try:
+                revel_score = hit['dbnsfp']['revel']['score']
+            except KeyError:
+                self.log.warning("no revel score found for mutation %s in this hit; it will be skipped" % mutation)
+                return None
+
+            revel_scores.append(revel_score)
+
+        revel_scores = list(set(revel_scores))
+        if len(revel_scores) > 1:
+            self.log.warning("more than one revel score found; it will be skipped (%s)" % ", ".join(['%.3f' % i for i in revel_scores]))
+            return None
+        elif len(revel_scores) == 0:
+            self.log.warning("no revel scores found using genomic coordinates for mutation %s" % mutation)
+            return None
+        else:
+            revel_md = DbnsfpRevel(source=self, score=revel_score)
+            return revel_md
 
 class ELMDatabase(DynamicSource, object):
     def __init__(self):
@@ -901,3 +974,5 @@ class ManualAnnotation(StaticSource):
             property_obj.metadata['function'] = [d[3]]
             property_obj.metadata['ref']      = [d[4]]
             sequence.add_property(property_obj)
+
+
