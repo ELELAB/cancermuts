@@ -228,6 +228,8 @@ class MetaTable(object):
                 property_rows[p] = [[] for i in self.sequence.positions]
 
             for pidx, property_name in enumerate(sequence_properties):
+                if property_name not in self.sequence.properties.keys():
+                    continue
                 for i,p in enumerate(self.sequence.properties[property_name]):
                     if p.category=='linear_motif':
                         sources_str = ",".join(s.name for s in p.sources)
