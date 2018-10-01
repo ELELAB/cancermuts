@@ -24,6 +24,9 @@ Classes to handle metadata
 """
 
 from .log import logger_init
+import pyliftover
+
+lo_hg38_hg19 = pyliftover.LiftOver('hg38', 'hg19')
 
 class Metadata(object):
     def __init__(self, source):
@@ -146,9 +149,12 @@ class GenomicMutation(Metadata):
     def get_value(self):
         return [self.genome_version, self.chr, self.coord, self.strand, self.wt, self.mut]
 
-    def get_value_str(self):
-        return "%s,chr%s:%s%s>%s" % (self.genome_version, self.chr, self.coord, self.get_sense_wt(), self.get_sense_mut())
-
+    def get_value_str(self, fmt='csv'):
+        if fmt == 'csv':
+            return "%s,chr%s:%s%s>%s" % (self.genome_version, self.chr, self.coord, self.get_sense_wt(), self.get_sense_mut())
+        if fmt == 'exac':
+            return '%s-%s-%s-%s' % (self.chr, self.coord, self.get_sense_wt(), self.get_sense_mut())
+        return None
     def get_coord(self):
         return self.coord
 
@@ -163,6 +169,17 @@ class GenomicMutation(Metadata):
             return base
         elif self.strand == '-':
             return self.complementarity[base]
+
+    def as_hg19(self):
+        if self.genome_version == 'hg19':
+            return GenomicMutation(self.source, self.genome_version, self.chr, self.strand, self.coord, self.wt, self.mut)
+        elif self.genome_version == 'hg38':
+            converted_coords = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.get_coord()))
+            assert len(converted_coords) == 1
+            return GenomicMutation(self.source, 'hg19', converted_coords[0][0][3:], self.strand, converted_coords[0][1], self.wt, self.mut)
+        else:
+            raise TypeError
+
 
     def __repr__(self):
         return "<GenomicMutation %s from %s>" % (self.get_value_str(), self.source.name)
@@ -209,8 +226,70 @@ class DbnsfpRevel(Metadata):
     def __hash__(self):
         return hash((self.source, self.score))
 
-metadata_classes = {'cancer_type'         : CancerType,
-                    'cancer_study'        : CancerStudy,
-                    'genomic_coordinates' : GenomicCoordinates,
-                    'genomic_mutations'   : GenomicMutation,
-                    'revel_score'         : DbnsfpRevel}
+class ExACAlleleFrequency(Metadata):
+
+    description = "Allele Frequency (ExAC)"
+
+    def __init__(self, source, frequency):
+        super(ExACAlleleFrequency, self).__init__(source)
+        self.source = source
+        self.frequency = frequency
+
+    def get_value(self):
+        return self.frequency
+
+    def get_value_str(self):
+        return "%f" % self.frequency
+
+    def __repr__(self):
+        return "<ExACAlleleFrequency, %f>" % self.frequency
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        return self.source == other.source and \
+               self.frequency == other.frequency
+
+    def __hash__(self):
+        return hash((self.source, self.frequency))
+
+class ExACAFFilter(Metadata):
+
+    description = "Allele frequency filter (AF filter)"
+
+    def __init__(self, source, frequency_filter):
+        super(ExACAFFilter, self).__init__(source)
+        self.source = source
+        self.frequency_filter = frequency_filter
+
+    def get_value(self):
+        return self.frequency_filter
+
+    def get_value_str(self):
+        return "%f" % self.frequency_filter
+
+    def __repr__(self):
+        return "<ExacIsSNP, %f>" % self.frequency_filter
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        return self.source == other.source and \
+               self.frequency_filter == other.frequency_filter
+
+    def __hash__(self):
+        return hash((self.source, self.frequency_filter))
+
+
+
+metadata_classes = { 
+                     'cancer_type'           : CancerType,
+                     'cancer_study'          : CancerStudy,
+                     'genomic_coordinates'   : GenomicCoordinates,
+                     'genomic_mutations'     : GenomicMutation,
+                     'revel_score'           : DbnsfpRevel,
+                     'exac_allele_frequency' : ExACAlleleFrequency,
+                     'exac_af_filter'        : ExACAFFilter 
+                   }
