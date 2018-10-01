@@ -30,6 +30,7 @@ from .core import Sequence, Mutation
 from .properties import *
 from .metadata import *
 from .log import *
+import json
 import re
 import sys
 import os
@@ -550,12 +551,12 @@ class PhosphoSite(DynamicSource, object):
                 try:
                     site_seq_idx = sequence.seq2index(num)
                 except:
-                    self.log.warning("mutation %s is outside the protein sequence; it will be skipped")
+                    self.log.warning("PTM site %s is outside the protein sequence; it will be skipped")
                     continue
 
                 position = sequence.positions[site_seq_idx]
                 if position.wt_residue_type != wt:
-                    self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
+                    self.log.warning("for PTM %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
                     continue
 
                 already_annotated = False
@@ -581,14 +582,27 @@ class MyVariant(DynamicSource, object):
         self._mv = myvariant.MyVariantInfo()
         self._lo = pyliftover.LiftOver('hg38', 'hg19')
 
+        self._supported_metadata = {'revel_score' : self._get_revel}
 
-    def add_metadata(self, sequence, md_type='revel'):
-        if md_type == 'revel':
-            add_this_metadata = self._get_revel
+
+    def add_metadata(self, sequence, md_type=['revel_score']):
+        if type(md_type) is str:
+            md_types = [md_type]
+        else:
+            md_types = md_type
+
+        metadata_functions = []
+
+        for md_type in md_types:
+            try:
+                metadata_functions.append(self._supported_metadata[md_type])
+            except KeyError:
+                self.log.warning("MyVariant doesn't support metadata type %s" % md_type)
 
         for pos in sequence.positions:
             for mut in pos.mutations:
-                add_this_metadata(mut)
+                for add_this_metadata in metadata_functions:
+                    add_this_metadata(mut)
 
 
     def _get_revel(self, mutation):
@@ -611,7 +625,7 @@ class MyVariant(DynamicSource, object):
             gms = mutation.metadata['genomic_mutations']
         else:
             self.log.warning("no genomic mutations available for revel score, mutation %s" % mutation)
-            gcs = [None] * len(mutation.metadata['genomic_coordinates'])
+            gms = [None] * len(mutation.metadata['genomic_coordinates'])
 
         gcs_gms = zip(gcs, gms)
 
@@ -842,6 +856,125 @@ class ELMPredictions(DynamicSource, object):
             property_obj.metadata['function'] = [self._elm_classes[d[0]][0]]
             property_obj.metadata['ref']      = self.description
             sequence.add_property(property_obj)
+
+class ExAC(DynamicSource, object):
+    
+    @logger_init
+    def __init__(self):
+        description = "ExAC"
+
+        super(ExAC, self).__init__(name='ExAC', version='0.1', description=description)
+
+        self._requests_url = 'http://exac.broadinstitute.org/variant'
+        self._data_cache = {}
+        self._supported_metadata = {'exac_allele_frequency' : self._get_allele_freq,
+                                    'exac_af_filter'        : self._get_af_filter}
+
+    def add_metadata(self, sequence, md_type=['exac_allele_frequency','exac_af_filter']):
+        
+        self.log.debug("Adding metadata: " + ', '.join(md_type) )
+
+        if type(md_type) is str:
+            md_types = [md_type]
+        else:
+            md_types = md_type
+
+        metadata_functions = []
+
+        for md_type in md_types:
+            try:
+                metadata_functions.append(self._supported_metadata[md_type])
+            except KeyError:
+                self.log.warning("ExAC doesn't support metadata type %s" % md_type)
+
+        self.log.debug("collected metadata functions: %s" % ', '.join([i for i in metadata_functions.__repr__()]))
+
+        for pos in sequence.positions:
+            for mut in pos.mutations:
+                for i,add_this_metadata in enumerate(metadata_functions):
+                    mut.metadata[md_types[i]] = []
+    
+                if not 'genomic_mutations' in mut.metadata.keys():
+                    self.log.warning("no genomic mutation data available for Exac SNP, mutation %s. It will be skipped" % mut)
+                    continue
+                elif mut.metadata['genomic_mutations'] is None or len(mut.metadata['genomic_mutations']) == 0:
+                    self.log.warning("no genomic mutation data available for Exac SNP, mutation %s. It will be skipped" % mut)
+                    continue
+
+                for i,add_this_metadata in enumerate(metadata_functions):
+                    self.log.debug("adding metadata %s to %s" % (md_types[i], mut))
+                    add_this_metadata(mut)
+
+    def _get_allele_freq(self, mutation):
+        self.log.debug("getting allele frequency")
+        self._get_metadata(mutation, md_type='exac_allele_frequency')
+
+    def _get_af_filter(self, mutation):
+        self.log.debug("getting af filter")
+        self._get_metadata(mutation, md_type='exac_af_filter')
+
+
+    def _get_metadata(self, mutation, md_type):
+
+        exac_key = {    'exac_allele_frequency' : 'allele_freq', 
+                        'exac_af_filter'        : 'af_filter'       }
+
+        mutation.metadata[md_type] = list()
+
+        gcs = mutation.metadata['genomic_mutations']
+
+        for gc in gcs:
+            try:
+                exac = self._data_cache[gc]
+            except KeyError:
+                self._data_cache[gc] = self._get_exac_data(gc)
+
+            if self._data_cache[gc] is None:
+                #self.log.warning("data for variant %s couldn't be retrieved" % gc)
+                continue
+            
+            exac = self._data_cache[gc]
+
+            print mutation, gc, md_type, exac[exac_key[md_type]]
+            mutation.metadata[md_type].append(metadata_classes[md_type](self, exac[exac_key[md_type]]))
+
+    def _parse_exac_page(self, text):
+        for line in text.split('\n'):
+            if line.strip().startswith('window.variant = '):
+                data = json.loads(line.split(' = ')[1][:-1])
+                return data
+
+    def _get_exac_data(self, variant):
+        print type(variant)
+        if type(variant) is GenomicMutation:
+            v_str = variant.as_hg19().get_value_str(fmt='exac')
+        else:
+            v_str = variant
+
+        self.log.debug("variant string is %s" % v_str)  
+
+        try:
+            self.log.info("fetching %s" % '/'.join( [ self._requests_url, v_str ] ) )
+            request = rq.get('/'.join( [ self._requests_url, v_str ] ))
+        except:
+            self.log.error("Couldn't perform request for EXaC variant")
+            return None
+
+        if request.status_code == 404:
+            self.log.warning("the specified variant %s wasn't found on ExAC" % v_str)
+            return None
+        elif request.status_code == 200:
+            if True:
+                data = self._parse_exac_page(request.text)
+            else:
+                self.log.warning("Couldn't parse downloaded file for variant %s" % v_str)
+                return None
+        else:
+            self.log.error("The request for EXaC variant returneds an unexpected status code")
+            return None
+
+        return data
+
 
 class ManualAnnotation(StaticSource):
     @logger_init

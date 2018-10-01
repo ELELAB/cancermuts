@@ -215,9 +215,9 @@ class MetaTable(object):
                             md_str = "-"
                         this_row.append(md_str)
                     csv_rows.append(this_row)
-                    print "appending", gi
+                    #print "appending", gi
                     positions_mutlist.append(gi)
-                    print positions_mutlist
+                    #print positions_mutlist
                 if len(mut_strings_order) == 0:
                     this_row = list(base_row)
                     positions_mutlist.append(gi)
@@ -228,6 +228,8 @@ class MetaTable(object):
                 property_rows[p] = [[] for i in self.sequence.positions]
 
             for pidx, property_name in enumerate(sequence_properties):
+                if property_name not in self.sequence.properties.keys():
+                    continue    
                 for i,p in enumerate(self.sequence.properties[property_name]):
                     if p.category=='linear_motif':
                         sources_str = ",".join(s.name for s in p.sources)
