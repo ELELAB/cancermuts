@@ -208,15 +208,53 @@ class CleavageSite(PositionProperty):
     def get_value_str(self):
         return "C"
 
-position_properties_classes = {  'phosphorylation':PhosphorylationSite,
-                                 'methylation'    :MethylationSite,
-                                 'acetylation'    :AcetylationSite,
-				                 's-nitrosylation':SNitrosylationSite,
-                                 'OGalNAc'        :OGalNAcSite,
-                                 'OGlcNAc'        :OGlcNAcSite,
-                                 'sumoylation'    :SumoylationSite,
-                                 'ubiquitination' :UbiquitinationSite,
-                                 'cleavage'       :CleavageSite
+
+class DisorderPropensity(PositionProperty):
+
+    description = "Structural disorder"
+
+#   def __init__(self, name, category, position, sources=None, values=None, metadata=None):
+    def __init__(self, position, sources, disorder_state):
+        super(DisorderPropensity, self).__init__(name="Disorder Propensity",
+                                                 category='disorder_propensity',
+                                                 position=position,
+                                                 sources=sources,
+                                                 values={},
+                                                 metadata={})
+        self.disorder_propensity = disorder_state
+
+    def get_value(self):
+        return self.disorder_propensity
+
+    def get_value_str(self):
+        return self.disorder_propensity
+
+    def __repr__(self):
+        return "<StructuralDisorder, %s>" % self.disorder_propensity
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        return self.source == other.source and \
+               self.disorder_propensity == other.disorder_propensity
+
+    def __hash__(self):
+        return hash((self.source, self.disorder_propensity))
+
+
+
+
+position_properties_classes = {  'phosphorylation'            : PhosphorylationSite,
+                                 'methylation'                : MethylationSite,
+                                 'acetylation'                : AcetylationSite,
+				                 's-nitrosylation'            : SNitrosylationSite,
+                                 'OGalNAc'                    : OGalNAcSite,
+                                 'OGlcNAc'                    : OGlcNAcSite,
+                                 'sumoylation'                : SumoylationSite,
+                                 'ubiquitination'             : UbiquitinationSite,
+                                 'cleavage'                   : CleavageSite,
+                                 'mobidb_disorder_propensity' : DisorderPropensity  
                               }
 
 sequence_properties_classes = {  'linear_motif'    :LinearMotif

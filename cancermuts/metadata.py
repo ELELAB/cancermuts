@@ -283,13 +283,12 @@ class ExACAFFilter(Metadata):
         return hash((self.source, self.frequency_filter))
 
 
-
 metadata_classes = { 
-                     'cancer_type'           : CancerType,
-                     'cancer_study'          : CancerStudy,
-                     'genomic_coordinates'   : GenomicCoordinates,
-                     'genomic_mutations'     : GenomicMutation,
-                     'revel_score'           : DbnsfpRevel,
-                     'exac_allele_frequency' : ExACAlleleFrequency,
-                     'exac_af_filter'        : ExACAFFilter 
+                     'cancer_type'                 : CancerType,
+                     'cancer_study'                : CancerStudy,
+                     'genomic_coordinates'         : GenomicCoordinates,
+                     'genomic_mutations'           : GenomicMutation,
+                     'revel_score'                 : DbnsfpRevel,
+                     'exac_allele_frequency'       : ExACAlleleFrequency,
+                     'exac_af_filter'              : ExACAFFilter,
                    }
