@@ -136,7 +136,7 @@ class cBioPortal(DynamicSource, object):
             position = sequence.positions[site_seq_idx]
 
             if position.wt_residue_type != wt:
-                self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
+                self.log.warning("for mutation %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
                 continue
 
             mutation_obj = Mutation(sequence.positions[site_seq_idx],
@@ -277,7 +277,7 @@ class cBioPortal(DynamicSource, object):
                 try:
                     cancer_type = self._cancer_types[cancer_study_suffix]
                 except KeyError:
-                    self.log.error("cancer type %s not found - cancer study will be used instead")
+                    self.log.error("cancer type for %s not found - cancer study will be used instead" % cancer_study_suffix)
                     cancer_type = cancer_study_suffix
             cancer_study_mutation_ids =     [ x[0] for x in self._cache_genetic_profiles[cancer_study_id] if x[1] == 'MUTATION' ]
             cancer_study_mutation_ext_ids = [ x[0] for x in self._cache_genetic_profiles[cancer_study_id] if x[1] == 'MUTATION_EXTENDED' ]
@@ -485,7 +485,7 @@ class COSMIC(DynamicSource, object):
             position = sequence.positions[site_seq_idx]
 
             if position.wt_residue_type != wt:
-                self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
+                self.log.warning("for mutation %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
                 continue
 
             mutation_indices = [i for i, x in enumerate(mutations) if x == m]
@@ -549,9 +549,9 @@ class PhosphoSite(DynamicSource, object):
                 site = int(m[1:])
 
                 try:
-                    site_seq_idx = sequence.seq2index(num)
+                    site_seq_idx = sequence.seq2index(site)
                 except:
-                    self.log.warning("PTM site %s is outside the protein sequence; it will be skipped")
+                    self.log.warning("PTM site %s is outside the protein sequence; it will be skipped" % m)
                     continue
 
                 position = sequence.positions[site_seq_idx]
@@ -635,7 +635,7 @@ class MyVariant(DynamicSource, object):
                 revel_score = self._get_revel_from_gm(mutation, gm)
             if gc is not None and revel_score is None:
                 self.log.info("genomic coordinates will be used to retrieve revel score for mutation %s" % mutation)
-                revel_score = self._get_revel_from_gc(mutation, gm)
+                revel_score = self._get_revel_from_gc(mutation, gc)
             if revel_score is None:
                 self.log.warning("mutations %s has no genomic coordinates or genomic mutation available; it will be skipped" % mutation)
                 return
@@ -648,10 +648,10 @@ class MyVariant(DynamicSource, object):
             hit_pos = hit['dbnsfp']['aa']['pos']
             hit_ref = hit['dbnsfp']['aa']['ref']
             hit_alt = hit['dbnsfp']['aa']['alt']
-        except KeyError:
+        except:
             self.log.warning("no residue information was found in the variant information; it will be skipped")
             return False
-
+    
         if not mutation.sequence_position.wt_residue_type == hit['dbnsfp']['aa']['ref']:
             self.log.warning("reference residue in revel does not correspond; it will be skipped")
             return False
@@ -712,11 +712,14 @@ class MyVariant(DynamicSource, object):
 
         found_scores = []
 
+	if gc is None:
+		return None
+
         if gc.coord_start != gc.coord_end:
             self.log.warning("mutation %s has more than one nucleotide change; it will be skipped" % mutation)
             return None
 
-        converted_coords = self._convert_hg38_to_hg19(gm)
+        converted_coords = self._convert_hg38_to_hg19(gc)
         if converted_coords is None:
             return None
 
@@ -778,6 +781,7 @@ class ELMDatabase(DynamicSource, object):
         pass
 
 class ELMPredictions(DynamicSource, object):
+
     @logger_init
     def __init__(self):
         description = "ELM Prediction"
@@ -826,6 +830,7 @@ class ELMPredictions(DynamicSource, object):
             for i in range(len(tmp2[3:])):
                 tmp2[i+3] = tmp2[i+3] == 'True'
             out.append(tmp2)
+            print out
         return out
 
     def add_sequence_properties(self, sequence, exclude_elm_classes='{100}', use_alias=None):
@@ -859,11 +864,12 @@ class ELMPredictions(DynamicSource, object):
 
 class ExAC(DynamicSource, object):
     
+    description = "ExAC"
+
     @logger_init
     def __init__(self):
-        description = "ExAC"
 
-        super(ExAC, self).__init__(name='ExAC', version='0.1', description=description)
+        super(ExAC, self).__init__(name='ExAC', version='0.1', description=self.description)
 
         self._requests_url = 'http://exac.broadinstitute.org/variant'
         self._data_cache = {}
@@ -964,9 +970,9 @@ class ExAC(DynamicSource, object):
             self.log.warning("the specified variant %s wasn't found on ExAC" % v_str)
             return None
         elif request.status_code == 200:
-            if True:
+            try:
                 data = self._parse_exac_page(request.text)
-            else:
+            except:
                 self.log.warning("Couldn't parse downloaded file for variant %s" % v_str)
                 return None
         else:
@@ -974,6 +980,148 @@ class ExAC(DynamicSource, object):
             return None
 
         return data
+
+class MobiDB(DynamicSource):
+
+    description = "MobiDB"
+
+    @logger_init
+    def __init__(self):
+
+        super(MobiDB, self).__init__(name='MobiDB', version='0.1', description=self.description)
+
+        self._requests_url = 'http://mobidb.bio.unipd.it/ws/'
+        self._data_cache = {}
+        self._supported_properties = { 'mobidb_disorder_propensity' : self._get_mobidb_disorder_predictions }
+                                    
+    def add_position_properties(self, sequence, prop=['mobidb_disorder_propensity'], use_alias=None):
+
+        if type(prop) is str:
+            props = [prop]
+        else:
+            props = prop
+
+        self.log.debug("Adding property: " + ', '.join(props) )
+
+        prop_functions = []
+
+        for prop in props:
+            try:
+                prop_functions.append(self._supported_properties[prop])
+            except KeyError:
+                self.log.warning("MobiDB doesn't support property type %s" % prop)
+
+        self.log.debug("collected property functions: %s" % ', '.join([i for i in prop_functions.__repr__()]))
+
+        for i,add_this_property in enumerate(prop_functions):
+            self.log.debug("adding property %s to %s" % (props[i], sequence))
+            add_this_property(sequence, use_alias=use_alias)
+
+
+    def _get_mobidb_disorder_predictions(self, sequence, *args, **kwargs):
+
+        print "ZZZ", kwargs
+
+        assignments = self._get_mobidb_disorder_predictions_assignments(sequence, *args, **kwargs)
+
+        if len(assignments) != len(sequence.positions): 
+            self.log.error("Error in the assignment of predictions")
+            return False
+
+        for i,a in enumerate(assignments):
+            sequence.positions[i].properties['mobidb_disorder_propensity'] = position_properties_classes['mobidb_disorder_propensity'](sequence.positions[i], [self], a)
+
+
+    def _get_mobidb_disorder_predictions_assignments(self, sequence, *args, **kwargs):
+        if 'use_alias' in kwargs.keys():
+            use_alias = kwargs['use_alias']
+        else:
+            use_alias = None
+
+        data = self._get_mobidb(sequence, use_alias=use_alias)
+
+        try:
+            disorder_data = data['mobidb_consensus']['disorder']
+        except KeyError:
+            self.log.error("No disorder data was found")
+            return None
+
+        #print "QQQ"
+        #print disorder_data.keys()
+        #print disorder_data
+        assignments = [None for p in sequence.positions]
+
+        if 'full' in disorder_data.keys():
+            self.log.info("full consensus available")
+            regions = data['mobidb_consensus']['disorder']['full']['regions']
+            for r in regions:
+                for i in range(r[0]-1, r[1]):
+                    try:
+                        assignments[i] = str(r[2])
+                    except IndexError:
+                        self.log.error("residue index %s not in sequence!" % i)
+                        return None
+            if None in assignments:
+                self.log.warning("Some positions were not assigned!")
+
+        elif 'predictors' in disorder_data.keys():
+            self.log.info("full consensus not available - predictions will be used")
+
+            mobidb_lite = data['mobidb_consensus']['disorder']['predictors'][1]
+            if mobidb_lite['method'] != 'mobidb-lite':
+                self.log.error("ModiDB-lite consensus prediction is not available")
+                return None
+
+            regions = mobidb_lite['regions']
+            for r in regions:
+                for i in range(r[0]-1,r[1]): # r[1]: -1 because of the 0-offset, +1 because of the [) of range, total 0
+                    try:
+                        assignments[i] = str(r[2])
+                    except IndexError:
+                        self.log.error("residue %s not in sequence!" % i)
+                        return None
+            assignments = [ 'S' if a is None else a for a in assignments ]
+
+        else:
+            self.log.error("No disorder data or prediction available!")
+            return None
+        
+        return assignments
+
+
+    def _get_mobidb(self, sequence, use_alias=None):
+        if use_alias is not None:
+            gene_id = sequence.aliases[use_alias]
+            self.log.info("using alias %s as gene name" % sequence.aliases[use_alias])
+        else:
+            gene_id = sequence.gene_id
+
+        try:
+            url = ('/').join([self._requests_url, gene_id, 'consensus'])
+            self.log.debug("fetching %s" % url)
+            req = rq.get(url)
+        except:
+            self.log.error("Couldn't get data for %s" % gene_id)
+            return None
+
+        if req.status_code == 200:
+            try:
+                data = req.json()
+            except:
+                self.log.error("Couldn't parse data for %s" % gene_id)
+                return None
+        else:
+            self.log.warning("Data requests didn't complete correctly for %s" % gene_id)
+            return None
+
+        return data
+
+
+
+
+            
+
+
 
 
 class ManualAnnotation(StaticSource):
