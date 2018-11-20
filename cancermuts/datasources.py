@@ -254,6 +254,7 @@ class cBioPortal(DynamicSource, object):
         responses = []
         mutations = []
         do_cancer_type = False
+
         if 'cancer_type' in metadata:
             out_metadata['cancer_type'] = []
             do_cancer_type = True
@@ -269,6 +270,8 @@ class cBioPortal(DynamicSource, object):
         if 'genomic_mutations' in metadata:
             out_metadata['genomic_mutations'] = []
             do_genomic_mutations = True
+
+
 
         for cancer_study_id, short_desc, long_desc, cancer_study_isoform in self._cache_cancer_studies:
             self.log.debug("fetching profile data for study %s" % cancer_study_id)
@@ -405,6 +408,15 @@ class COSMIC(DynamicSource, object):
         do_genomic_mutations = False
         if 'genomic_mutations' in metadata:
             do_genomic_mutations = True
+        do_site = False
+        if 'cancer_site' in metadata:
+            out_metadata['cancer_site'] = []
+            do_site = True
+        do_histology = False
+        if 'cancer_histology' in metadata:
+            out_metadata['cancer_histology'] = []
+            do_histology = True
+
 
 
         for f in self._database_files:
@@ -448,6 +460,14 @@ class COSMIC(DynamicSource, object):
                             else:
                                 gm = [gd[0], gd[1], tmp[24], gd[2], gd[4], tmp[17][-1]]
                             out_metadata['genomic_mutations'].append(gm)
+			
+                        if do_site:
+                            out_metadata['cancer_site'].append(tmp[7:11])
+
+                        if do_histology:
+			                 out_metadata['cancer_histology'].append(tmp[11:15])
+
+                        print out_metadata['cancer_site'], 'ZZZ'
 
 
         return mutations, out_metadata
