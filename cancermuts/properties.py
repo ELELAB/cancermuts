@@ -259,5 +259,5 @@ position_properties_classes = {  'phosphorylation'            : PhosphorylationS
                                  'mobidb_disorder_propensity' : DisorderPropensity  
                               }
 
-sequence_properties_classes = {  'linear_motif'    :LinearMotif
+sequence_properties_classes = {  'linear_motif'               : LinearMotif
                               }
