@@ -1,4 +1,4 @@
-# metadata.py - properties handling for the cancermuts package
+    # metadata.py - properties handling for the cancermuts package
 # (c) 2018 Matteo Tiberti <matteo.tiberti@gmail.com>
 # This file is part of cancermuts
 #
@@ -86,10 +86,11 @@ class LinearMotif(SequenceProperty):
 
 class PhosphorylationSite(PositionProperty):
     description = "Phosphorylation site"
+    category="ptm"
 
     def __init__(self, position, sources):
         super(PhosphorylationSite, self).__init__(  name="Phosphorylation Site",
-                                                    category='phosphorylation',
+                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -100,10 +101,11 @@ class PhosphorylationSite(PositionProperty):
 
 class MethylationSite(PositionProperty):
     description = "Methylation site"
+    category="ptm"
 
     def __init__(self, position, sources):
         super(MethylationSite, self).__init__(  name="Methylation Site",
-                                                    category='methylation',
+                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -117,7 +119,7 @@ class AcetylationSite(PositionProperty):
 
     def __init__(self, position, sources):
         super(AcetylationSite, self).__init__(  name="Acetylation Site",
-                                                    category='acetylation',
+                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -131,7 +133,7 @@ class SNitrosylationSite(PositionProperty):
 
     def __init__(self, position, sources):
         super(SNitrosylationSite, self).__init__(  name="S-Nytrosilation site",
-                                                    category='s-nitrosylation',
+                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -145,7 +147,7 @@ class OGalNAcSite(PositionProperty):
 
     def __init__(self, position, sources):
         super(OGalNAcSite, self).__init__(  name="o-GalNAc Site",
-                                                    category='OGalNAc',
+                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -159,7 +161,7 @@ class OGlcNAcSite(PositionProperty):
 
     def __init__(self, position, sources):
         super(OGlcNAcSite, self).__init__(  name="o-GlcNAc Site",
-                                                    category='OGlcNAc',
+                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -173,7 +175,7 @@ class SumoylationSite(PositionProperty):
 
     def __init__(self, position, sources):
         super(SumoylationSite, self).__init__(  name="Sumoylation Site",
-                                                    category='sumoylation',
+                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -186,7 +188,7 @@ class UbiquitinationSite(PositionProperty):
 
     def __init__(self, position, sources):
         super(UbiquitinationSite, self).__init__(  name="Ubiquitination Site",
-                                                    category='ubiquitination',
+                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -199,7 +201,7 @@ class CleavageSite(PositionProperty):
 
     def __init__(self, position, sources):
         super(CleavageSite, self).__init__(  name="Caspase cleavage site",
-                                                    category='cleavage',
+                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
