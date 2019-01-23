@@ -84,6 +84,12 @@ class LinearMotif(SequenceProperty):
                                                     metadata=None  )
         self.type = lmtype
 
+    def get_value_str(self):
+        return "%s, %d-%d, %s" % (p.type,
+                                      self.positions[ 0].sequence_position,
+                                      self.positions[-1].sequence_position,
+                                      ",".join(s.name for s in p.sources))
+
 class PhosphorylationSite(PositionProperty):
     description = "Phosphorylation site"
     category="ptm"
