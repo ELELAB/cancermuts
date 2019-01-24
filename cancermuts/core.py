@@ -72,6 +72,8 @@ class Sequence(object):
 
 
 class SequencePosition(object):
+
+    description = 'Position'
     @logger_init
     def __init__(self, wt_residue_type, sequence_position, mutations=None, properties=None):
         self.wt_residue_type = wt_residue_type
@@ -141,7 +143,6 @@ class Mutation(object):
                             self.sequence_position.sequence_position, 
                             self.mutated_residue_type )
 
-
 class Source(object):
     def __init__(self):
         self.name = name
@@ -158,97 +159,3 @@ class Source(object):
     def __hash__(self):
         return hash((self.name, self.version))
 
-class MetaTable(object):
-    def __init__(self, sequence):
-        self.sequence = sequence
-
-    def write_csv(self, outfile="metatable.csv", 
-                        mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology"], 
-                        position_properties=['phosphorylation','methylation','ubiquitination','cleavage', 's-nitrosylation','acetylation', 'sumoylation'],
-                        sequence_properties=['linear_motif']):
-        header =  ['Position',]
-        header += [position_properties_classes[p].description for p in position_properties]
-        sequence_properties_cols_start = len(header)
-
-        header += [sequence_properties_classes[p].description for p in sequence_properties]
-        sequence_properties_col = range(sequence_properties_cols_start, len(header))
-        header += ['WT residue', 'Mutated residue', 'Sources']
-        for md in mutation_metadata:
-            header.append(metadata_classes[md].description)
-
-        with open(outfile, 'wb') as csvfile:
-
-            csvw = csv.writer(csvfile, dialect='excel', delimiter=';')
-            csvw.writerow(header)
-            csv_rows = []
-            positions_mutlist = []
-
-            for gi,p in enumerate(self.sequence.positions):
-                base_row = [p.sequence_position]
-                val = '-'
-                for r in position_properties:
-                    try:
-                        val = p.properties[r].get_value_str()
-                    except:
-                        val = '-'
-                    base_row.append(val)
-                base_row.extend(['-']*len(sequence_properties_col))
-                base_row.append(p.wt_residue_type)
-
-                mut_strings = [str(m) for m in p.mutations]
-                mut_strings_order = sorted(range(len(mut_strings)), key=mut_strings.__getitem__)
-                print mut_strings_order
-                for m in mut_strings_order:
-                    this_row = list(base_row)
-                    this_row.append(p.mutations[m].mutated_residue_type)
-                    this_row.append(",".join([s.name for s in p.mutations[m].sources]))
-                    for md in mutation_metadata:
-                        try:
-                            md_values = []
-                            if mutation_metadata == 'genomic_mutations':
-                                print p.mutations[m].metadata[md], 'UUU'
-                            for single_md in p.mutations[m].metadata[md]:
-                                md_values.append(single_md.get_value_str())
-
-                            md_str = ", ".join(sorted(list(set(md_values))))
-                        except:
-                            md_str = "-"
-                        this_row.append(md_str)
-                    csv_rows.append(this_row)
-                    #print "appending", gi
-                    positions_mutlist.append(gi)
-                    #print positions_mutlist
-                if len(mut_strings_order) == 0:
-                    this_row = list(base_row)
-                    positions_mutlist.append(gi)
-                    csv_rows.append(this_row)
-
-            property_rows = {}
-            for p in sequence_properties:
-                property_rows[p] = [[] for i in self.sequence.positions]
-
-            for pidx, property_name in enumerate(sequence_properties):
-                if property_name not in self.sequence.properties.keys():
-                    continue    
-                for i,p in enumerate(self.sequence.properties[property_name]):
-                    if p.category=='linear_motif':
-                        sources_str = ",".join(s.name for s in p.sources)
-                        cat_str = "%s, %d, %d-%d, %s" % (p.type,
-                                                    i,
-                                                    p.positions[ 0].sequence_position,
-                                                    p.positions[-1].sequence_position,
-                                                    sources_str)
-                        positions = p.positions
-
-                    for pos in positions:
-                        property_rows[property_name][self.sequence.seq2index(pos.sequence_position)].append(cat_str)
-
-                for i,p in enumerate(property_rows[property_name]):
-                    indices = [j for j, x in enumerate(positions_mutlist) if x == i]
-                    print indices
-                    property_str= "|".join(p)
-                    for idx in indices:
-                        csv_rows[idx][sequence_properties_col[pidx]] = property_str
-
-            for r in csv_rows:
-                csvw.writerow(r)
