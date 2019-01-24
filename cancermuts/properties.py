@@ -24,8 +24,7 @@ Classes to handle properties of sequence or positions
 """
 
 class SequenceProperty(object):
-    def __init__(self, name, category, positions=None, sources=None, values=None, metadata=None):
-        self.category = category
+    def __init__(self, name, positions=None, sources=None, values=None, metadata=None):
         self.name = name
 
         if positions is None:
@@ -51,8 +50,7 @@ class SequenceProperty(object):
         return "<SequenceProperty %s from %s, positions %s>" % (self.name, sources_str, ",".join([str(s.sequence_position) for s in self.positions]))
 
 class PositionProperty(object):
-    def __init__(self, name, category, position, sources=None, values=None, metadata=None):
-        self.category = category
+    def __init__(self, name, position, sources=None, values=None, metadata=None):
         self.name = name
         self.position = position
         if sources is None:
@@ -74,10 +72,10 @@ class PositionProperty(object):
 
 class LinearMotif(SequenceProperty):
     description = "Residue part of a linear motif"
+    category='linear_motif'
 
     def __init__(self, positions, sources, lmtype=""):
         super(LinearMotif, self).__init__(  name="Linear motif",
-                                                    category='linear_motif',
                                                     positions=positions,
                                                     sources=sources,
                                                     values=None,
@@ -85,18 +83,17 @@ class LinearMotif(SequenceProperty):
         self.type = lmtype
 
     def get_value_str(self):
-        return "%s, %d-%d, %s" % (p.type,
+        return "%s, %d-%d, %s" % (    self.type,
                                       self.positions[ 0].sequence_position,
                                       self.positions[-1].sequence_position,
-                                      ",".join(s.name for s in p.sources))
+                                      ",".join(s.name for s in self.sources))
 
 class PhosphorylationSite(PositionProperty):
     description = "Phosphorylation site"
-    category="ptm"
+    category="ptm_phosphorylation"
 
     def __init__(self, position, sources):
         super(PhosphorylationSite, self).__init__(  name="Phosphorylation Site",
-                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -107,11 +104,10 @@ class PhosphorylationSite(PositionProperty):
 
 class MethylationSite(PositionProperty):
     description = "Methylation site"
-    category="ptm"
+    category="ptm_methylation"
 
     def __init__(self, position, sources):
         super(MethylationSite, self).__init__(  name="Methylation Site",
-                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -122,10 +118,10 @@ class MethylationSite(PositionProperty):
 
 class AcetylationSite(PositionProperty):
     description = "Acetylation site"
+    category='ptm_acetylation'
 
     def __init__(self, position, sources):
         super(AcetylationSite, self).__init__(  name="Acetylation Site",
-                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -136,10 +132,10 @@ class AcetylationSite(PositionProperty):
 
 class SNitrosylationSite(PositionProperty):
     description = "S-Nitrosylation site"
+    category='ptm_nitrosylation'
 
     def __init__(self, position, sources):
         super(SNitrosylationSite, self).__init__(  name="S-Nytrosilation site",
-                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -150,10 +146,10 @@ class SNitrosylationSite(PositionProperty):
 
 class OGalNAcSite(PositionProperty):
     description = "OGalNAc site"
+    category='ptm_ogalnac'
 
     def __init__(self, position, sources):
         super(OGalNAcSite, self).__init__(  name="o-GalNAc Site",
-                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -164,10 +160,11 @@ class OGalNAcSite(PositionProperty):
 
 class OGlcNAcSite(PositionProperty):
     description = "OGlcNAc site"
+    category='ptm_oglcnac'
+
 
     def __init__(self, position, sources):
         super(OGlcNAcSite, self).__init__(  name="o-GlcNAc Site",
-                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -178,10 +175,11 @@ class OGlcNAcSite(PositionProperty):
 
 class SumoylationSite(PositionProperty):
     description = "Sumoylation site"
+    category='ptm_sumoylation'
+
 
     def __init__(self, position, sources):
         super(SumoylationSite, self).__init__(  name="Sumoylation Site",
-                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -191,10 +189,10 @@ class SumoylationSite(PositionProperty):
 
 class UbiquitinationSite(PositionProperty):
     description = "Ubiquitination site"
+    category='ptm_ubiquitination'
 
     def __init__(self, position, sources):
         super(UbiquitinationSite, self).__init__(  name="Ubiquitination Site",
-                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -204,10 +202,10 @@ class UbiquitinationSite(PositionProperty):
 
 class CleavageSite(PositionProperty):
     description = "Caspase cleavage site"
+    category='ptm_cleavage'
 
     def __init__(self, position, sources):
         super(CleavageSite, self).__init__(  name="Caspase cleavage site",
-                                                    category='ptm',
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -218,8 +216,8 @@ class CleavageSite(PositionProperty):
 
 
 class DisorderPropensity(PositionProperty):
-
     description = "Structural disorder"
+    category = 'disorder_propensity'
 
 #   def __init__(self, name, category, position, sources=None, values=None, metadata=None):
     def __init__(self, position, sources, disorder_state):
@@ -253,15 +251,15 @@ class DisorderPropensity(PositionProperty):
 
 
 
-position_properties_classes = {  'phosphorylation'            : PhosphorylationSite,
-                                 'methylation'                : MethylationSite,
-                                 'acetylation'                : AcetylationSite,
-				                 's-nitrosylation'            : SNitrosylationSite,
-                                 'OGalNAc'                    : OGalNAcSite,
-                                 'OGlcNAc'                    : OGlcNAcSite,
-                                 'sumoylation'                : SumoylationSite,
-                                 'ubiquitination'             : UbiquitinationSite,
-                                 'cleavage'                   : CleavageSite,
+position_properties_classes = {  'ptm_phosphorylation'            : PhosphorylationSite,
+                                 'ptm_methylation'                : MethylationSite,
+                                 'ptm_acetylation'                : AcetylationSite,
+				                 'ptm_nitrosylation'            : SNitrosylationSite,
+                                 'ptm_OGalNAc'                    : OGalNAcSite,
+                                 'ptm_OGlcNAc'                    : OGlcNAcSite,
+                                 'ptm_sumoylation'                : SumoylationSite,
+                                 'ptm_ubiquitination'             : UbiquitinationSite,
+                                 'ptm_cleavage'                   : CleavageSite,
                                  'mobidb_disorder_propensity' : DisorderPropensity  
                               }
 
