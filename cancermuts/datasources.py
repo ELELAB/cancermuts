@@ -522,6 +522,13 @@ class PhosphoSite(DynamicSource, object):
         super(PhosphoSite, self).__init__(name='PhosphoSite', version='1.0', description=description)
         if database_file is None:
             self._ptm_types = ['acetylation', 'methylation', 'O-GalNAc', 'O-GlcNAc', 'phosphorylation', 'sumoylation', 'ubiquitination']
+            self._ptm_types_to_classes = {  'acetylation'     : 'ptm_acetylation', 
+                                            'methylation'     : 'ptm_methylation', 
+                                            'O-GalNAc'        : 'ptm_ogalnac', 
+                                            'O-GlcNAc'        : 'ptm_oglcnac', 
+                                            'phosphorylation' : 'ptm_phosphorylation', 
+                                            'sumoylation'     : 'ptm_sumoylation',
+                                            'ubiquitination'  : 'ptm_ubiquitination' }
             self._ptm_suffixes = ['ac', 'm[0-9]', 'ga', 'gl', 'p', 'sm', 'ub']
             self._ptm_suffix_offsets = [-3, -3, -3, -3, -2, -3, -3]
             self._database_dir = "/data/databases/phosphosite/"
@@ -579,7 +586,7 @@ class PhosphoSite(DynamicSource, object):
                         already_annotated = True
                 
                 if not already_annotated:
-                    property_obj = position_properties_classes[ptm](  sources=[self],
+                    property_obj = position_properties_classes[self._ptm_types_to_classes[ptm]](  sources=[self],
                                                         position=sequence.positions[site_seq_idx]
                                                         )
                     position.add_property(property_obj)
@@ -1167,7 +1174,7 @@ class ManualAnnotation(StaticSource):
     def _parse_datafile(self):
         self.log.info("Parsing annotations from %s" % self._datafile)
         out = [] # type seq type function ref
-        ptm_keywords = ['cleavage', 'phosphorylation', 'ubiquitination', 'acetylation', 'sumoylation', 's-nitrosylation', 'methylation']
+        ptm_keywords = ['ptm_cleavage', 'ptm_phosphorylation', 'ptm_ubiquitination', 'ptm_acetylation', 'ptm_sumoylation', 'ptm_nitrosylation', 'ptm_methylation']
         for idx,row in enumerate(self._csv):
             row_number = idx+1
             if len(row) < 5:
