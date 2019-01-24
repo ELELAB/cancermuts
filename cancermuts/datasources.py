@@ -645,20 +645,32 @@ class MyVariant(DynamicSource, object):
     def _validate_revel_hit(self, mutation, hit):
 
         try:
-            hit_pos = hit['dbnsfp']['aa']['pos']
-            hit_ref = hit['dbnsfp']['aa']['ref']
-            hit_alt = hit['dbnsfp']['aa']['alt']
+            aa = hit['dbnsfp']['aa']
+        except:
+            self.log.error("no residue information was found; it will be skipped")
+            return False
+
+        if isinstance(aa, list):
+            if len(aa) == 1:
+                aa = aa[0]
+            else:
+                self.log.error("more than one aminoacid specified; it will be skipped")
+                return False
+        try:
+            hit_pos = aa['pos']
+            hit_ref = aa['ref']
+            hit_alt = aa['alt']
         except:
             self.log.warning("no residue information was found in the variant information; it will be skipped")
             return False
     
-        if not mutation.sequence_position.wt_residue_type == hit['dbnsfp']['aa']['ref']:
+        if not mutation.sequence_position.wt_residue_type == aa['ref']:
             self.log.warning("reference residue in revel does not correspond; it will be skipped")
             return False
 
         if not mutation.sequence_position.sequence_position == hit_pos:
             try:
-                if not mutation.sequence_position.sequence_position in map(int, hit['dbnsfp']['aa']['pos']):
+                if not mutation.sequence_position.sequence_position in map(int, aa['pos']):
                     raise TypeError
             except:
                 self.log.warning("sequence position in revel does not correspond for this hit; it will be skipped")
@@ -819,6 +831,7 @@ class ELMPredictions(DynamicSource, object):
         out = []
         response = rq.get(req_url).text
         tmp = response.split("\n")
+
         for line in tmp:
             tmp2 = line.strip().split()
             if line.startswith("#") or line.startswith('elm_identifier') or not line:
@@ -830,7 +843,6 @@ class ELMPredictions(DynamicSource, object):
             for i in range(len(tmp2[3:])):
                 tmp2[i+3] = tmp2[i+3] == 'True'
             out.append(tmp2)
-            print out
         return out
 
     def add_sequence_properties(self, sequence, exclude_elm_classes='{100}', use_alias=None):
