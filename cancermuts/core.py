@@ -163,7 +163,7 @@ class MetaTable(object):
         self.sequence = sequence
 
     def write_csv(self, outfile="metatable.csv", 
-                        mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score"], 
+                        mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology"], 
                         position_properties=['phosphorylation','methylation','ubiquitination','cleavage', 's-nitrosylation','acetylation', 'sumoylation'],
                         sequence_properties=['linear_motif']):
         header =  ['Position',]

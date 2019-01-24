@@ -282,6 +282,65 @@ class ExACAFFilter(Metadata):
     def __hash__(self):
         return hash((self.source, self.frequency_filter))
 
+class CancerSite(Metadata):
+
+    description = "Cancer site"
+    not_specified = 'NS'
+
+    def __init__(self, source, *sites):
+        super(CancerSite, self).__init__(source)
+        self.source = source
+        sites = [ i for i in sites if i != self.not_specified ]
+        self.sites = sites
+
+    def get_value(self):
+        return self.sites
+
+    def get_value_str(self):
+        return ", ".join(self.sites)
+
+    def __repr__(self):
+        return "<CancerSite, %s>" % self.get_value_str()
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        return self.source == other.source and \
+               self.sites == other.sites
+
+    def __hash__(self):
+        return hash((self.source, self.site))
+
+class CancerHistology(Metadata):
+
+    description = "Cancer histology"
+    not_specified = 'NS'
+
+    def __init__(self, source, *histology):
+        super(CancerHistology, self).__init__(source)
+        histology = [ i for i in histology if i != self.not_specified ]
+        self.source = source
+        self.histology = histology
+
+    def get_value(self):
+        return self.histology
+
+    def get_value_str(self):
+        return ", ".join(self.histology)
+
+    def __repr__(self):
+        return "<TumorHistology, %s>" % self.get_value_str()
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        return self.source == other.source and \
+               self.histology == other.histology
+
+    def __hash__(self):
+        return hash((self.source, self.histology))
 
 metadata_classes = { 
                      'cancer_type'                 : CancerType,
@@ -291,4 +350,6 @@ metadata_classes = {
                      'revel_score'                 : DbnsfpRevel,
                      'exac_allele_frequency'       : ExACAlleleFrequency,
                      'exac_af_filter'              : ExACAFFilter,
+                     'cancer_site'                 : CancerSite,
+                     'cancer_histology'            : CancerHistology,
                    }
