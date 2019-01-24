@@ -291,7 +291,6 @@ class CancerSite(Metadata):
         super(CancerSite, self).__init__(source)
         self.source = source
         sites = [ i for i in sites if i != self.not_specified ]
-        print "adding sites", sites
         self.sites = sites
 
     def get_value(self):

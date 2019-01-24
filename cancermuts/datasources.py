@@ -271,8 +271,6 @@ class cBioPortal(DynamicSource, object):
             out_metadata['genomic_mutations'] = []
             do_genomic_mutations = True
 
-
-
         for cancer_study_id, short_desc, long_desc, cancer_study_isoform in self._cache_cancer_studies:
             self.log.debug("fetching profile data for study %s" % cancer_study_id)
             if do_cancer_type:
@@ -354,7 +352,6 @@ class cBioPortal(DynamicSource, object):
                                     gm = ['hg19', tmp[12], self.default_strand, gd[2], gd[4], tmp[16]]
                                 out_metadata['genomic_mutations'].append(gm)
 
-
         return mutations, out_metadata
 
     def _convert_isoform(self, mutation, main_isoform, alternate_isoform, mapping):
@@ -417,8 +414,6 @@ class COSMIC(DynamicSource, object):
             out_metadata['cancer_histology'] = []
             do_histology = True
 
-
-
         for f in self._database_files:
             with open(f) as fh:
                 fh.next()
@@ -460,15 +455,12 @@ class COSMIC(DynamicSource, object):
                             else:
                                 gm = [gd[0], gd[1], tmp[24], gd[2], gd[4], tmp[17][-1]]
                             out_metadata['genomic_mutations'].append(gm)
-			
+            
                         if do_site:
                             out_metadata['cancer_site'].append(tmp[7:11])
 
                         if do_histology:
-			                 out_metadata['cancer_histology'].append(tmp[11:15])
-
-                        print out_metadata['cancer_site'], 'ZZZ'
-
+                            out_metadata['cancer_histology'].append(tmp[11:15])
 
         return mutations, out_metadata
 
@@ -732,8 +724,8 @@ class MyVariant(DynamicSource, object):
 
         found_scores = []
 
-	if gc is None:
-		return None
+        if gc is None:
+            return None
 
         if gc.coord_start != gc.coord_end:
             self.log.warning("mutation %s has more than one nucleotide change; it will be skipped" % mutation)
@@ -1275,5 +1267,3 @@ class ManualAnnotation(StaticSource):
             property_obj.metadata['function'] = [d[3]]
             property_obj.metadata['ref']      = [d[4]]
             sequence.add_property(property_obj)
-
-
