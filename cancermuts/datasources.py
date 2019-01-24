@@ -567,9 +567,9 @@ class PhosphoSite(DynamicSource, object):
                 wt = m[0]
                 site = int(m[1:])
 
-                if True:
+                try:
                     site_seq_idx = sequence.seq2index(site)
-                else:
+                except:
                     self.log.warning("PTM site %s is outside the protein sequence; it will be skipped" % m)
                     continue
 
