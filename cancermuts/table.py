@@ -165,8 +165,8 @@ class Table:
 
 
     def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology"], 
-                        position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage', 'ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation'],
-                        sequence_properties=['linear_motif']):
+                        position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage', 'ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation','mobidb_disorder_propensity'],
+                        sequence_properties=['linear_motif',]):
 
         rows = []
 
