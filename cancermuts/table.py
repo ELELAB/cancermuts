@@ -24,6 +24,7 @@ Classes to save/read the table and generate a graphical representation
 """
 
 from __future__ import division
+from future.utils import iteritems
 
 import matplotlib
 matplotlib.use("Agg")
@@ -141,15 +142,15 @@ class Table:
         headers = {}
         ptms = {}
 
-        for k,v in position_properties_classes.iteritems():
+        for k,v in iteritems(position_properties_classes):
             headers[k] = v.description
             if 'ptm' in v.category:
                 ptms[k] = v.description
 
-        for k,v in sequence_properties_classes.iteritems():
+        for k,v in iteritems(sequence_properties_classes):
             headers[k] = v.description
 
-        for k,v in metadata_classes.iteritems():
+        for k,v in iteritems(metadata_classes):
             headers[k] = v.description
 
         headers['position']    = SequencePosition.description
@@ -219,14 +220,10 @@ class Table:
                     except:
                         md_str = None
                     this_row.append(md_str)
-                #print "appending", gi
                 positions_mutlist.append(gi)
-                #print positions_mutlist
             rows.append(this_row)
 
         df = pd.DataFrame(rows, columns=header)
-
-        print df
 
         positions = df[ self.headers['position'] ]
 
@@ -385,7 +382,7 @@ class Table:
                         rcParams={'font.size':8.0, 'font.sans-serif':['Arial']}):
 
         if rcParams:
-            for k,v in rcParams.iteritems():
+            for k,v in iteritems(rcParams.iteritems):
                 matplotlib.rcParams[k] = v
 
         df = df.copy()

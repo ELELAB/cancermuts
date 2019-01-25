@@ -38,9 +38,6 @@ import csv
 import myvariant
 import pyliftover
 
-reload(sys)
-sys.setdefaultencoding('utf8')
-
 class Source(object):
     def __init__(self, name, version, description):
         self.name = name
@@ -192,7 +189,7 @@ class cBioPortal(DynamicSource, object):
             self._get_cancer_studies()
 
         self._cache_genetic_profiles = {}
-        for cancer_study_id in zip(*self._cache_cancer_studies)[0]:
+        for cancer_study_id in list(zip(*self._cache_cancer_studies))[0]:
             self._cache_genetic_profiles[cancer_study_id] = []
             self.log.debug("fetching genetic profiles for cancer study %s" % cancer_study_id)
             try:
@@ -218,7 +215,7 @@ class cBioPortal(DynamicSource, object):
             self._get_cancer_studies()
 
         self._cache_case_sets = {}
-        for cancer_study_id in zip(*self._cache_cancer_studies)[0]:
+        for cancer_study_id in list(zip(*self._cache_cancer_studies))[0]:
             self._cache_case_sets[cancer_study_id] = []
             self.log.debug("fetching case sets for cancer study %s" % cancer_study_id)
             try:
@@ -385,7 +382,7 @@ class COSMIC(DynamicSource, object):
         cancer_types = set()
         for f in self._database_files:
             with open(f) as fh:
-                fh.next()
+                next(fh)
                 for line in fh:
                     cancer_types.add(line.strip().split("\t")[11])
         return sorted(list(cancer_types))
@@ -416,7 +413,7 @@ class COSMIC(DynamicSource, object):
 
         for f in self._database_files:
             with open(f) as fh:
-                fh.next()
+                next(fh)
                 for line in fh:
                     tmp = line.strip().split("\t")
                     if tmp[0] != gene_id or tmp[11] not in cancer_types:
@@ -544,9 +541,9 @@ class PhosphoSite(DynamicSource, object):
             p_sites = []
 
             with open(self._database_files[ptm]) as fh:
-                fh.next()
-                fh.next()
-                fh.next()
+                next(fh)
+                next(fh)
+                next(fh)
                 for line in fh:
                     tmp = line.strip().split("\t")
                     if str.upper(tmp[0]) != gene_id or tmp[6] != 'human':
@@ -972,7 +969,6 @@ class ExAC(DynamicSource, object):
             
             exac = self._data_cache[gc]
 
-            print mutation, gc, md_type, exac[exac_key[md_type]]
             mutation.metadata[md_type].append(metadata_classes[md_type](self, exac[exac_key[md_type]]))
 
     def _parse_exac_page(self, text):
@@ -982,7 +978,6 @@ class ExAC(DynamicSource, object):
                 return data
 
     def _get_exac_data(self, variant):
-        print type(variant)
         if type(variant) is GenomicMutation:
             v_str = variant.as_hg19().get_value_str(fmt='exac')
         else:
@@ -1122,7 +1117,6 @@ class MobiDB(DynamicSource):
         
         return assignments
 
-
     def _get_mobidb(self, sequence, use_alias=None):
         if use_alias is not None:
             gene_id = sequence.aliases[use_alias]
@@ -1150,14 +1144,6 @@ class MobiDB(DynamicSource):
 
         return data
 
-
-
-
-            
-
-
-
-
 class ManualAnnotation(StaticSource):
     @logger_init
     def __init__(self, datafile, csvoptions=None):
@@ -1165,13 +1151,13 @@ class ManualAnnotation(StaticSource):
         super(ManualAnnotation, self).__init__(name='Manual annotations', version='', description=description)
 
         self._datafile = datafile
-        fh = open(self._datafile, 'rb')
+        fh = open(self._datafile, 'rt')
         if csvoptions is None:
             csvoptions = {}
         try:
             self._csv = csv.reader(fh, **csvoptions)
         except:
-            log.error("")
+            self.log.error("reading of csv file failed")
         self._table = None
 
     def _parse_datafile(self):
