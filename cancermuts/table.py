@@ -164,7 +164,7 @@ class Table:
 
 
 
-    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology"], 
+    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'exac_allele_frequency', 'exac_af_filter'], 
                         position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage', 'ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation','mobidb_disorder_propensity'],
                         sequence_properties=['linear_motif',]):
 
@@ -184,7 +184,6 @@ class Table:
 
         for gi,p in enumerate(sequence.positions):
             base_row = [p.sequence_position]
-            print p.properties
             for r in position_properties:
                 if r in p.properties.keys():
                     val = p.properties[r].get_value_str()
@@ -224,9 +223,6 @@ class Table:
                 positions_mutlist.append(gi)
                 #print positions_mutlist
             rows.append(this_row)
-
-        print rows
-        print header
 
         df = pd.DataFrame(rows, columns=header)
 
