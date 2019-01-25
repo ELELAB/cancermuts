@@ -1051,8 +1051,6 @@ class MobiDB(DynamicSource):
 
     def _get_mobidb_disorder_predictions(self, sequence, *args, **kwargs):
 
-        print "ZZZ", kwargs
-
         assignments = self._get_mobidb_disorder_predictions_assignments(sequence, *args, **kwargs)
 
         if len(assignments) != len(sequence.positions): 
@@ -1084,7 +1082,12 @@ class MobiDB(DynamicSource):
 
         if 'full' in disorder_data.keys():
             self.log.info("full consensus available")
-            regions = data['mobidb_consensus']['disorder']['full']['regions']
+
+            if len(data['mobidb_consensus']['disorder']['full']) > 0:
+                self.log.warning("More than one prediction found; will use the first")
+
+            regions = data['mobidb_consensus']['disorder']['full'][0]['regions']
+
             for r in regions:
                 for i in range(r[0]-1, r[1]):
                     try:

@@ -222,7 +222,6 @@ class DisorderPropensity(PositionProperty):
 #   def __init__(self, name, category, position, sources=None, values=None, metadata=None):
     def __init__(self, position, sources, disorder_state):
         super(DisorderPropensity, self).__init__(name="Disorder Propensity",
-                                                 category='disorder_propensity',
                                                  position=position,
                                                  sources=sources,
                                                  values={},
