@@ -187,10 +187,8 @@ class Table:
             print p.properties
             for r in position_properties:
                 if r in p.properties.keys():
-                    print "addng", p.properties.keys(), r
                     val = p.properties[r].get_value_str()
                 else:
-                    print "notin", p.properties.keys(), r
                     val = None
                 base_row.append(val)
             base_row.extend([None]*len(sequence_properties_col))
@@ -402,15 +400,15 @@ class Table:
         #                    left=0.02, top=1.02, bottom=0.02, right=1.02)
 
         if self.headers['mutated'] not in df.keys():
-            #log.warning("No mutations column found - mutations won't be annotated")
+            self.log.warning("No mutations column found - mutations won't be annotated")
             mutations = False
 
         if self.headers['revel'] not in df.keys():
-            #log.warning("No revel score found - value won't be annotated")
+            self.log.warning("No revel score found - value won't be annotated")
             mutations_revel = False
 
         if self.headers["elm"] not in df.keys():
-            #log.warning("No ELMs information found - won't be annotated")
+            self.log.warning("No ELMs information found - won't be annotated")
             elm = False
 
         for i, df_i in enumerate(dfs):
