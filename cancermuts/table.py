@@ -164,7 +164,7 @@ class Table:
 
 
 
-    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology"], 
+    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'exac_allele_frequency', 'exac_af_filter'], 
                         position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage', 'ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation','mobidb_disorder_propensity'],
                         sequence_properties=['linear_motif',]):
 
@@ -184,13 +184,10 @@ class Table:
 
         for gi,p in enumerate(sequence.positions):
             base_row = [p.sequence_position]
-            print p.properties
             for r in position_properties:
                 if r in p.properties.keys():
-                    print "addng", p.properties.keys(), r
                     val = p.properties[r].get_value_str()
                 else:
-                    print "notin", p.properties.keys(), r
                     val = None
                 base_row.append(val)
             base_row.extend([None]*len(sequence_properties_col))
@@ -226,9 +223,6 @@ class Table:
                 positions_mutlist.append(gi)
                 #print positions_mutlist
             rows.append(this_row)
-
-        print rows
-        print header
 
         df = pd.DataFrame(rows, columns=header)
 
@@ -402,15 +396,15 @@ class Table:
         #                    left=0.02, top=1.02, bottom=0.02, right=1.02)
 
         if self.headers['mutated'] not in df.keys():
-            #log.warning("No mutations column found - mutations won't be annotated")
+            self.log.warning("No mutations column found - mutations won't be annotated")
             mutations = False
 
         if self.headers['revel'] not in df.keys():
-            #log.warning("No revel score found - value won't be annotated")
+            self.log.warning("No revel score found - value won't be annotated")
             mutations_revel = False
 
         if self.headers["elm"] not in df.keys():
-            #log.warning("No ELMs information found - won't be annotated")
+            self.log.warning("No ELMs information found - won't be annotated")
             elm = False
 
         for i, df_i in enumerate(dfs):
