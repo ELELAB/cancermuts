@@ -1051,8 +1051,6 @@ class MobiDB(DynamicSource):
 
     def _get_mobidb_disorder_predictions(self, sequence, *args, **kwargs):
 
-        print "ZZZ", kwargs
-
         assignments = self._get_mobidb_disorder_predictions_assignments(sequence, *args, **kwargs)
 
         if len(assignments) != len(sequence.positions): 
