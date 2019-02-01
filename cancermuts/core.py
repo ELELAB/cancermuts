@@ -61,7 +61,7 @@ class Sequence(object):
         return "<Sequence of %s from %s, %d positions>" % (self.gene_id, self.source.name, len(self.positions))
 
     def add_property(self, prop):
-        if self.properties.has_key(prop.category):
+        if prop.category in self.properties:
             self.properties[prop.category].append(prop)
             add_type = "appending"
             self.log.debug("adding property %s to sequence of %s (appeding)" % (str(prop), self.gene_id))
@@ -94,8 +94,8 @@ class SequencePosition(object):
             self.log.info("Mutation %s already in position %s; will just add sources and metadata" % (str(mut), self.__repr__()))
             pos = self.mutations.index(mut)
             self.mutations[pos].sources.extend(mut.sources)
-            for k in mut.metadata.keys():
-                if k in self.mutations[pos].metadata.keys():
+            for k in mut.metadata:
+                if k in self.mutations[pos].metadata:
                     self.mutations[pos].metadata[k].extend(mut.metadata[k])
                     self.log.debug("    metadata %s was extended" % k)
                 else:
@@ -103,7 +103,7 @@ class SequencePosition(object):
                     self.log.debug("    metadata %s was added anew" % k)
 
     def add_property(self, prop):
-        if prop.category in self.properties.keys():
+        if prop.category in self.properties:
             self.log.info("property %s was replaced with %s" % (self.properties[prop.category], prop))
         else:
             self.log.info("added property %s" % str(prop))

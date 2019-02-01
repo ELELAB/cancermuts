@@ -38,8 +38,10 @@ import csv
 import myvariant
 import pyliftover
 
-reload(sys)
-sys.setdefaultencoding('utf8')
+import sys
+if sys.version_info[0] >= 3:
+    unicode = str
+
 
 class Source(object):
     def __init__(self, name, version, description):
@@ -164,7 +166,7 @@ class cBioPortal(DynamicSource, object):
         tmp = response.split("\n")
         data = []
         for line in tmp[:-1]:
-            data.append(tuple(map(str, line.strip().split("\t"))))
+            data.append(tuple(map(unicode, line.strip().split("\t"))))
         self._cancer_types = dict(data)
 
     def _get_cancer_studies(self):
@@ -192,7 +194,7 @@ class cBioPortal(DynamicSource, object):
             self._get_cancer_studies()
 
         self._cache_genetic_profiles = {}
-        for cancer_study_id in zip(*self._cache_cancer_studies)[0]:
+        for cancer_study_id in list(zip(*self._cache_cancer_studies))[0]:
             self._cache_genetic_profiles[cancer_study_id] = []
             self.log.debug("fetching genetic profiles for cancer study %s" % cancer_study_id)
             try:
@@ -218,7 +220,7 @@ class cBioPortal(DynamicSource, object):
             self._get_cancer_studies()
 
         self._cache_case_sets = {}
-        for cancer_study_id in zip(*self._cache_cancer_studies)[0]:
+        for cancer_study_id in list(zip(*self._cache_cancer_studies))[0]:
             self._cache_case_sets[cancer_study_id] = []
             self.log.debug("fetching case sets for cancer study %s" % cancer_study_id)
             try:
@@ -242,7 +244,7 @@ class cBioPortal(DynamicSource, object):
         split_regexp = '\s+|,'
         split_prog = re.compile(split_regexp)
 
-        out_metadata = dict(zip(metadata, [list() for i in range(len(metadata))]))
+        out_metadata = dict(list(zip(metadata, [list() for i in range(len(metadata))])))
 
         self._get_genetic_profiles(cancer_studies=cancer_studies)
         self._get_case_sets(cancer_studies=cancer_studies)
@@ -298,8 +300,8 @@ class cBioPortal(DynamicSource, object):
                     for line in response.strip().split("\n"):
                         if not line.startswith("#") and not line.startswith("GENE_ID"):
                             tmp = split_prog.split(line)[2:]
-                            tmp2 = filter(lambda x: x != 'NaN', tmp)
-                            tmp3 = filter(lambda x: mut_prog.match(x), tmp2)
+                            tmp2 = [x for x in tmp if x != 'NaN']
+                            tmp3 = [x for x in tmp2 if mut_prog.match(x)]
                             fixed_isoform = [self._convert_isoform(m, mainisoform, cancer_study_isoform, mapisoform) for m in tmp3]
                             mutations.extend(tmp3)
                             if do_cancer_type:
@@ -385,7 +387,7 @@ class COSMIC(DynamicSource, object):
         cancer_types = set()
         for f in self._database_files:
             with open(f) as fh:
-                fh.next()
+                next(fh)
                 for line in fh:
                     cancer_types.add(line.strip().split("\t")[11])
         return sorted(list(cancer_types))
@@ -394,7 +396,7 @@ class COSMIC(DynamicSource, object):
 
         mutations = []
 
-        out_metadata = dict(zip(metadata, [list() for i in range(len(metadata))]))
+        out_metadata = dict(list(zip(metadata, [list() for i in range(len(metadata))])))
 
         do_cancer_type = False
         if 'cancer_type' in metadata:
@@ -416,7 +418,7 @@ class COSMIC(DynamicSource, object):
 
         for f in self._database_files:
             with open(f) as fh:
-                fh.next()
+                next(fh)
                 for line in fh:
                     tmp = line.strip().split("\t")
                     if tmp[0] != gene_id or tmp[11] not in cancer_types:
@@ -475,7 +477,7 @@ class COSMIC(DynamicSource, object):
         else:
             gene_id = sequence.gene_id
         raw_mutations, out_metadata = self._parse_db_file(gene_id, cancer_types=cancer_types, metadata=metadata)
-        mutations = map(lambda x: x[2:], raw_mutations)
+        mutations = [x[2:] for x in raw_mutations]
         unique_mutations = list(set(mutations))
         self.log.info("unique mutations found in %s: %s" % (self.name, ", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1])))))
 
@@ -536,7 +538,7 @@ class PhosphoSite(DynamicSource, object):
 
     def _parse_db_file(self, gene_id):
 
-        sites = dict(zip(self._ptm_types, [list() for i in range(len(self._ptm_types))]))
+        sites = dict(list(zip(self._ptm_types, [list() for i in range(len(self._ptm_types))])))
 
         for ptm_idx,ptm in enumerate(self._ptm_types):
             p_regexp = '[A-Z][0-9]+-%s' % self._ptm_suffixes[ptm_idx]
@@ -544,9 +546,9 @@ class PhosphoSite(DynamicSource, object):
             p_sites = []
 
             with open(self._database_files[ptm]) as fh:
-                fh.next()
-                fh.next()
-                fh.next()
+                next(fh)
+                next(fh)
+                next(fh)
                 for line in fh:
                     tmp = line.strip().split("\t")
                     if str.upper(tmp[0]) != gene_id or tmp[6] != 'human':
@@ -630,23 +632,23 @@ class MyVariant(DynamicSource, object):
 
         mutation.metadata['revel_score'] = list()
 
-        if 'genomic_coordinates' not in mutation.metadata.keys() and 'genomic_mutations' not in mutation.metadata.keys():
+        if 'genomic_coordinates' not in mutation.metadata and 'genomic_mutations' not in mutation.metadata:
             self.log.warning("no genomic coordinates or genomic mutations data for mutation %s; it will be skipped" % mutation)
             return False
 
-        if 'genomic_coordinates' in mutation.metadata.keys():
+        if 'genomic_coordinates' in mutation.metadata:
             gcs = mutation.metadata['genomic_coordinates']
         else:
             self.log.warning("no genomic coordinates available for revel score, mutation %s" % mutation)
             gcs = [None] * len(mutation.metadata['genomic_mutations'])
 
-        if 'genomic_mutations' in mutation.metadata.keys():
+        if 'genomic_mutations' in mutation.metadata:
             gms = mutation.metadata['genomic_mutations']
         else:
             self.log.warning("no genomic mutations available for revel score, mutation %s" % mutation)
             gms = [None] * len(mutation.metadata['genomic_coordinates'])
 
-        gcs_gms = zip(gcs, gms)
+        gcs_gms = list(zip(gcs, gms))
 
         for gc,gm in gcs_gms:
             if gm is not None:
@@ -689,7 +691,7 @@ class MyVariant(DynamicSource, object):
 
         if not mutation.sequence_position.sequence_position == hit_pos:
             try:
-                if not mutation.sequence_position.sequence_position in map(int, aa['pos']):
+                if not mutation.sequence_position.sequence_position in [ int(a) for a in aa['pos'] ]:
                     raise TypeError
             except:
                 self.log.warning("sequence position in revel does not correspond for this hit; it will be skipped")
@@ -824,7 +826,6 @@ class ELMPredictions(DynamicSource, object):
 
     def _get_elm_classes(self):
         self._elm_classes = {}
-        unquote = lambda x: str.strip(x, '"')
         self.log.info("retrieving ELM classes")
         try:
             response = rq.get(self._classes_url+'/elms_index.tsv').text
@@ -835,8 +836,8 @@ class ELMPredictions(DynamicSource, object):
         for line in tmp:
             if line.startswith('"ELME'):
                 tmp2 = line.strip().split("\t")
-                tmp2 = map(str, tmp2)
-                tmp2 = map(unquote, tmp2)
+                tmp2 = [ unicode(t) for t in tmp2 ]  
+                tmp2 = [ unicode.strip(t, '"') for t in tmp2 ]
                 self._elm_classes[tmp2[1]] = tmp2[2:]
 
     def _get_prediction(self, gene_name):
@@ -931,7 +932,7 @@ class ExAC(DynamicSource, object):
                 for i,add_this_metadata in enumerate(metadata_functions):
                     mut.metadata[md_types[i]] = []
     
-                if not 'genomic_mutations' in mut.metadata.keys():
+                if not 'genomic_mutations' in mut.metadata:
                     self.log.warning("no genomic mutation data available for Exac SNP, mutation %s. It will be skipped" % mut)
                     continue
                 elif mut.metadata['genomic_mutations'] is None or len(mut.metadata['genomic_mutations']) == 0:
@@ -972,7 +973,6 @@ class ExAC(DynamicSource, object):
             
             exac = self._data_cache[gc]
 
-            print mutation, gc, md_type, exac[exac_key[md_type]]
             mutation.metadata[md_type].append(metadata_classes[md_type](self, exac[exac_key[md_type]]))
 
     def _parse_exac_page(self, text):
@@ -982,7 +982,6 @@ class ExAC(DynamicSource, object):
                 return data
 
     def _get_exac_data(self, variant):
-        print type(variant)
         if type(variant) is GenomicMutation:
             v_str = variant.as_hg19().get_value_str(fmt='exac')
         else:
@@ -1062,7 +1061,7 @@ class MobiDB(DynamicSource):
 
 
     def _get_mobidb_disorder_predictions_assignments(self, sequence, *args, **kwargs):
-        if 'use_alias' in kwargs.keys():
+        if 'use_alias' in kwargs:
             use_alias = kwargs['use_alias']
         else:
             use_alias = None
@@ -1080,7 +1079,7 @@ class MobiDB(DynamicSource):
         #print disorder_data
         assignments = [None for p in sequence.positions]
 
-        if 'full' in disorder_data.keys():
+        if 'full' in disorder_data:
             self.log.info("full consensus available")
 
             if len(data['mobidb_consensus']['disorder']['full']) > 0:
@@ -1098,7 +1097,7 @@ class MobiDB(DynamicSource):
             if None in assignments:
                 self.log.warning("Some positions were not assigned!")
 
-        elif 'predictors' in disorder_data.keys():
+        elif 'predictors' in disorder_data:
             self.log.info("full consensus not available - predictions will be used")
 
             mobidb_lite = data['mobidb_consensus']['disorder']['predictors'][1]
@@ -1121,7 +1120,6 @@ class MobiDB(DynamicSource):
             return None
         
         return assignments
-
 
     def _get_mobidb(self, sequence, use_alias=None):
         if use_alias is not None:
@@ -1150,14 +1148,6 @@ class MobiDB(DynamicSource):
 
         return data
 
-
-
-
-            
-
-
-
-
 class ManualAnnotation(StaticSource):
     @logger_init
     def __init__(self, datafile, csvoptions=None):
@@ -1165,13 +1155,13 @@ class ManualAnnotation(StaticSource):
         super(ManualAnnotation, self).__init__(name='Manual annotations', version='', description=description)
 
         self._datafile = datafile
-        fh = open(self._datafile, 'rb')
+        fh = open(self._datafile, 'rt')
         if csvoptions is None:
             csvoptions = {}
         try:
             self._csv = csv.reader(fh, **csvoptions)
         except:
-            log.error("")
+            self.log.error("reading of csv file failed")
         self._table = None
 
     def _parse_datafile(self):
@@ -1189,7 +1179,7 @@ class ManualAnnotation(StaticSource):
             elif row[2] == 'linear_motif':
                 this_row = [row[2]]
                 if '-' in row[1]:
-                    tmp = map(int, row[1].split("-"))
+                    tmp = list(map(int, row[1].split("-")))
                     this_row.append(tuple(range(tmp[0], tmp[1]+1)))
                 else:
                     this_row.append( (int(row[1]) ))

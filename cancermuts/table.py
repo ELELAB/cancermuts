@@ -24,6 +24,7 @@ Classes to save/read the table and generate a graphical representation
 """
 
 from __future__ import division
+from future.utils import iteritems
 
 import matplotlib
 matplotlib.use("Agg")
@@ -141,15 +142,15 @@ class Table:
         headers = {}
         ptms = {}
 
-        for k,v in position_properties_classes.iteritems():
+        for k,v in iteritems(position_properties_classes):
             headers[k] = v.description
             if 'ptm' in v.category:
                 ptms[k] = v.description
 
-        for k,v in sequence_properties_classes.iteritems():
+        for k,v in iteritems(sequence_properties_classes):
             headers[k] = v.description
 
-        for k,v in metadata_classes.iteritems():
+        for k,v in iteritems(metadata_classes):
             headers[k] = v.description
 
         headers['position']    = SequencePosition.description
@@ -175,7 +176,7 @@ class Table:
         sequence_properties_cols_start = len(header)
 
         header += [ self.headers[p] for p in sequence_properties ]
-        sequence_properties_col = range(sequence_properties_cols_start, len(header))
+        sequence_properties_col = list(range(sequence_properties_cols_start, len(header)))
         header += ['WT residue', 'Mutated residue', 'Sources']
         for md in mutation_metadata:
             header.append(self.headers[md])
@@ -185,7 +186,7 @@ class Table:
         for gi,p in enumerate(sequence.positions):
             base_row = [p.sequence_position]
             for r in position_properties:
-                if r in p.properties.keys():
+                if r in p.properties:
                     val = p.properties[r].get_value_str()
                 else:
                     val = None
@@ -194,7 +195,7 @@ class Table:
             base_row.append(p.wt_residue_type)
 
             mut_strings = [str(m) for m in p.mutations]
-            mut_strings_order = sorted(range(len(mut_strings)), key=mut_strings.__getitem__)
+            mut_strings_order = sorted(list(range(len(mut_strings))), key=mut_strings.__getitem__)
             
             if len(mut_strings_order) == 0:
                 this_row = list(base_row)
@@ -219,14 +220,10 @@ class Table:
                     except:
                         md_str = None
                     this_row.append(md_str)
-                #print "appending", gi
                 positions_mutlist.append(gi)
-                #print positions_mutlist
             rows.append(this_row)
 
         df = pd.DataFrame(rows, columns=header)
-
-        print df
 
         positions = df[ self.headers['position'] ]
 
@@ -235,7 +232,7 @@ class Table:
         properties_series = dict()
 
         for pidx, property_name in enumerate(sequence_properties):
-            if property_name not in sequence.properties.keys():
+            if property_name not in sequence.properties:
                 property_cols[property_name] = [ None ] * len(positions)
                 sequence_properties.remove(property_name)
                 self.log.warning("property %s not found in data; it won't be annotated" % property_name)
@@ -337,9 +334,9 @@ class Table:
 
         ladder = self._y_ladder(*y_ladder)
 
-        all_elms =     [ elm.split(", ") for elm in all_elms ]
+        all_elms = [ elm.split(", ") for elm in all_elms ]
         for i, elm in enumerate(all_elms):
-            all_elms[i][2] = map(int, elm[1].split('-'))
+            all_elms[i][2] = [ int(e) for e in elm[1].split('-') ]
             all_elms[i].append( elm[1][0] + (elm[1][1] - elm[1][0]) / 2.0 )
 
         all_elms = sorted(all_elms, key=lambda x: x[4])
@@ -360,7 +357,7 @@ class Table:
             ax.add_patch(patches.Rectangle((pos[0],0), pos[1]-pos[0], 1.0, alpha=0.8, color=color))
 
             if x >= df_i_range[0] and x <= df_i_range[-1]:
-                if name in self.labels.keys():
+                if name in self.labels:
                     label = self.labels[name]
                 else:
                     label = name
@@ -385,7 +382,7 @@ class Table:
                         rcParams={'font.size':8.0, 'font.sans-serif':['Arial']}):
 
         if rcParams:
-            for k,v in rcParams.iteritems():
+            for k,v in iteritems(rcParams.iteritems):
                 matplotlib.rcParams[k] = v
 
         df = df.copy()
