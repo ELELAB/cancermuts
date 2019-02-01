@@ -26,6 +26,7 @@ Classes to interrogate data sources and annotate various data
 import time
 import requests as rq
 from bioservices.uniprot import UniProt as bsUniProt
+import pandas as pd
 from .core import Sequence, Mutation
 from .properties import *
 from .metadata import *
@@ -92,8 +93,6 @@ class UniProt(DynamicSource, object):
         except:
             self.log.error("failed retrieving sequence for Uniprot ID %s" % upid)
             return None
-
-
 
         return Sequence(gene_id, sequence, self, aliases=aliases)
 
@@ -1149,61 +1148,58 @@ class MobiDB(DynamicSource):
         return data
 
 class ManualAnnotation(StaticSource):
+
+    _expected_cols = ['name', 'site', 'type', 'function', 'reference']
+    _ptm_keywords = ['ptm_cleavage', 'ptm_phosphorylation', 'ptm_ubiquitination', 'ptm_acetylation', 'ptm_sumoylation', 'ptm_nitrosylation', 'ptm_methylation']
+    _supported_position_properties = _ptm_keywords
+    _supported_sequence_properties = ['linear_motif']
+
     @logger_init
-    def __init__(self, datafile, csvoptions=None):
+    def __init__(self, datafile, **parsing_options):
+
         description="Annotations from %s" % datafile
         super(ManualAnnotation, self).__init__(name='Manual annotations', version='', description=description)
 
         self._datafile = datafile
-        fh = open(self._datafile, 'rt')
-        if csvoptions is None:
-            csvoptions = {}
+        self._df = None
+        
         try:
-            self._csv = csv.reader(fh, **csvoptions)
+            self._parse_datafile(**parsing_options)
         except:
-            self.log.error("reading of csv file failed")
-        self._table = None
+            self.log.error("An error occurred while parsing the input file %s; manual annotation will be skipped" % self._datafile)
+            self._df = None
+            return
 
-    def _parse_datafile(self):
+    def _parse_datafile(self, **parsing_options):
+
         self.log.info("Parsing annotations from %s" % self._datafile)
-        out = [] # type seq type function ref
-        ptm_keywords = ['ptm_cleavage', 'ptm_phosphorylation', 'ptm_ubiquitination', 'ptm_acetylation', 'ptm_sumoylation', 'ptm_nitrosylation', 'ptm_methylation']
-        for idx,row in enumerate(self._csv):
-            row_number = idx+1
-            if len(row) < 5:
-                self.log.warning("row %d has less than 5 columns and will be skipped. You need at least 5 columns to be present." % row_number)
-                continue
-            if   row[2] in ptm_keywords:
-                this_row = [row[2], tuple([int(row[1])]), row[0], row[3], row[4]]
-                self.log.info("added %s from row %d" % (row[2], row_number))
-            elif row[2] == 'linear_motif':
-                this_row = [row[2]]
-                if '-' in row[1]:
-                    tmp = list(map(int, row[1].split("-")))
-                    this_row.append(tuple(range(tmp[0], tmp[1]+1)))
-                else:
-                    this_row.append( (int(row[1]) ))
-                self.log.info("added %s from row %d" % (row[2], row_number))
-                this_row.extend([row[0], row[3], row[4]])
-            elif row[2] == 'mutation':
-                this_row = [ row[2], tuple([int(row[1][1:-1])]), row[1], row[0], row[3], row[4] ]
-                self.log.info("added %s from row %d" % (row[2], row_number))
-            else:
-                self.log.warning("no recognized keyword was found in column 3 and row %d will be skipped." % row_number)
-                continue
 
-            out.append(tuple(this_row))
-        self._table = out
+        try:
+            df = pd.read_csv(self._datafile, **parsing_options)
+        except IOError:
+            self.log.error("Parsing of file %s failed. ")
+            raise IOError
 
+        try:
+            self._df = df[ self._expected_cols ]
+        except IndexError:
+            log.error("required columns not found in csv file (these are: %s). Manual annotation will be skipped" % ", ".join(self._expected_cols))
+            raise IndexError
+
+        all_properties = set(self._supported_position_properties + self._supported_sequence_properties)
+
+        diff = set(df['type']).difference(all_properties)
+        if len(diff) > 0:
+            self.log.warning("the following annotation types were not recognized: %s" % ", ".join(diff))
 
     def add_mutations(self, sequence):
-        if self._table is None:
-            self._parse_datafile()
-        else:
-            self.log.info("datafile information has already been parsed - won't be re-read")
 
-        mutations = [d[2] for d in self._table if d[0] == 'mutation']
-        unique_mutations = list(set(mutations))
+        if self._df is None:
+            return
+
+        tmp_df = self._df[ self._df['type'] == 'mutation' ]
+
+        unique_mutations = list(set(tmp_df['site']))
 
         self.log.info("unique mutations found in datafile: %s" % (", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1])))))
 
@@ -1225,10 +1221,8 @@ class ManualAnnotation(StaticSource):
             position = sequence.positions[site_seq_idx]
 
             if position.wt_residue_type != wt:
-                self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
+                self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, num, position.wt_residue_type))
                 continue
-
-            mutation_indices = [i for i, x in enumerate(mutations) if x == m]
 
             mutation_obj = Mutation(sequence.positions[site_seq_idx],
                                     mut,
@@ -1236,46 +1230,59 @@ class ManualAnnotation(StaticSource):
 
             position.add_mutation(mutation_obj)
 
-    def add_position_properties(self, sequence):
-        if self._table is None:
-            self._parse_datafile()
-        else:
-            self.log.info("datafile information has already been parsed - won't be re-read")
+    def add_position_properties(self, sequence, prop=_supported_position_properties):
 
-        for d in self._table:
-            this_position = sequence.positions[sequence.seq2index(d[1][0])]
+        if self._df is None:
+            return
+
+        tmp_df = self._df[ self._df.apply(lambda x: x['type'] in self._supported_position_properties, axis=1) ]
+
+        for idx, row in tmp_df.iterrows():
+
+            this_position = sequence.positions[sequence.seq2index(int(row['site']))]
             
-            try:
-                property_obj = position_properties_classes[d[0]](sources=[self],
-                                                                 position=this_position)
-                assert len(d[1]) == 1
-            except KeyError:
-                self.log.warning("property %s is not a valid position property; row will be skipped" % d[0])
-                continue
+            property_obj = position_properties_classes[row['type']](sources=[self],
+                                                                    position=this_position)
 
-            property_obj.metadata['function'] = [d[3]]
-            property_obj.metadata['ref']      = [d[4]]
+            property_obj.metadata['function'] = row['function']
+            property_obj.metadata['reference']      = row['reference']
+
             this_position.add_property(property_obj)
 
-    def add_sequence_properties(self, sequence):
-        if self._table is None:
-            self._parse_datafile()
-        else:
-            self.log.info("datafile information has already been parsed - won't be re-read")
+            self.log.info("added %s from row %d" % (row['type'], idx+1))
 
-        for d in self._table:
-            this_positions = []
-            for p in d[1]:
-                this_positions.append(sequence.positions[sequence.seq2index(p)])
 
-            try:
-                property_obj = sequence_properties_classes[d[0]](sources=[self],
-                                                             positions=this_positions,
-                                                             lmtype=d[2])
-            except KeyError:
-                self.log.warning("property %s is not a valid sequence property; row will be skipped" % d[0])
+    def add_sequence_properties(self, sequence, prop=_supported_sequence_properties):
+
+        if self._df is None:
+            return
+
+        tmp_df = self._df[ self._df.apply(lambda x: x['type'] in self._supported_sequence_properties, axis=1) ]
+
+        for idx,row in tmp_df.iterrows():
+            if '-' in row['site']:
+                tmp = list(map(int, row['site'].split("-")))
+                try:
+                    assert(len(tmp) == 2)
+                    assert(int(tmp[0]) <= int(tmp[1]))
+                except AssertionError:
+                    log.error("line %d range in site column must be specified as 'from-to' (ex 10-15)" % (idx+1))
+                positions = tuple(range(tmp[0], tmp[1]+1))
+            else:
+                positions = ( int(row['site']) )
+
+            try: 
+                positions = [ sequence.positions[sequence.seq2index(p)] for p in positions ]
+            except:
+                self.log.warning("position property %s is outside the protein sequence; it will be skipped" % row['type'])
                 continue
 
-            property_obj.metadata['function'] = [d[3]]
-            property_obj.metadata['ref']      = [d[4]]
+            property_obj = sequence_properties_classes[row['type']](sources=[self],
+                                                                    positions=positions,
+                                                                    lmtype=row['name'])
+
+
+            property_obj.metadata['function'] = row['function']
+            property_obj.metadata['reference']      = row['reference']
+
             sequence.add_property(property_obj)
