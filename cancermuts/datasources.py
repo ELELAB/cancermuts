@@ -857,6 +857,7 @@ class ELMPredictions(DynamicSource, object):
             if line.startswith("#") or line.startswith('elm_identifier') or not line:
                 continue
             assert len(tmp2) == 10
+            
             tmp2[0] = str(tmp2[0])
             tmp2[1] = int(tmp2[1])
             tmp2[2] = int(tmp2[2])

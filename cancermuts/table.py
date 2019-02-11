@@ -32,7 +32,6 @@ from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 import pandas as pd
 import argparse
-import logging as log
 from .log import *
 from .properties import *
 from .metadata import *
@@ -47,6 +46,8 @@ class Table:
             '14-3-3 binding phosphopeptide motif':'14-3-3',
             'APCC activator-binding ABBA motif':'ABBA',
             'Actin-binding motifs':'Actin',
+            'APCC-binding Destruction motifs':'APCC',
+            'AP-2 beta2 appendage CCV component motifs':'AP2',
             'Atg8 protein family ligands':'Atg8',
             'BCL-2 binding site':'BCL-2',
             'BRCT phosphopeptide ligands':'BRCT',
@@ -65,6 +66,7 @@ class Table:
             'Extracellular side LRP5 and -6 binding motif':'LRP5,6',
             'EVH1  ligands':'EVH1',
             'FHA phosphopeptide ligands':'FHA',
+            'Helical calmodulin binding motifs': 'Calm.',
             'IAP-binding motif (IBM)':'IBM',
             'Immunoreceptor tyrosine-based motif':'ImmY',
             'IRF-3 binding site':'IRF-3',
@@ -104,28 +106,14 @@ class Table:
             'xLIR LIR motif':'xLIR',
             'GTPase-binding domain (GBD) ligand':'GTPase'}
 
-    ptms = {    'Phosphorylation site'  : 'P',
-                'Methylation site'      : 'Me',
-                'Ubiquitination site'   : 'Ubq',
-                'Caspase cleavage site' : 'C',
-                'S-Nitrosylation site'  : 'SN',
-                'Acetylation site'      : 'Ac',
-                'Sumoylation site'      : 'Sumo'    }
-
     ptm_colors = defaultdict(lambda: 'black',
-                {    'Phosphorylation site'  : 'red',
-                    'Methylation site'      : 'darkgreen',
-                    'Ubiquitination site'   : 'blue',
-                    'Caspase cleavage site' : 'purple',
-                    'S-Nitrosylation site'  : 'orange',
-                    'Acetylation site'      : 'grey',
-                    'Sumoylation site'      : 'lightblue'    })
-
-    headers = { "elm"      : "Residue part of a linear motif",
-                "position" : 'Position',
-                "mutated"  : 'Mutated residue',
-                "wt"       : 'WT residue',
-                "revel"    : 'Revel score' }
+                {   'ptm_phosphorylation' : 'red',
+                    'ptm_methylation'     : 'darkgreen',
+                    'ptm_ubiquitination'  : 'blue',
+                    'ptm_cleavage'        : 'purple',
+                    'ptm_nitrosylation'   : 'orange',
+                    'ptm_acetylation'     : 'grey',
+                    'ptm_sumoylation'     : 'lightblue'    })
 
     y_ptm = 1.02
 
@@ -141,11 +129,13 @@ class Table:
 
         headers = {}
         ptms = {}
+        ptm_codes = {}
 
         for k,v in iteritems(position_properties_classes):
             headers[k] = v.description
             if 'ptm' in v.category:
                 ptms[k] = v.description
+                ptm_codes[k] = v.code
 
         for k,v in iteritems(sequence_properties_classes):
             headers[k] = v.description
@@ -154,11 +144,13 @@ class Table:
             headers[k] = v.description
 
         headers['position']    = SequencePosition.description
-        headers['wt']          = 'Wt residue'
+        headers['wt']          = 'WT residue'
         headers['mutated']     = 'Mutated residue'
         headers['mut_sources'] = 'Mutation sources'
 
         self.headers = headers
+        self.ptms = ptms
+        self.ptm_codes = ptm_codes
 
         if not set(self.ptms.keys()).issubset(set(self.ptm_colors.keys())):
             self.log.warning("not enough colors specified for ptms to plot")
@@ -292,7 +284,7 @@ class Table:
         else:
             df_m['Revel score'] = revel_not_annotated
 
-        (markerline, stemlines, baseline) = ax.stem(df_m[self.headers['position']], df_m[self.headers['revel']])
+        (markerline, stemlines, baseline) = ax.stem(df_m[self.headers['position']], df_m[self.headers['revel_score']])
         plt.setp(baseline, visible=False)
 
         ladder = self._y_ladder(*y_ladder)
@@ -312,16 +304,22 @@ class Table:
             types = self.ptms.keys()
 
         for t in types:
-            df_t = df_i[ df_i[t] == self.ptms[t] ]
+            if self.ptms[t] not in df_i.keys():
+                self.log.warning("PTM type %s not found in DataFrame" % self.ptms[t])
+                continue
+            df_t = df_i[ df_i[self.ptms[t]].fillna('') == self.ptm_codes[t] ]
+            if len(df_t) == 0:
+                self.log.info("No information found for %s" % self.ptms[t])
+                continue
             for r in df_t[self.headers['position']]:
-                ax.text(r, self.y_ptm, self.ptms[t], color=self.ptm_colors[t], horizontalalignment='center') #bbox=dict(facecolor='red', alpha=0.5),
+                ax.text(r, self.y_ptm, self.ptm_codes[t], color=self.ptm_colors[t], horizontalalignment='center') #bbox=dict(facecolor='red', alpha=0.5),
                 ax.axvline(x=r, color=self.ptm_colors[t], lw=0.5)
 
     def _plot_elms(self, ax, df, df_i, mutation_elms_only=True, color='lightblue', y_ladder=(-0.2, -0.6, 5)):
         
         all_elms = []
 
-        df_e = df [ df[ self.headers['elm'] ].notnull() ][ self.headers['elm']]
+        df_e = df [ df[ self.headers['linear_motif'] ].notnull() ][ self.headers['linear_motif']]
 
         df_mut_pos = set( df[ df[self.headers['mutated']].notnull() ][self.headers['position']] )
         df_i_pos = sorted(list(set(df_i[self.headers['position']])))
@@ -335,11 +333,12 @@ class Table:
         ladder = self._y_ladder(*y_ladder)
 
         all_elms = [ elm.split(", ") for elm in all_elms ]
+
         for i, elm in enumerate(all_elms):
-            all_elms[i][2] = [ int(e) for e in elm[1].split('-') ]
+            all_elms[i][1] = [ int(e) for e in elm[1].split('-') ]
             all_elms[i].append( elm[1][0] + (elm[1][1] - elm[1][0]) / 2.0 )
 
-        all_elms = sorted(all_elms, key=lambda x: x[4])
+        all_elms = sorted(all_elms, key=lambda x: x[3])
 
         for elm in all_elms:
             name, pos, source, x = elm
@@ -382,7 +381,7 @@ class Table:
                         rcParams={'font.size':8.0, 'font.sans-serif':['Arial']}):
 
         if rcParams:
-            for k,v in iteritems(rcParams.iteritems):
+            for k,v in iteritems(rcParams):
                 matplotlib.rcParams[k] = v
 
         df = df.copy()
@@ -396,11 +395,11 @@ class Table:
             self.log.warning("No mutations column found - mutations won't be annotated")
             mutations = False
 
-        if self.headers['revel'] not in df.keys():
+        if self.headers['revel_score'] not in df.keys():
             self.log.warning("No revel score found - value won't be annotated")
             mutations_revel = False
 
-        if self.headers["elm"] not in df.keys():
+        if self.headers['linear_motif'] not in df.keys():
             self.log.warning("No ELMs information found - won't be annotated")
             elm = False
 
