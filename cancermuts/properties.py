@@ -91,6 +91,7 @@ class LinearMotif(SequenceProperty):
 class PhosphorylationSite(PositionProperty):
     description = "Phosphorylation site"
     category="ptm_phosphorylation"
+    code = "P"
 
     def __init__(self, position, sources):
         super(PhosphorylationSite, self).__init__(  name="Phosphorylation Site",
@@ -100,11 +101,12 @@ class PhosphorylationSite(PositionProperty):
                                                     metadata={}  )
 
     def get_value_str(self):
-        return "P"
+        return self.code
 
 class MethylationSite(PositionProperty):
     description = "Methylation site"
     category="ptm_methylation"
+    code = "Me"
 
     def __init__(self, position, sources):
         super(MethylationSite, self).__init__(  name="Methylation Site",
@@ -114,11 +116,12 @@ class MethylationSite(PositionProperty):
                                                     metadata={}  )
 
     def get_value_str(self):
-        return "Me"
+        return self.code
 
 class AcetylationSite(PositionProperty):
     description = "Acetylation site"
     category='ptm_acetylation'
+    code = 'Ac'
 
     def __init__(self, position, sources):
         super(AcetylationSite, self).__init__(  name="Acetylation Site",
@@ -128,11 +131,12 @@ class AcetylationSite(PositionProperty):
                                                     metadata={}  )
 
     def get_value_str(self):
-        return "Ac"
+        return self.code
 
 class SNitrosylationSite(PositionProperty):
     description = "S-Nitrosylation site"
     category='ptm_nitrosylation'
+    code = "SN"
 
     def __init__(self, position, sources):
         super(SNitrosylationSite, self).__init__(  name="S-Nytrosilation site",
@@ -142,11 +146,12 @@ class SNitrosylationSite(PositionProperty):
                                                     metadata={}  )
 
     def get_value_str(self):
-        return "SN"
+        return self.code
 
 class OGalNAcSite(PositionProperty):
     description = "OGalNAc site"
     category='ptm_ogalnac'
+    code = "O-GalNAc"
 
     def __init__(self, position, sources):
         super(OGalNAcSite, self).__init__(  name="o-GalNAc Site",
@@ -156,11 +161,12 @@ class OGalNAcSite(PositionProperty):
                                                     metadata={}  )
 
     def get_value_str(self):
-        return "O-GalNAc"
+        return self.code
 
 class OGlcNAcSite(PositionProperty):
     description = "OGlcNAc site"
     category='ptm_oglcnac'
+    code = "O-GlcNAc"
 
 
     def __init__(self, position, sources):
@@ -171,11 +177,12 @@ class OGlcNAcSite(PositionProperty):
                                                     metadata={}  )
 
     def get_value_str(self):
-        return "O-GlcNAc"
+        return self.code
 
 class SumoylationSite(PositionProperty):
     description = "Sumoylation site"
     category='ptm_sumoylation'
+    code = "Sumo"
 
 
     def __init__(self, position, sources):
@@ -185,11 +192,12 @@ class SumoylationSite(PositionProperty):
                                                     values={},
                                                     metadata={}  )
     def get_value_str(self):
-        return "Sumo"
+        return self.code
 
 class UbiquitinationSite(PositionProperty):
     description = "Ubiquitination site"
     category='ptm_ubiquitination'
+    code = 'Ubq'
 
     def __init__(self, position, sources):
         super(UbiquitinationSite, self).__init__(  name="Ubiquitination Site",
@@ -198,11 +206,12 @@ class UbiquitinationSite(PositionProperty):
                                                     values={},
                                                     metadata={}  )
     def get_value_str(self):
-        return "Ubq"
+        return self.code
 
 class CleavageSite(PositionProperty):
     description = "Caspase cleavage site"
     category='ptm_cleavage'
+    code = 'C'
 
     def __init__(self, position, sources):
         super(CleavageSite, self).__init__(  name="Caspase cleavage site",
@@ -212,7 +221,7 @@ class CleavageSite(PositionProperty):
                                                     metadata={}  )
 
     def get_value_str(self):
-        return "C"
+        return self.code
 
 
 class DisorderPropensity(PositionProperty):
