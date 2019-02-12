@@ -370,28 +370,36 @@ class COSMIC(DynamicSource, object):
     @logger_init
     def __init__(self, database_files=None, cancer_type=None):
         description = "COSMIC Database"
-        super(COSMIC, self).__init__(name='COSMIC', version='v85', description=description)
+        super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
+
+        self._mut_regexp = 'p\.[A-Z][0-9]+[A-Z]$'
+        self._mut_prog = re.compile(self._mut_regexp)
+        dataframes = []
 
         if database_files is None:
-            database_dir   = '/data/databases/cosmic-v85'
+            database_dir   = '/data/databases/cosmic'
             databases      = [  'CosmicMutantExport',
                                 'CosmicCompleteTargetedScreensMutantExport',
                                 'CosmicGenomeScreensMutantExport' ]
             self._database_files = [os.path.join(database_dir, i)+'.tsv' for i in databases]
-            self._mut_regexp = 'p\.[A-Z][0-9]+[A-Z]$'
-            self._mut_prog = re.compile(self._mut_regexp)
+        else:
+            self._database_files = database_files
 
-    def _get_all_cancer_types(self):
-        self.log.info("getting cancer types...")
-        cancer_types = set()
         for f in self._database_files:
-            with open(f) as fh:
-                next(fh)
-                for line in fh:
-                    cancer_types.add(line.strip().split("\t")[11])
-        return sorted(list(cancer_types))
+            try:
+                self.log.info("Parsing database file %s ..." % f)
+                dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS') )
+            except:
+                self.log.error("Couldn't parse database file.")
+                self._df = None
+                return
 
-    def _parse_db_file(self, gene_id, cancer_types=[], metadata=[], filter_snps=True):
+        self._df = pd.concat(dataframes, ignore_index=True, sort=False)
+
+    def _parse_db_file(self, gene_id, cancer_types=None, metadata=[], filter_snps=True):
+
+        site_kwd = ['Primary_site', 'Site_subtype_1', 'Site_subtype_2', 'Site_subtype_3']
+        histology_kwd = ['Primary_histology', 'Histology_subtype_1', 'Histology_subtype_2', 'Histology_subtype_3']
 
         mutations = []
 
@@ -415,66 +423,72 @@ class COSMIC(DynamicSource, object):
             out_metadata['cancer_histology'] = []
             do_histology = True
 
-        for f in self._database_files:
-            with open(f) as fh:
-                next(fh)
-                for line in fh:
-                    tmp = line.strip().split("\t")
-                    if tmp[0] != gene_id or tmp[11] not in cancer_types:
-                        continue
+        df = self._df[ self._df['Gene name'] == gene_id ]
 
-                    if filter_snps and tmp[25] == 'y':
-                        self.log.info("mutation %s was filtered out as it is classified as SNP" % tmp[18])
-                        continue
+        if filter_snps:
+            df = df[ df['SNP'] != 'y' ]
 
-                    mut_str = tmp[18]
-                    if self._mut_prog.match(mut_str):
-                        mutations.append(mut_str)
-                        if do_cancer_type:
-                            out_metadata['cancer_type'].append([tmp[11]])
-                        if do_genomic_coordinates or do_genomic_mutations:
-                            gd = []
-                            if tmp[22] == '38':
-                                gd.append('hg38') # genome version
-                            elif tmp[22] == '37':
-                                gd.append('hg19')
-                            else:
-                                out_metadata['genomic_coordinates'].append(None)
-                                continue
-                            tmp2 = tmp[23].split(":")
-                            gd.append(tmp2[0]) # chr
-                            gd.extend(tmp2[1].split("-")) # [start, end]
-                            gd.append(tmp[17][-3]) # ref
+        if cancer_types is not None:
+            df = df[ df['Primary histology'] in cancer_types ]
 
-                        if do_genomic_coordinates:
-                            out_metadata['genomic_coordinates'].append(gd)
+        df = df[ df['Mutation AA'].notna() ]
 
-                        if do_genomic_mutations:
-                            if gd[2] != gd[3]:
-                                self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
-                                gm = None
-                            else:
-                                gm = [gd[0], gd[1], tmp[24], gd[2], gd[4], tmp[17][-1]]
-                            out_metadata['genomic_mutations'].append(gm)
-            
-                        if do_site:
-                            out_metadata['cancer_site'].append(tmp[7:11])
+        df = df[ df.apply(lambda x: bool(self._mut_prog.match(x['Mutation AA'])), axis=1) ]
 
-                        if do_histology:
-                            out_metadata['cancer_histology'].append(tmp[11:15])
+        df.columns = df.columns.str.replace(r'\s+', '_')
+
+        for r in df.itertuples():
+            mutations.append(r.Mutation_AA)
+
+            if do_cancer_type:
+                out_metadata['cancer_type'].append([r.Primary_histology])
+
+            if do_genomic_coordinates or do_genomic_mutations:
+                gd = []
+                grch = r.GRCh
+                if grch == '38':
+                    gd.append('hg38') # genome version
+                elif grch == '37':
+                    gd.append('hg19')
+                else:
+                    out_metadata['genomic_coordinates'].append(None)
+                    self.log.warning("Genome assembly not specified for mutation; genomic coordinates won't be annotated")
+                    continue
+
+                tmp2 = r.Mutation_genome_position.split(":")
+                gd.append(tmp2[0]) # chr
+                gd.extend(tmp2[1].split("-")) # [start, end]
+                gd.append(r.Mutation_CDS[-3]) # ref
+
+            if do_genomic_coordinates:
+                out_metadata['genomic_coordinates'].append(gd)
+
+            if do_genomic_mutations:
+                if gd[2] != gd[3]:
+                    self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
+                    gm = None
+                else:
+                    gm = [gd[0], gd[1], r.Mutation_strand, gd[2], gd[4], r.Mutation_CDS[-1]]
+                out_metadata['genomic_mutations'].append(gm)
+
+            if do_site:
+                out_metadata['cancer_site'].append([r.__getattribute__(a) for a in site_kwd])
+
+            if do_histology:
+                out_metadata['cancer_histology'].append([r.__getattribute__(a) for a in histology_kwd])
 
         return mutations, out_metadata
 
     def add_mutations(self, sequence, cancer_types=None, use_alias=None, filter_snps=True, metadata=[]):
 
         if cancer_types is None:
-            cancer_types = self._get_all_cancer_types()
             self.log.info("no cancer type specified; will use all of them")
         if use_alias is not None:
             gene_id = sequence.aliases[use_alias]
             self.log.info("using alias %s as gene name" % sequence.aliases[use_alias])
         else:
             gene_id = sequence.gene_id
+
         raw_mutations, out_metadata = self._parse_db_file(gene_id, cancer_types=cancer_types, metadata=metadata)
         mutations = [x[2:] for x in raw_mutations]
         unique_mutations = list(set(mutations))
@@ -1074,9 +1088,6 @@ class MobiDB(DynamicSource):
             self.log.error("No disorder data was found")
             return None
 
-        #print "QQQ"
-        #print disorder_data.keys()
-        #print disorder_data
         assignments = [None for p in sequence.positions]
 
         if 'full' in disorder_data:
