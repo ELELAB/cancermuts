@@ -1201,7 +1201,6 @@ class ManualAnnotation(StaticSource):
         except IOError:
             self.log.error("Parsing of file %s failed. ")
             raise IOError
-
         try:
             self._df = df[ self._expected_cols ]
         except IndexError:
