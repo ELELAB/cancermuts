@@ -38,6 +38,7 @@ import os
 import csv
 import myvariant
 import pyliftover
+from future.utils import iteritems
 
 import sys
 if sys.version_info[0] >= 3:
@@ -532,22 +533,37 @@ class COSMIC(DynamicSource, object):
 
 class PhosphoSite(DynamicSource, object):
     @logger_init
-    def __init__(self, database_file=None):
+    def __init__(self, database_files=None):
         description = "PhosphoSite Database"
         super(PhosphoSite, self).__init__(name='PhosphoSite', version='1.0', description=description)
-        if database_file is None:
-            self._ptm_types = ['acetylation', 'methylation', 'O-GalNAc', 'O-GlcNAc', 'phosphorylation', 'sumoylation', 'ubiquitination']
-            self._ptm_types_to_classes = {  'acetylation'     : 'ptm_acetylation', 
-                                            'methylation'     : 'ptm_methylation', 
-                                            'O-GalNAc'        : 'ptm_ogalnac', 
-                                            'O-GlcNAc'        : 'ptm_oglcnac', 
-                                            'phosphorylation' : 'ptm_phosphorylation', 
-                                            'sumoylation'     : 'ptm_sumoylation',
-                                            'ubiquitination'  : 'ptm_ubiquitination' }
-            self._ptm_suffixes = ['ac', 'm[0-9]', 'ga', 'gl', 'p', 'sm', 'ub']
-            self._ptm_suffix_offsets = [-3, -3, -3, -3, -2, -3, -3]
+
+        self._ptm_types = ['acetylation', 'methylation', 'O-GalNAc', 'O-GlcNAc', 'phosphorylation', 'sumoylation', 'ubiquitination']
+        self._ptm_types_to_classes = {  'acetylation'     : 'ptm_acetylation', 
+                                        'methylation'     : 'ptm_methylation', 
+                                        'O-GalNAc'        : 'ptm_ogalnac', 
+                                        'O-GlcNAc'        : 'ptm_oglcnac', 
+                                        'phosphorylation' : 'ptm_phosphorylation', 
+                                        'sumoylation'     : 'ptm_sumoylation',
+                                        'ubiquitination'  : 'ptm_ubiquitination' }
+        self._ptm_suffixes = ['ac', 'm[0-9]', 'ga', 'gl', 'p', 'sm', 'ub']
+        self._ptm_suffix_offsets = [-3, -3, -3, -3, -2, -3, -3]
+
+        if database_files is None:
             self._database_dir = "/data/databases/phosphosite/"
             self._database_files = dict([(i, "%s/%s_site_dataset"%(self._database_dir,i)) for i in self._ptm_types])
+
+        else:
+            self._database_files = database_files
+
+        self._dataframes = {}
+        for k,f in iteritems(self._database_files):
+            try:
+                self._dataframes[k] = pd.read_csv(f, skiprows=3, sep='\t')
+                self._dataframes[k] = self._dataframes[k][ self._dataframes[k]['ORGANISM'] == 'human']
+            except:
+                self.log.error("couldn't read database file %s" % f)
+
+
 
     def _parse_db_file(self, gene_id):
 
@@ -558,18 +574,12 @@ class PhosphoSite(DynamicSource, object):
             p_prog = re.compile(p_regexp)
             p_sites = []
 
-            with open(self._database_files[ptm]) as fh:
-                next(fh)
-                next(fh)
-                next(fh)
-                for line in fh:
-                    tmp = line.strip().split("\t")
-                    if str.upper(tmp[0]) != gene_id or tmp[6] != 'human':
-                        continue
-                    p_str = tmp[4]
-                    if p_prog.match(p_str):
-                        p_sites.append(p_str[:self._ptm_suffix_offsets[ptm_idx]])
-            sites[ptm] = p_sites
+            df = self._dataframes[ptm]
+            df = df[ df['GENE'].str.upper() == gene_id.upper() ]
+            df = df[ df.apply(lambda x: bool(p_prog.match(x['MOD_RSD'])), axis=1) ]
+
+            sites[ptm] = [ x[:self._ptm_suffix_offsets[ptm_idx]] for x in df['MOD_RSD'].values  ]
+
         return sites
 
     def add_position_properties(self, sequence):
