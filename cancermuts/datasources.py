@@ -26,10 +26,12 @@ Classes to interrogate data sources and annotate various data
 import time
 import requests as rq
 from bioservices.uniprot import UniProt as bsUniProt
+import pandas as pd
 from .core import Sequence, Mutation
 from .properties import *
 from .metadata import *
 from .log import *
+import io
 import json
 import re
 import sys
@@ -37,6 +39,8 @@ import os
 import csv
 import myvariant
 import pyliftover
+from multiprocessing.dummy import Pool
+from future.utils import iteritems
 
 import sys
 if sys.version_info[0] >= 3:
@@ -93,8 +97,6 @@ class UniProt(DynamicSource, object):
             self.log.error("failed retrieving sequence for Uniprot ID %s" % upid)
             return None
 
-
-
         return Sequence(gene_id, sequence, self, aliases=aliases)
 
 class cBioPortal(DynamicSource, object):
@@ -102,21 +104,27 @@ class cBioPortal(DynamicSource, object):
     default_strand = '+'
     
     @logger_init
-    def __init__(self):
+    def __init__(self, cancer_studies=None):
         description = "cBioPortal"
 
         super(cBioPortal, self).__init__(name='cBioPortal', version='1.0', description=description)
 
         self._requests_url = 'http://www.cbioportal.org/webservice.do'
-        self._cache_cancer_studies = None
-        self._cache_genetic_profiles = None
-        self._cache_case_sets = None
-        self._cache_profile_data = None
-        self._cancer_types = {}
+        self._cache_cancer_studies = pd.DataFrame()
+        self._cache_genetic_profiles = pd.DataFrame()
+        self._cache_case_sets = pd.DataFrame()
+        self._cache_profile_data = pd.DataFrame()
+        self._cancer_types = pd.DataFrame()
         self._get_cancer_types()
+        self._get_cancer_studies(cancer_studies)
+        self._get_genetic_profiles()
+        self._get_case_sets()
 
-    def add_mutations(self, sequence, cancer_studies=None, metadata=[], mainisoform=1, mapisoform=None):
-        mutations, out_metadata = self._get_profile_data(sequence.gene_id, cancer_studies=cancer_studies, metadata=metadata, mainisoform=mainisoform, mapisoform=mapisoform)
+        self._mut_regexp = '[A-Z][0-9]+[A-Z]$'
+        self._mut_prog = re.compile(self._mut_regexp)
+
+    def add_mutations(self, sequence, metadata=[], mainisoform=1, mapisoform=None):
+        mutations, out_metadata = self._get_profile_data(sequence.gene_id, metadata=metadata, mainisoform=mainisoform, mapisoform=mapisoform)
         unique_mutations = list(set(mutations))
         self.log.info("unique mutations found in %s: %s" % (self.name, ", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1])))))
         for m_idx,m in enumerate(unique_mutations):
@@ -158,100 +166,200 @@ class cBioPortal(DynamicSource, object):
     def _get_cancer_types(self):
         self.log.info("fetching cancer types")
         try:
-            response = rq.post(self._requests_url, {'cmd':'getTypesOfCancer'}).text
+            response = rq.post(self._requests_url, {'cmd':'getTypesOfCancer'})
         except:
             self.log.error("failed retrieving cancer types")
             self._cancer_types = None
             return    
-        tmp = response.split("\n")
-        data = []
-        for line in tmp[:-1]:
-            data.append(tuple(map(unicode, line.strip().split("\t"))))
-        self._cancer_types = dict(data)
+        self._cancer_types = pd.read_csv(io.StringIO(response.text), sep='\t')
 
-    def _get_cancer_studies(self):
+    def _get_cancer_studies(self, cancer_studies=None):
         self.log.info("retrieving cancer studies...")
-        self._cache_cancer_studies = []
         try:
-            response = rq.post(self._requests_url, {'cmd':'getCancerStudies'}).text
+            response = rq.post(self._requests_url, {'cmd':'getCancerStudies'})
         except:
             self.log.error("failed retrieving cancer studies")
             self._cache_cancer_studies = None
             return
-        tmp = response.split("\n")
-        for line in tmp[1:]:
-            if line:
-                tmp2 = line.split("\t")
-                self._cache_cancer_studies.append(tuple(tmp2))
 
-    def _get_genetic_profiles(self, cancer_studies=None):
+        df = pd.read_csv(io.StringIO(response.text), sep='\t')
+
+        if cancer_studies is None:
+            self.log.info("all cancer studies will be considered")
+            self._cache_cancer_studies = df
+        else:
+            set_cs = set(cancer_studies)
+            set_csid = set(df['cancer_study_id'])
+            if not set_cs.issubset(set_csid):
+                notcommon = set_cs - set_csid
+                self.log.warning("the following cancer studies are not in the cBioPortal cancer studies list and will be skipped: %s" % (", ".join(sorted(list(notcommon)))))
+            cancer_studies = set_cs & set_csid
+            self._cache_cancer_studies = df[ df.apply(lambda x: x['cancer_study_id'] in cancer_studies, axis=1) ]
+
+    def _get_genetic_profile(self, cancer_study_id):
+        #self.log.debug("fetching genetic profiles for cancer study %s" % cancer_study_id)
+
+        try:
+            response = rq.post(self._requests_url, {'cmd':'getGeneticProfiles',
+                                                    'cancer_study_id':cancer_study_id})
+        except:
+            self.log.error("failed to fetch genetic profiles for study %s" % cancer_study_id)
+            return pd.DataFrame()
+
+        try:
+            df = pd.read_csv(io.StringIO(response.text), sep='\t')
+        except:
+            self.log.error("couldn't parse genetic profiles for study %s" % cancer_study_id)
+            return pd.DataFrame()
+
+        df['cancer_study'] = cancer_study_id
+        return df 
+
+    def _get_genetic_profiles(self):
         self.log.info("retrieving genetic profiles")
-        if cancer_studies is not None:
-            self.log.info("user-provided cancer studies will be used")
-            self._cache_cancer_studies = cancer_studies
-        else:
-            self.log.info("all available cancer studies will be used")
-            self._get_cancer_studies()
 
-        self._cache_genetic_profiles = {}
-        for cancer_study_id in list(zip(*self._cache_cancer_studies))[0]:
-            self._cache_genetic_profiles[cancer_study_id] = []
-            self.log.debug("fetching genetic profiles for cancer study %s" % cancer_study_id)
-            try:
-                response = rq.post(self._requests_url, {'cmd':'getGeneticProfiles',
-                                                        'cancer_study_id':cancer_study_id}).text
-            except:
-                self.log.error("failed to fetch genetic profiles for study %s" % cancer_study_id)
-                continue
-            tmp = response.split("\n")
-            for line in tmp[1:]:
-                if line:
-                    tmp2 = line.split("\t")
-                    if tmp2[4] == 'MUTATION' or tmp2[4] == 'MUTATION_EXTENDED':
-                        self._cache_genetic_profiles[cancer_study_id].append((tmp2[0],tmp2[4]))
+        if self._cache_cancer_studies.empty:
+            return
 
-    def _get_case_sets(self, cancer_studies=None):
+        cancer_study_ids = self._cache_cancer_studies['cancer_study_id'].values
+
+        pool = Pool(len(cancer_study_ids))
+
+        results = pool.map_async(self._get_genetic_profile, cancer_study_ids).get()
+
+        self._cache_genetic_profiles = pd.concat(results, ignore_index=True)
+
+    def _get_case_set(self, cancer_study_id):
+        #self.log.debug("fetching case sets for cancer study %s" % cancer_study_id)
+
+        try:
+            response = rq.post(self._requests_url, {'cmd':'getCaseLists',
+                                        'cancer_study_id':cancer_study_id})
+        except:
+            self.log.error("failed to fetch case sets profiles for study %s" % cancer_study_id)
+            return pd.DataFrame()
+
+        if response.text.startswith("Error"):
+            self.log.warning("no case sets for %s" % cancer_study_id)
+            return pd.DataFrame()
+
+        try:
+            df = pd.read_csv(io.StringIO(response.text), sep='\t')
+        except:
+            self.log.error("couldn't parse case sets for study %s" % cancer_study_id)
+            return pd.DataFrame()
+
+        df['cancer_study'] = cancer_study_id
+        return df 
+
+    def _get_case_sets(self):
         self.log.info("retrieving case sets")
-        if cancer_studies is not None:
-            self.log.info("user-provided cancer studies will be used")
-            self._cache_cancer_studies = cancer_studies
-        else:
-            self.log.info("all available cancer studies will be used")
-            self._get_cancer_studies()
 
-        self._cache_case_sets = {}
-        for cancer_study_id in list(zip(*self._cache_cancer_studies))[0]:
-            self._cache_case_sets[cancer_study_id] = []
-            self.log.debug("fetching case sets for cancer study %s" % cancer_study_id)
-            try:
-                response = rq.post(self._requests_url, {'cmd':'getCaseLists',
-                                                        'cancer_study_id':cancer_study_id}).text
-            except:
-                self.log.error("failed to fetch case sets for study %s" % cancer_study_id)
-                continue
+        if self._cache_cancer_studies.empty:
+            return
 
-            tmp = response.split("\n")
-            for line in tmp[1:]:
-                if line:
-                    tmp2 = line.split("\t")
-                    self._cache_case_sets[cancer_study_id].append(tmp2[0])
+        cancer_study_ids = self._cache_cancer_studies['cancer_study_id'].values
+
+        pool = Pool(len(cancer_study_ids))
+
+        results = pool.map_async(self._get_case_set, cancer_study_ids).get()
+
+        self._cache_case_sets = pd.concat(results, ignore_index=True)
+
+    def _get_case_profile_data(self, args):
+
+        case_row, cancer_study_mutation_ids, gene_id = args
+
+        case_set = case_row[1]['case_list_name']
+        self.log.debug("doing case set %s for genetic profiles %s" % (case_set, ",".join(cancer_study_mutation_ids['genetic_profile_id'].values)))
+        try:
+            response = rq.post(self._requests_url, {'cmd':'getProfileData',
+                                                    'case_set_id':case_set,
+                                                    'genetic_profile_id':",".join(cancer_study_mutation_ids['genetic_profile_id'].values),
+                                                    'gene_list':gene_id})
+            if response.text.lower().startswith('error'):
+                self.log.error("this combination returned an error; it will be skipped")
+                return
+        except:
+            log.error("failed to fetch profile data for these case set and genetic profiles")
+            return
+
+        df = pd.read_csv(io.StringIO(response.text), sep='\t', comment='#').drop(['GENE_ID', 'COMMON'], axis=1).dropna(how='all', axis=1)
+
+        try:
+            assert(df.values.shape[0] == 1)
+        except AssertionError:
+            self.log.warning("Something wrong with downloaded data; will be skipped")
+            return
+
+        return df
+
+
+    def _get_case_set_profile_data(self, this_sets, cancer_study_mutation_ids, gene_id):
+
+        data = [ (r, cancer_study_mutation_ids, gene_id) for r in this_sets.iterrows() ]
+
+        pool = Pool(len(this_sets))
+
+        results = pool.map_async(self._get_case_profile_data, data).get()
+
+        return pd.concat(results, ignore_index=True)
+
+    def _get_single_mutation_data(self, args):
+
+        case_row, cancer_study_mutation_ext_ids, gene_id = args
+
+        case_set = case_row[1]['case_list_id']
+
+        self.log.debug("doing case set %s for genetic profiles %s" % (case_set, ",".join(cancer_study_mutation_ext_ids['genetic_profile_id'].values)))
+
+        try:
+            response = rq.post(self._requests_url, {'cmd':'getMutationData',
+                                                    'case_set_id':case_set,
+                                                    'genetic_profile_id':",".join(cancer_study_mutation_ext_ids['genetic_profile_id'].values),
+                                                    'gene_list':gene_id})
+            if response.text.lower().startswith('error'):
+                self.log.error("this combination returned an error; it will be skipped")
+                return
+
+        except:
+            self.log.error("failed to fetch profile data for these case set and genetic profiles")
+            return
+
+        mutdata = pd.read_csv(io.StringIO(response.text), sep='\t', skiprows=1)
+
+        mutdata = mutdata[ mutdata['mutation_type'] == "Missense_Mutation" ]
+
+        if mutdata.empty:
+            return
+
+        return mutdata[ mutdata.apply(lambda x: bool(self._mut_prog.match(x['amino_acid_change'])), axis=1) ]
+
+    def _get_mutation_data(self, this_sets, cancer_study_mutation_ext_ids, gene_id):
+
+        data = [ (r, cancer_study_mutation_ext_ids, gene_id) for r in this_sets.iterrows() ]
+
+        if len(data) == 0:
+            return pd.DataFrame()
+
+        pool = Pool(len(this_sets))
+
+        results = pool.map_async(self._get_single_mutation_data, data).get()
+
+        for r in results:
+            if r is not None:
+                return pd.concat(results, ignore_index=True)
+
+        return pd.DataFrame()
 
     def _get_profile_data(self, gene_id, cancer_studies=None, metadata=[], mapisoform=None, mainisoform=1):
 
         self.log.info("fetching profile data")
-        mut_regexp = '[A-Z][0-9]+[A-Z]$'
-        mut_prog = re.compile(mut_regexp)
-        split_regexp = '\s+|,'
-        split_prog = re.compile(split_regexp)
 
         out_metadata = dict(list(zip(metadata, [list() for i in range(len(metadata))])))
 
-        self._get_genetic_profiles(cancer_studies=cancer_studies)
-        self._get_case_sets(cancer_studies=cancer_studies)
-
-        if len(self._cache_cancer_studies[0]) == 3:
-            for i,c in enumerate(self._cache_cancer_studies):
-                self._cache_cancer_studies[i] = c + tuple([mainisoform])    
+        if len(self._cache_cancer_studies.columns) == 3:
+            self._cache_cancer_studies['isoform'] = mainisoform
 
         responses = []
         mutations = []
@@ -273,87 +381,76 @@ class cBioPortal(DynamicSource, object):
             out_metadata['genomic_mutations'] = []
             do_genomic_mutations = True
 
-        for cancer_study_id, short_desc, long_desc, cancer_study_isoform in self._cache_cancer_studies:
+        for row in self._cache_cancer_studies.iterrows():
+            cancer_study_id, short_desc, long_desc, cancer_study_isoform = row[1]
+
             self.log.debug("fetching profile data for study %s" % cancer_study_id)
+
             if do_cancer_type:
-                cancer_study_suffix = cancer_study_id.split("_")[0]
+                cancer_study_prefix = cancer_study_id.split("_")[0]
                 try:
-                    cancer_type = self._cancer_types[cancer_study_suffix]
+                    cancer_type = self._cancer_types[ self._cancer_types['type_of_cancer_id'] == cancer_study_prefix ]
+                    if len(cancer_type) != 1:
+                        raise KeyError
+                    cancer_type = cancer_type.values[0][1]
                 except KeyError:
-                    self.log.error("cancer type for %s not found - cancer study will be used instead" % cancer_study_suffix)
-                    cancer_type = cancer_study_suffix
-            cancer_study_mutation_ids =     [ x[0] for x in self._cache_genetic_profiles[cancer_study_id] if x[1] == 'MUTATION' ]
-            cancer_study_mutation_ext_ids = [ x[0] for x in self._cache_genetic_profiles[cancer_study_id] if x[1] == 'MUTATION_EXTENDED' ]
+                    self.log.warning("cancer type for %s not found - cancer study will be used instead" % cancer_study_prefix)
+                    cancer_type = cancer_study_prefix
 
-            for case_set in self._cache_case_sets[cancer_study_id]:
-                self.log.debug("doing case set %s for genetic profiles %s" % (case_set, ",".join(cancer_study_mutation_ids)))
-                if len(cancer_study_mutation_ids) > 0:
-                    try:
-                        response = rq.post(self._requests_url, {'cmd':'getProfileData',
-                                                                'case_set_id':case_set,
-                                                                'genetic_profile_id':",".join(cancer_study_mutation_ids),
-                                                                'gene_list':gene_id}).text
-                    except:
-                        log.error("failed to fetch profile data for these case set and genetic profiles")
-                        return None
 
-                    for line in response.strip().split("\n"):
-                        if not line.startswith("#") and not line.startswith("GENE_ID"):
-                            tmp = split_prog.split(line)[2:]
-                            tmp2 = [x for x in tmp if x != 'NaN']
-                            tmp3 = [x for x in tmp2 if mut_prog.match(x)]
-                            fixed_isoform = [self._convert_isoform(m, mainisoform, cancer_study_isoform, mapisoform) for m in tmp3]
-                            mutations.extend(tmp3)
-                            if do_cancer_type:
-                                out_metadata['cancer_type'].extend([[cancer_type]]*len(tmp3))
-                            if do_cancer_study:
-                                out_metadata['cancer_study'].extend([[cancer_study_id]]*len(tmp3))
-                            if do_genomic_coordinates:
-                                out_metadata['genomic_coordinates'].extend([[None]]*len(tmp3))
-                            if do_genomic_mutations:
-                                out_metadata['genomic_mutations'].extend([[None]]*len(tmp3))
-                else:
-                    self.log.debug("no mutations found in this case set")
+            this_profiles = self._cache_genetic_profiles[ self._cache_genetic_profiles['cancer_study'] == cancer_study_id ]
 
-                self.log.debug("doing case set %s for genetic profiles %s" % (case_set, ",".join(cancer_study_mutation_ids)))
-                if len(cancer_study_mutation_ext_ids) > 0:
-                    try:
-                        response = rq.post(self._requests_url, {'cmd':'getMutationData',
-                                                                'case_set_id':case_set,
-                                                                'genetic_profile_id':",".join(cancer_study_mutation_ext_ids),
-                                                                'gene_list':gene_id}).text
-                    except:
-                        self.log.error("failed to fetch profile data for these case set and genetic profiles")
-                        return None
+            cancer_study_mutation_ids     = this_profiles[ this_profiles['genetic_alteration_type'] == 'MUTATION' ]
+            cancer_study_mutation_ext_ids = this_profiles[ this_profiles['genetic_alteration_type'] == 'MUTATION_EXTENDED' ]
 
-                    for line in response.strip().split("\n"):
-                        if not line.startswith("#") and not line.startswith("entrez_gene_id") and line:
-                            tmp=line.strip().split("\t")
+            this_sets = self._cache_case_sets[ self._cache_case_sets['cancer_study'] == cancer_study_id ]
 
-                            try:
-                                if tmp[5] != "Missense_Mutation":
-                                    continue
-                            except:
-                                pass
+            if len(cancer_study_mutation_ids) > 0:
 
-                            if mut_prog.match(tmp[7]):
-                                mutations.append(self._convert_isoform(tmp[7], mainisoform, cancer_study_isoform, mapisoform))
+                df = self._get_case_set_profile_data(this_sets, cancer_study_mutation_ids, gene_id)
 
-                            if do_cancer_type:
-                                out_metadata['cancer_type'].append([cancer_type])
-                            if do_cancer_study:
-                                out_metadata['cancer_study'].append([cancer_study_id])
-                            if do_genomic_coordinates:
-                                gd = ['hg19', tmp[12], tmp[13], tmp[14], tmp[15]]
-                                out_metadata['genomic_coordinates'].append(gd)
-                            if do_genomic_mutations:
-                                if tmp[13] != tmp[14]:
-                                    self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
-                                    gm = None
-                                else:
-                                    gm = ['hg19', tmp[12], self.default_strand, gd[2], gd[4], tmp[16]]
-                                out_metadata['genomic_mutations'].append(gm)
+                for r in df.iterrows():
+                    for val in r.values[0]:
+                        this_muts = [ x for x in val.split(",") if self._mut_prog.match(x) ]
+                        mutations.extend(this_muts)
+                        if do_cancer_type:
+                            out_metadata['cancer_type'].extend([[cancer_type]]*len(this_muts))
+                        if do_cancer_study:
+                            out_metadata['cancer_study'].extend([[cancer_study_id]]*len(this_muts))
+                        if do_genomic_coordinates:
+                            out_metadata['genomic_coordinates'].extend([[None]]*len(this_muts))
+                        if do_genomic_mutations:
+                            out_metadata['genomic_mutations'].extend([[None]]*len(this_muts))
 
+            else:
+                self.log.debug("no simple mutations found in this cancer study")
+
+            if len(cancer_study_mutation_ext_ids) > 0:
+
+                mutdata = self._get_mutation_data(this_sets, cancer_study_mutation_ext_ids, gene_id)
+                    
+                for rmt in mutdata.iterrows():
+                    rmt = rmt[1]
+                    mutations.append(rmt['amino_acid_change'])
+
+                    if do_cancer_type:
+                        out_metadata['cancer_type'].append([cancer_type])
+                    if do_cancer_study:
+                        out_metadata['cancer_study'].append([cancer_study_id])
+                    if do_genomic_coordinates or do_genomic_mutations:
+                        gd = list(rmt[['chr',
+                                       'start_position',
+                                       'end_position',
+                                       'reference_allele']].values)
+                        gd = ['hg19'] + gd
+                        out_metadata['genomic_coordinates'].append(gd)
+                    if do_genomic_mutations:
+                        if rmt['start_position'] != rmt['end_position']:
+                            self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
+                            gm = None
+                        else:
+                            gm = ['hg19', rmt['chr'], self.default_strand, gd[2], gd[4], rmt['variant_allele']]
+                        out_metadata['genomic_mutations'].append(gm)
         return mutations, out_metadata
 
     def _convert_isoform(self, mutation, main_isoform, alternate_isoform, mapping):
@@ -371,28 +468,36 @@ class COSMIC(DynamicSource, object):
     @logger_init
     def __init__(self, database_files=None, cancer_type=None):
         description = "COSMIC Database"
-        super(COSMIC, self).__init__(name='COSMIC', version='v85', description=description)
+        super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
+
+        self._mut_regexp = 'p\.[A-Z][0-9]+[A-Z]$'
+        self._mut_prog = re.compile(self._mut_regexp)
+        dataframes = []
 
         if database_files is None:
-            database_dir   = '/data/databases/cosmic-v85'
+            database_dir   = '/data/databases/cosmic'
             databases      = [  'CosmicMutantExport',
                                 'CosmicCompleteTargetedScreensMutantExport',
                                 'CosmicGenomeScreensMutantExport' ]
             self._database_files = [os.path.join(database_dir, i)+'.tsv' for i in databases]
-            self._mut_regexp = 'p\.[A-Z][0-9]+[A-Z]$'
-            self._mut_prog = re.compile(self._mut_regexp)
+        else:
+            self._database_files = database_files
 
-    def _get_all_cancer_types(self):
-        self.log.info("getting cancer types...")
-        cancer_types = set()
         for f in self._database_files:
-            with open(f) as fh:
-                next(fh)
-                for line in fh:
-                    cancer_types.add(line.strip().split("\t")[11])
-        return sorted(list(cancer_types))
+            try:
+                self.log.info("Parsing database file %s ..." % f)
+                dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS') )
+            except:
+                self.log.error("Couldn't parse database file.")
+                self._df = None
+                return
 
-    def _parse_db_file(self, gene_id, cancer_types=[], metadata=[], filter_snps=True):
+        self._df = pd.concat(dataframes, ignore_index=True, sort=False)
+
+    def _parse_db_file(self, gene_id, cancer_types=None, metadata=[], filter_snps=True):
+
+        site_kwd = ['Primary_site', 'Site_subtype_1', 'Site_subtype_2', 'Site_subtype_3']
+        histology_kwd = ['Primary_histology', 'Histology_subtype_1', 'Histology_subtype_2', 'Histology_subtype_3']
 
         mutations = []
 
@@ -416,66 +521,73 @@ class COSMIC(DynamicSource, object):
             out_metadata['cancer_histology'] = []
             do_histology = True
 
-        for f in self._database_files:
-            with open(f) as fh:
-                next(fh)
-                for line in fh:
-                    tmp = line.strip().split("\t")
-                    if tmp[0] != gene_id or tmp[11] not in cancer_types:
-                        continue
+        df = self._df[ self._df['Gene name'] == gene_id ]
 
-                    if filter_snps and tmp[25] == 'y':
-                        self.log.info("mutation %s was filtered out as it is classified as SNP" % tmp[18])
-                        continue
+        if filter_snps:
+            df = df[ df['SNP'] != 'y' ]
 
-                    mut_str = tmp[18]
-                    if self._mut_prog.match(mut_str):
-                        mutations.append(mut_str)
-                        if do_cancer_type:
-                            out_metadata['cancer_type'].append([tmp[11]])
-                        if do_genomic_coordinates or do_genomic_mutations:
-                            gd = []
-                            if tmp[22] == '38':
-                                gd.append('hg38') # genome version
-                            elif tmp[22] == '37':
-                                gd.append('hg19')
-                            else:
-                                out_metadata['genomic_coordinates'].append(None)
-                                continue
-                            tmp2 = tmp[23].split(":")
-                            gd.append(tmp2[0]) # chr
-                            gd.extend(tmp2[1].split("-")) # [start, end]
-                            gd.append(tmp[17][-3]) # ref
+        if cancer_types is not None:
+            df = df[ df['Primary histology'] in cancer_types ]
 
-                        if do_genomic_coordinates:
-                            out_metadata['genomic_coordinates'].append(gd)
+        df = df[ df['Mutation AA'].notna() ]
 
-                        if do_genomic_mutations:
-                            if gd[2] != gd[3]:
-                                self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
-                                gm = None
-                            else:
-                                gm = [gd[0], gd[1], tmp[24], gd[2], gd[4], tmp[17][-1]]
-                            out_metadata['genomic_mutations'].append(gm)
-            
-                        if do_site:
-                            out_metadata['cancer_site'].append(tmp[7:11])
+        df = df[ df.apply(lambda x: bool(self._mut_prog.match(x['Mutation AA'])), axis=1) ]
 
-                        if do_histology:
-                            out_metadata['cancer_histology'].append(tmp[11:15])
+        #df.columns = df.columns.str.replace(r'\s+', '_')
+
+        for r in df.iterrows():
+            r = r[1]
+            mutations.append(r['Mutation AA'])
+
+            if do_cancer_type:
+                out_metadata['cancer_type'].append([r['Primary histology']])
+
+            if do_genomic_coordinates or do_genomic_mutations:
+                gd = []
+                grch = r['GRCh']
+                if grch == '38':
+                    gd.append('hg38') # genome version
+                elif grch == '37':
+                    gd.append('hg19')
+                else:
+                    out_metadata['genomic_coordinates'].append(None)
+                    self.log.warning("Genome assembly not specified for mutation; genomic coordinates won't be annotated")
+                    continue
+
+                tmp2 = r.Mutation_genome_position.split(":")
+                gd.append(tmp2[0]) # chr
+                gd.extend(tmp2[1].split("-")) # [start, end]
+                gd.append(r['Mutation CDS'][-3]) # ref
+
+            if do_genomic_coordinates:
+                out_metadata['genomic_coordinates'].append(gd)
+
+            if do_genomic_mutations:
+                if gd[2] != gd[3]:
+                    self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
+                    gm = None
+                else:
+                    gm = [gd[0], gd[1], r['Mutation strand'], gd[2], gd[4], r['Mutation     CDS'][-1]]
+                out_metadata['genomic_mutations'].append(gm)
+
+            if do_site:
+                out_metadata['cancer_site'].append([r.__getitem__(a) for a in site_kwd])
+
+            if do_histology:
+                out_metadata['cancer_histology'].append([r.__getitem__(a) for a in histology_kwd])
 
         return mutations, out_metadata
 
     def add_mutations(self, sequence, cancer_types=None, use_alias=None, filter_snps=True, metadata=[]):
 
         if cancer_types is None:
-            cancer_types = self._get_all_cancer_types()
             self.log.info("no cancer type specified; will use all of them")
         if use_alias is not None:
             gene_id = sequence.aliases[use_alias]
             self.log.info("using alias %s as gene name" % sequence.aliases[use_alias])
         else:
             gene_id = sequence.gene_id
+
         raw_mutations, out_metadata = self._parse_db_file(gene_id, cancer_types=cancer_types, metadata=metadata)
         mutations = [x[2:] for x in raw_mutations]
         unique_mutations = list(set(mutations))
@@ -519,22 +631,37 @@ class COSMIC(DynamicSource, object):
 
 class PhosphoSite(DynamicSource, object):
     @logger_init
-    def __init__(self, database_file=None):
+    def __init__(self, database_files=None):
         description = "PhosphoSite Database"
         super(PhosphoSite, self).__init__(name='PhosphoSite', version='1.0', description=description)
-        if database_file is None:
-            self._ptm_types = ['acetylation', 'methylation', 'O-GalNAc', 'O-GlcNAc', 'phosphorylation', 'sumoylation', 'ubiquitination']
-            self._ptm_types_to_classes = {  'acetylation'     : 'ptm_acetylation', 
-                                            'methylation'     : 'ptm_methylation', 
-                                            'O-GalNAc'        : 'ptm_ogalnac', 
-                                            'O-GlcNAc'        : 'ptm_oglcnac', 
-                                            'phosphorylation' : 'ptm_phosphorylation', 
-                                            'sumoylation'     : 'ptm_sumoylation',
-                                            'ubiquitination'  : 'ptm_ubiquitination' }
-            self._ptm_suffixes = ['ac', 'm[0-9]', 'ga', 'gl', 'p', 'sm', 'ub']
-            self._ptm_suffix_offsets = [-3, -3, -3, -3, -2, -3, -3]
+
+        self._ptm_types = ['acetylation', 'methylation', 'O-GalNAc', 'O-GlcNAc', 'phosphorylation', 'sumoylation', 'ubiquitination']
+        self._ptm_types_to_classes = {  'acetylation'     : 'ptm_acetylation', 
+                                        'methylation'     : 'ptm_methylation', 
+                                        'O-GalNAc'        : 'ptm_ogalnac', 
+                                        'O-GlcNAc'        : 'ptm_oglcnac', 
+                                        'phosphorylation' : 'ptm_phosphorylation', 
+                                        'sumoylation'     : 'ptm_sumoylation',
+                                        'ubiquitination'  : 'ptm_ubiquitination' }
+        self._ptm_suffixes = ['ac', 'm[0-9]', 'ga', 'gl', 'p', 'sm', 'ub']
+        self._ptm_suffix_offsets = [-3, -3, -3, -3, -2, -3, -3]
+
+        if database_files is None:
             self._database_dir = "/data/databases/phosphosite/"
             self._database_files = dict([(i, "%s/%s_site_dataset"%(self._database_dir,i)) for i in self._ptm_types])
+
+        else:
+            self._database_files = database_files
+
+        self._dataframes = {}
+        for k,f in iteritems(self._database_files):
+            try:
+                self._dataframes[k] = pd.read_csv(f, skiprows=3, sep='\t')
+                self._dataframes[k] = self._dataframes[k][ self._dataframes[k]['ORGANISM'] == 'human']
+            except:
+                self.log.error("couldn't read database file %s" % f)
+
+
 
     def _parse_db_file(self, gene_id):
 
@@ -545,18 +672,12 @@ class PhosphoSite(DynamicSource, object):
             p_prog = re.compile(p_regexp)
             p_sites = []
 
-            with open(self._database_files[ptm]) as fh:
-                next(fh)
-                next(fh)
-                next(fh)
-                for line in fh:
-                    tmp = line.strip().split("\t")
-                    if str.upper(tmp[0]) != gene_id or tmp[6] != 'human':
-                        continue
-                    p_str = tmp[4]
-                    if p_prog.match(p_str):
-                        p_sites.append(p_str[:self._ptm_suffix_offsets[ptm_idx]])
-            sites[ptm] = p_sites
+            df = self._dataframes[ptm]
+            df = df[ df['GENE'].str.upper() == gene_id.upper() ]
+            df = df[ df.apply(lambda x: bool(p_prog.match(x['MOD_RSD'])), axis=1) ]
+
+            sites[ptm] = [ x[:self._ptm_suffix_offsets[ptm_idx]] for x in df['MOD_RSD'].values  ]
+
         return sites
 
     def add_position_properties(self, sequence):
@@ -1075,9 +1196,6 @@ class MobiDB(DynamicSource):
             self.log.error("No disorder data was found")
             return None
 
-        #print "QQQ"
-        #print disorder_data.keys()
-        #print disorder_data
         assignments = [None for p in sequence.positions]
 
         if 'full' in disorder_data:
@@ -1150,61 +1268,57 @@ class MobiDB(DynamicSource):
         return data
 
 class ManualAnnotation(StaticSource):
+
+    _expected_cols = ['name', 'site', 'type', 'function', 'reference']
+    _ptm_keywords = ['ptm_cleavage', 'ptm_phosphorylation', 'ptm_ubiquitination', 'ptm_acetylation', 'ptm_sumoylation', 'ptm_nitrosylation', 'ptm_methylation']
+    _supported_position_properties = _ptm_keywords
+    _supported_sequence_properties = ['linear_motif']
+
     @logger_init
-    def __init__(self, datafile, csvoptions=None):
+    def __init__(self, datafile, **parsing_options):
+
         description="Annotations from %s" % datafile
         super(ManualAnnotation, self).__init__(name='Manual annotations', version='', description=description)
 
         self._datafile = datafile
-        fh = open(self._datafile, 'rt')
-        if csvoptions is None:
-            csvoptions = {}
+        self._df = None
+        
         try:
-            self._csv = csv.reader(fh, **csvoptions)
+            self._parse_datafile(**parsing_options)
         except:
-            self.log.error("reading of csv file failed")
-        self._table = None
+            self.log.error("An error occurred while parsing the input file %s; manual annotation will be skipped" % self._datafile)
+            self._df = None
+            return
 
-    def _parse_datafile(self):
+    def _parse_datafile(self, **parsing_options):
+
         self.log.info("Parsing annotations from %s" % self._datafile)
-        out = [] # type seq type function ref
-        ptm_keywords = ['ptm_cleavage', 'ptm_phosphorylation', 'ptm_ubiquitination', 'ptm_acetylation', 'ptm_sumoylation', 'ptm_nitrosylation', 'ptm_methylation']
-        for idx,row in enumerate(self._csv):
-            row_number = idx+1
-            if len(row) < 5:
-                self.log.warning("row %d has less than 5 columns and will be skipped. You need at least 5 columns to be present." % row_number)
-                continue
-            if   row[2] in ptm_keywords:
-                this_row = [row[2], tuple([int(row[1])]), row[0], row[3], row[4]]
-                self.log.info("added %s from row %d" % (row[2], row_number))
-            elif row[2] == 'linear_motif':
-                this_row = [row[2]]
-                if '-' in row[1]:
-                    tmp = list(map(int, row[1].split("-")))
-                    this_row.append(tuple(range(tmp[0], tmp[1]+1)))
-                else:
-                    this_row.append( (int(row[1]) ))
-                self.log.info("added %s from row %d" % (row[2], row_number))
-                this_row.extend([row[0], row[3], row[4]])
-            elif row[2] == 'mutation':
-                this_row = [ row[2], tuple([int(row[1][1:-1])]), row[1], row[0], row[3], row[4] ]
-                self.log.info("added %s from row %d" % (row[2], row_number))
-            else:
-                self.log.warning("no recognized keyword was found in column 3 and row %d will be skipped." % row_number)
-                continue
 
-            out.append(tuple(this_row))
-        self._table = out
+        try:
+            df = pd.read_csv(self._datafile, **parsing_options)
+        except IOError:
+            self.log.error("Parsing of file %s failed. ")
+            raise IOError
+        try:
+            self._df = df[ self._expected_cols ]
+        except IndexError:
+            log.error("required columns not found in csv file (these are: %s). Manual annotation will be skipped" % ", ".join(self._expected_cols))
+            raise IndexError
 
+        all_properties = set(self._supported_position_properties + self._supported_sequence_properties)
+
+        diff = set(df['type']).difference(all_properties)
+        if len(diff) > 0:
+            self.log.warning("the following annotation types were not recognized: %s" % ", ".join(diff))
 
     def add_mutations(self, sequence):
-        if self._table is None:
-            self._parse_datafile()
-        else:
-            self.log.info("datafile information has already been parsed - won't be re-read")
 
-        mutations = [d[2] for d in self._table if d[0] == 'mutation']
-        unique_mutations = list(set(mutations))
+        if self._df is None:
+            return
+
+        tmp_df = self._df[ self._df['type'] == 'mutation' ]
+
+        unique_mutations = list(set(tmp_df['site']))
 
         self.log.info("unique mutations found in datafile: %s" % (", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1])))))
 
@@ -1226,10 +1340,8 @@ class ManualAnnotation(StaticSource):
             position = sequence.positions[site_seq_idx]
 
             if position.wt_residue_type != wt:
-                self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
+                self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, num, position.wt_residue_type))
                 continue
-
-            mutation_indices = [i for i, x in enumerate(mutations) if x == m]
 
             mutation_obj = Mutation(sequence.positions[site_seq_idx],
                                     mut,
@@ -1237,46 +1349,59 @@ class ManualAnnotation(StaticSource):
 
             position.add_mutation(mutation_obj)
 
-    def add_position_properties(self, sequence):
-        if self._table is None:
-            self._parse_datafile()
-        else:
-            self.log.info("datafile information has already been parsed - won't be re-read")
+    def add_position_properties(self, sequence, prop=_supported_position_properties):
 
-        for d in self._table:
-            this_position = sequence.positions[sequence.seq2index(d[1][0])]
+        if self._df is None:
+            return
+
+        tmp_df = self._df[ self._df.apply(lambda x: x['type'] in self._supported_position_properties, axis=1) ]
+
+        for idx, row in tmp_df.iterrows():
+
+            this_position = sequence.positions[sequence.seq2index(int(row['site']))]
             
-            try:
-                property_obj = position_properties_classes[d[0]](sources=[self],
-                                                                 position=this_position)
-                assert len(d[1]) == 1
-            except KeyError:
-                self.log.warning("property %s is not a valid position property; row will be skipped" % d[0])
-                continue
+            property_obj = position_properties_classes[row['type']](sources=[self],
+                                                                    position=this_position)
 
-            property_obj.metadata['function'] = [d[3]]
-            property_obj.metadata['ref']      = [d[4]]
+            property_obj.metadata['function'] = row['function']
+            property_obj.metadata['reference']      = row['reference']
+
             this_position.add_property(property_obj)
 
-    def add_sequence_properties(self, sequence):
-        if self._table is None:
-            self._parse_datafile()
-        else:
-            self.log.info("datafile information has already been parsed - won't be re-read")
+            self.log.info("added %s from row %d" % (row['type'], idx+1))
 
-        for d in self._table:
-            this_positions = []
-            for p in d[1]:
-                this_positions.append(sequence.positions[sequence.seq2index(p)])
 
-            try:
-                property_obj = sequence_properties_classes[d[0]](sources=[self],
-                                                             positions=this_positions,
-                                                             lmtype=d[2])
-            except KeyError:
-                self.log.warning("property %s is not a valid sequence property; row will be skipped" % d[0])
+    def add_sequence_properties(self, sequence, prop=_supported_sequence_properties):
+
+        if self._df is None:
+            return
+
+        tmp_df = self._df[ self._df.apply(lambda x: x['type'] in self._supported_sequence_properties, axis=1) ]
+
+        for idx,row in tmp_df.iterrows():
+            if '-' in row['site']:
+                tmp = list(map(int, row['site'].split("-")))
+                try:
+                    assert(len(tmp) == 2)
+                    assert(int(tmp[0]) <= int(tmp[1]))
+                except AssertionError:
+                    log.error("line %d range in site column must be specified as 'from-to' (ex 10-15)" % (idx+1))
+                positions = tuple(range(tmp[0], tmp[1]+1))
+            else:
+                positions = ( int(row['site']) )
+
+            try: 
+                positions = [ sequence.positions[sequence.seq2index(p)] for p in positions ]
+            except:
+                self.log.warning("position property %s is outside the protein sequence; it will be skipped" % row['type'])
                 continue
 
-            property_obj.metadata['function'] = [d[3]]
-            property_obj.metadata['ref']      = [d[4]]
+            property_obj = sequence_properties_classes[row['type']](sources=[self],
+                                                                    positions=positions,
+                                                                    lmtype=row['name'])
+
+
+            property_obj.metadata['function'] = row['function']
+            property_obj.metadata['reference']      = row['reference']
+
             sequence.add_property(property_obj)
