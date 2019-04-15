@@ -320,12 +320,10 @@ class cBioPortal(DynamicSource, object):
                                                     'gene_list':gene_id})
             if response.text.lower().startswith('error'):
                 self.log.error("this combination returned an error; it will be skipped")
-                print "FUORI1"
                 return
 
         except:
             self.log.error("failed to fetch profile data for these case set and genetic profiles")
-            print "FUORI2"
             return
 
         mutdata = pd.read_csv(io.StringIO(response.text), sep='\t', skiprows=1)
