@@ -120,6 +120,9 @@ class cBioPortal(DynamicSource, object):
         self._get_genetic_profiles()
         self._get_case_sets()
 
+        self._mut_regexp = '[A-Z][0-9]+[A-Z]$'
+        self._mut_prog = re.compile(self._mut_regexp)
+
     def add_mutations(self, sequence, metadata=[], mainisoform=1, mapisoform=None):
         mutations, out_metadata = self._get_profile_data(sequence.gene_id, metadata=metadata, mainisoform=mainisoform, mapisoform=mapisoform)
         unique_mutations = list(set(mutations))
@@ -236,6 +239,10 @@ class cBioPortal(DynamicSource, object):
             self.log.error("failed to fetch case sets profiles for study %s" % cancer_study_id)
             return pd.DataFrame()
 
+        if response.text.startswith("Error"):
+            self.log.warning("no case sets for %s" % cancer_study_id)
+            return pd.DataFrame()
+
         try:
             df = pd.read_csv(io.StringIO(response.text), sep='\t')
         except:
@@ -259,11 +266,97 @@ class cBioPortal(DynamicSource, object):
 
         self._cache_case_sets = pd.concat(results, ignore_index=True)
 
+    def _get_case_profile_data(self, args):
+
+        case_row, cancer_study_mutation_ids, gene_id = args
+
+        case_set = case_row[1]['case_list_name']
+        self.log.debug("doing case set %s for genetic profiles %s" % (case_set, ",".join(cancer_study_mutation_ids['genetic_profile_id'].values)))
+        try:
+            response = rq.post(self._requests_url, {'cmd':'getProfileData',
+                                                    'case_set_id':case_set,
+                                                    'genetic_profile_id':",".join(cancer_study_mutation_ids['genetic_profile_id'].values),
+                                                    'gene_list':gene_id})
+            if response.text.lower().startswith('error'):
+                self.log.error("this combination returned an error; it will be skipped")
+                return
+        except:
+            log.error("failed to fetch profile data for these case set and genetic profiles")
+            return
+
+        df = pd.read_csv(io.StringIO(response.text), sep='\t', comment='#').drop(['GENE_ID', 'COMMON'], axis=1).dropna(how='all', axis=1)
+
+        try:
+            assert(df.values.shape[0] == 1)
+        except AssertionError:
+            self.log.warning("Something wrong with downloaded data; will be skipped")
+            return
+
+        return df
+
+
+    def _get_case_set_profile_data(self, this_sets, cancer_study_mutation_ids, gene_id):
+
+        data = [ (r, cancer_study_mutation_ids, gene_id) for r in this_sets.iterrows() ]
+
+        pool = Pool(len(this_sets))
+
+        results = pool.map_async(self._get_case_profile_data, data).get()
+
+        return pd.concat(results, ignore_index=True)
+
+    def _get_single_mutation_data(self, args):
+
+        case_row, cancer_study_mutation_ext_ids, gene_id = args
+
+        case_set = case_row[1]['case_list_id']
+
+        self.log.debug("doing case set %s for genetic profiles %s" % (case_set, ",".join(cancer_study_mutation_ext_ids['genetic_profile_id'].values)))
+
+        try:
+            response = rq.post(self._requests_url, {'cmd':'getMutationData',
+                                                    'case_set_id':case_set,
+                                                    'genetic_profile_id':",".join(cancer_study_mutation_ext_ids['genetic_profile_id'].values),
+                                                    'gene_list':gene_id})
+            if response.text.lower().startswith('error'):
+                self.log.error("this combination returned an error; it will be skipped")
+                print "FUORI1"
+                return
+
+        except:
+            self.log.error("failed to fetch profile data for these case set and genetic profiles")
+            print "FUORI2"
+            return
+
+        mutdata = pd.read_csv(io.StringIO(response.text), sep='\t', skiprows=1)
+
+        mutdata = mutdata[ mutdata['mutation_type'] == "Missense_Mutation" ]
+
+        if mutdata.empty:
+            return
+
+        return mutdata[ mutdata.apply(lambda x: bool(self._mut_prog.match(x['amino_acid_change'])), axis=1) ]
+
+    def _get_mutation_data(self, this_sets, cancer_study_mutation_ext_ids, gene_id):
+
+        data = [ (r, cancer_study_mutation_ext_ids, gene_id) for r in this_sets.iterrows() ]
+
+        if len(data) == 0:
+            return pd.DataFrame()
+
+        pool = Pool(len(this_sets))
+
+        results = pool.map_async(self._get_single_mutation_data, data).get()
+
+        for r in results:
+            if r is not None:
+                return pd.concat(results, ignore_index=True)
+
+        return pd.DataFrame()
+
     def _get_profile_data(self, gene_id, cancer_studies=None, metadata=[], mapisoform=None, mainisoform=1):
 
         self.log.info("fetching profile data")
-        mut_regexp = '[A-Z][0-9]+[A-Z]$'
-        mut_prog = re.compile(mut_regexp)
 
         out_metadata = dict(list(zip(metadata, [list() for i in range(len(metadata))])))
 
@@ -316,31 +409,11 @@ class cBioPortal(DynamicSource, object):
 
             if len(cancer_study_mutation_ids) > 0:
 
-                for case_row in this_sets.iterrows():
-                    case_set = case_row[1]['case_list_name']
-                    self.log.debug("doing case set %s for genetic profiles %s" % (case_set, ",".join(cancer_study_mutation_ids['genetic_profile_id'].values)))
-                    if True:
-                        response = rq.post(self._requests_url, {'cmd':'getProfileData',
-                                                                'case_set_id':case_set,
-                                                                'genetic_profile_id':",".join(cancer_study_mutation_ids['genetic_profile_id'].values),
-                                                                'gene_list':gene_id})
-                        if response.text.lower().startswith('error'):
-                            self.log.error("this combination returned an error; it will be skipped")
-                            continue
-                    else:
-                        log.error("failed to fetch profile data for these case set and genetic profiles")
-                        continue
+                df = self._get_case_set_profile_data(this_sets, cancer_study_mutation_ids, gene_id)
 
-                    df = pd.read_csv(io.StringIO(response.text), sep='\t', comment='#').drop(['GENE_ID', 'COMMON'], axis=1).dropna(how='all', axis=1).values
-                    
-                    try:
-                        assert(df.values.shape[0] == 1)
-                    except AssertionError:
-                        self.log.warning("Something wrong with downloaded data; will be skipped")
-                        continue
-
-                    for val in df.values[0]:
-                        this_muts = [ x for x in val.split(",") if mut_prog.match(x) ]
+                for r in df.iterrows():
+                    for val in r.values[0]:
+                        this_muts = [ x for x in val.split(",") if self._mut_prog.match(x) ]
                         mutations.extend(this_muts)
                         if do_cancer_type:
                             out_metadata['cancer_type'].extend([[cancer_type]]*len(this_muts))
@@ -356,55 +429,30 @@ class cBioPortal(DynamicSource, object):
 
             if len(cancer_study_mutation_ext_ids) > 0:
 
-                for case_row in this_sets.iterrows():
-                    case_set = case_row[1]['case_list_id']
-
-                    self.log.debug("doing case set %s for genetic profiles %s" % (case_set, ",".join(cancer_study_mutation_ext_ids['genetic_profile_id'].values)))
-
-                    try:
-                        response = rq.post(self._requests_url, {'cmd':'getMutationData',
-                                                                'case_set_id':case_set,
-                                                                'genetic_profile_id':",".join(cancer_study_mutation_ext_ids['genetic_profile_id'].values),
-                                                                'gene_list':gene_id})
-                        if response.text.lower().startswith('error'):
-                            self.log.error("this combination returned an error; it will be skipped")
-                            continue
-
-                    except:
-                        self.log.error("failed to fetch profile data for these case set and genetic profiles")
-                        return None
-
-                    mutdata = pd.read_csv(io.StringIO(response.text), sep='\t', skiprows=1)
-
-                    mutdata = mutdata[ mutdata['mutation_type'] == "Missense_Mutation" ]
-
-                    if mutdata.empty:
-                        continue
-
-                    mutdata = mutdata[ mutdata.apply(lambda x: bool(mut_prog.match(x['amino_acid_change'])), axis=1) ]
+                mutdata = self._get_mutation_data(this_sets, cancer_study_mutation_ext_ids, gene_id)
                     
-                    for rmt in mutdata.iterrows():
-                        rmt = rmt[1]
-                        mutations.append(rmt['amino_acid_change'])
+                for rmt in mutdata.iterrows():
+                    rmt = rmt[1]
+                    mutations.append(rmt['amino_acid_change'])
 
-                        if do_cancer_type:
-                            out_metadata['cancer_type'].append([cancer_type])
-                        if do_cancer_study:
-                            out_metadata['cancer_study'].append([cancer_study_id])
-                        if do_genomic_coordinates or do_genomic_mutations:
-                            gd = list(rmt[['chr', 
-                                           'start_position', 
-                                           'end_position', 
-                                           'reference_allele']].values)
-                            gd = ['hg19'] + gd
-                            out_metadata['genomic_coordinates'].append(gd)
-                        if do_genomic_mutations:
-                            if rmt['start_position'] != rmt['end_position']:
-                                self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
-                                gm = None
-                            else:
-                                gm = ['hg19', rmt['chr'], self.default_strand, gd[2], gd[4], rmt['variant_allele']]
-                            out_metadata['genomic_mutations'].append(gm)
+                    if do_cancer_type:
+                        out_metadata['cancer_type'].append([cancer_type])
+                    if do_cancer_study:
+                        out_metadata['cancer_study'].append([cancer_study_id])
+                    if do_genomic_coordinates or do_genomic_mutations:
+                        gd = list(rmt[['chr',
+                                       'start_position',
+                                       'end_position',
+                                       'reference_allele']].values)
+                        gd = ['hg19'] + gd
+                        out_metadata['genomic_coordinates'].append(gd)
+                    if do_genomic_mutations:
+                        if rmt['start_position'] != rmt['end_position']:
+                            self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
+                            gm = None
+                        else:
+                            gm = ['hg19', rmt['chr'], self.default_strand, gd[2], gd[4], rmt['variant_allele']]
+                        out_metadata['genomic_mutations'].append(gm)
         return mutations, out_metadata
 
     def _convert_isoform(self, mutation, main_isoform, alternate_isoform, mapping):
