@@ -74,19 +74,39 @@ class LinearMotif(SequenceProperty):
     description = "Residue part of a linear motif"
     category='linear_motif'
 
-    def __init__(self, positions, sources, lmtype=""):
+    def __init__(self, positions, sources, name=""):
         super(LinearMotif, self).__init__(  name="Linear motif",
                                                     positions=positions,
                                                     sources=sources,
                                                     values=None,
                                                     metadata=None  )
-        self.type = lmtype
+        self.type = name
 
     def get_value_str(self):
         return "%s, %d-%d, %s" % (    self.type,
                                       self.positions[ 0].sequence_position,
                                       self.positions[-1].sequence_position,
                                       ",".join(s.name for s in self.sources))
+
+class Structure(SequenceProperty):
+    description = "Structure"
+    category='structure'
+
+    def __init__(self, positions, sources, name=""):
+        super(Structure, self).__init__(  name="Structure",
+                                                    positions=positions,
+                                                    sources=sources,
+                                                    values=None,
+                                                    metadata=None  )
+        self.type = name
+
+    def get_value_str(self):
+        return "%s, %d-%d, %s" % (    self.type,
+                                      self.positions[ 0].sequence_position,
+                                      self.positions[-1].sequence_position,
+                                      ",".join(s.name for s in self.sources))
+
+
 
 class PhosphorylationSite(PositionProperty):
     description = "Phosphorylation site"
@@ -256,20 +276,32 @@ class DisorderPropensity(PositionProperty):
     def __hash__(self):
         return hash((self.source, self.disorder_propensity))
 
+class Structured(DisorderPropensity):
+    def __init__(self, position, sources):
+        super(Ordered, self).__init__(name="Disorder Propensity",
+                                                 position=position,
+                                                 sources=sources,
+                                                 disorder_state='S')
 
-
+class Disordered(DisorderPropensity):
+    def __init__(self, position, sources):
+        super(Ordered, self).__init__(name="Disorder Propensity",
+                                                 position=position,
+                                                 sources=sources,
+                                                 disorder_state='D')
 
 position_properties_classes = {  'ptm_phosphorylation'            : PhosphorylationSite,
                                  'ptm_methylation'                : MethylationSite,
                                  'ptm_acetylation'                : AcetylationSite,
-				                 'ptm_nitrosylation'            : SNitrosylationSite,
+				                 'ptm_nitrosylation'              : SNitrosylationSite,
                                  'ptm_OGalNAc'                    : OGalNAcSite,
                                  'ptm_OGlcNAc'                    : OGlcNAcSite,
                                  'ptm_sumoylation'                : SumoylationSite,
                                  'ptm_ubiquitination'             : UbiquitinationSite,
                                  'ptm_cleavage'                   : CleavageSite,
-                                 'mobidb_disorder_propensity' : DisorderPropensity  
+                                 'mobidb_disorder_propensity'     : DisorderPropensity
                               }
 
-sequence_properties_classes = {  'linear_motif'               : LinearMotif
+sequence_properties_classes = {  'linear_motif'                   : LinearMotif,
+                                 'structure'            : Structure
                               }
