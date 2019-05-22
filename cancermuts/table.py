@@ -158,8 +158,8 @@ class Table:
 
 
     def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'exac_allele_frequency', 'exac_af_filter'], 
-                        position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage', 'ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation','mobidb_disorder_propensity'],
-                        sequence_properties=['linear_motif',]):
+                        position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage', 'ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation', 'mobidb_disorder_propensity'],
+                        sequence_properties=['linear_motif', 'structure']):
 
         rows = []
 
@@ -213,7 +213,7 @@ class Table:
                         md_str = None
                     this_row.append(md_str)
                 positions_mutlist.append(gi)
-            rows.append(this_row)
+                rows.append(this_row)
 
         df = pd.DataFrame(rows, columns=header)
 
@@ -223,14 +223,20 @@ class Table:
 
         properties_series = dict()
 
+        delenda = []
         for pidx, property_name in enumerate(sequence_properties):
             if property_name not in sequence.properties:
-                property_cols[property_name] = [ None ] * len(positions)
-                sequence_properties.remove(property_name)
+                #property_cols[property_name] = [ None ] * len(positions)
+                delenda.append(property_name)
                 self.log.warning("property %s not found in data; it won't be annotated" % property_name)
                 continue
             elif sequence.properties[property_name][0].category == 'linear_motif':
                 property_cols[property_name] = dict( [ (i, list()) for i in list(set(positions)) ] )
+            elif sequence.properties[property_name][0].category == 'structure':
+                property_cols[property_name] = dict( [ (i, list()) for i in list(set(positions)) ] )
+
+        for d in delenda:
+            sequence_properties.remove(d)
 
         for pidx, property_name in enumerate(sequence_properties):
             props = sequence.properties[property_name]
@@ -238,13 +244,22 @@ class Table:
                 if p.category == 'linear_motif':
                     for pos in p.positions:
                         property_cols[property_name][pos.sequence_position].append(p.get_value_str())
+                if p.category == 'structure':
+                    for pos in p.positions:
+                        property_cols[property_name][pos.sequence_position].append(p.get_value_str())
 
         for pidx, property_name in enumerate(sequence_properties):
+            properties_series[property_name] = []
+
             if p.category == 'linear_motif':
-                properties_series[property_name] = []
                 for pos in positions:
                     properties_series[property_name].append("|".join(property_cols[property_name][pos]))
-            df[self.headers[property_name]] = properties_series[property_name]
+                df[self.headers[property_name]] = properties_series[property_name]
+
+            if p.category == 'structure':
+                for pos in positions:
+                    properties_series[property_name].append("|".join(property_cols[property_name][pos]))
+                df[self.headers[property_name]] = properties_series[property_name]
 
         return df
 
@@ -275,6 +290,9 @@ class Table:
     def _plot_mutations(self, ax, df_i, revel, revel_not_annotated, revel_cutoff, y_ladder):
 
         df_m = df_i[ df_i[self.headers['mutated']].notnull() ]
+
+        if len(df_m) == 0:
+            return
 
         if revel is True:
             df_m = df_m.fillna(revel_not_annotated)
@@ -308,6 +326,7 @@ class Table:
                 self.log.warning("PTM type %s not found in DataFrame" % self.ptms[t])
                 continue
             df_t = df_i[ df_i[self.ptms[t]].fillna('') == self.ptm_codes[t] ]
+
             if len(df_t) == 0:
                 self.log.info("No information found for %s" % self.ptms[t])
                 continue
@@ -320,6 +339,7 @@ class Table:
         all_elms = []
 
         df_e = df [ df[ self.headers['linear_motif'] ].notnull() ][ self.headers['linear_motif']]
+        df_e = filter(lambda x: x != '', df_e)
 
         df_mut_pos = set( df[ df[self.headers['mutated']].notnull() ][self.headers['position']] )
         df_i_pos = sorted(list(set(df_i[self.headers['position']])))
@@ -342,16 +362,18 @@ class Table:
 
         for elm in all_elms:
             name, pos, source, x = elm
+
+            if mutation_elms_only:
+                elm_range = set(range(pos[0], pos[1]+1))
+                if df_mut_pos.isdisjoint(elm_range):
+                    continue
+
             if pos[0] < df_i_range[0]:
                 pos[0] = df_i_range[0]
             if pos[1] > df_i_range[-1]:
                 pos[1] = df_i_range[-1]
 
             # XXX: add colors predicted/manual
-            if mutation_elms_only:
-                elm_range = set(range(pos[0], pos[1]+1))
-                if df_mut_pos.isdisjoint(elm_range):
-                    continue
 
             ax.add_patch(patches.Rectangle((pos[0],0), pos[1]-pos[0], 1.0, alpha=0.8, color=color))
 
@@ -363,22 +385,55 @@ class Table:
                     self.log.warning("missing ELM label: %s" % name)
                 ax.text(x, next(ladder), label, color='black', ha='center', va='center') #fontdict=dict(weight='bold')) #bbox=dict(facecolor='red', alpha=0.5),
 
+    def _plot_structures(self, ax, df, df_i):
+        all_structs = []
+
+        df_e = df [ df[ self.headers['structure'] ].notnull() ][ self.headers['structure']]
+        df_e = filter(lambda x: x != '', df_e)
+
+        df_i_pos = sorted(list(set(df_i[self.headers['position']])))
+        df_i_range = (df_i_pos[0], df_i_pos[-1])
+
+        for e in df_e:
+            all_structs.extend(e.split('|'))
+
+        all_structs = set(all_structs)
+
+        all_structs = [ struct.split(", ") for struct in all_structs ]
+
+        for i, struct in enumerate(all_structs):
+            all_structs[i][1] = [ int(e) for e in struct[1].split('-') ]
+            all_structs[i].append( struct[1][0] + (struct[1][1] - struct[1][0]) / 2.0 )
+
+        all_structs = sorted(all_structs, key=lambda x: x[3])
+
+        for struct in all_structs:
+            name, pos, source, x = struct
+            if name != 'structured':
+                continue
+            if pos[0] < df_i_range[0]:
+                pos[0] = df_i_range[0]
+            if pos[1] > df_i_range[-1]:
+                pos[1] = df_i_range[-1]
+            ax.add_patch(patches.Rectangle((pos[0],0), pos[1]-pos[0], 1.0, alpha=0.3, color="black", hatch='...', fill=False))
+
     def plot_metatable( self, 
                         df, 
                         fname=None, 
                         section_size=50, 
                         figsize=(8.27,6), 
-                        mutations=True, 
+                        mutations=True,
+                        elm=True,
                         ptms=True, 
-                        elm=True, 
+                        structure=True, 
                         ptm_types=None, 
                         mutations_revel=True, 
                         revel_not_annotated=0.5, 
-                        do_elms=True, 
                         filter_elms=True, 
                         y_ladder=(0.65, 0.95, 4), 
                         revel_cutoff=0.4,
-                        rcParams={'font.size':8.0, 'font.sans-serif':['Arial']}):
+                        rcParams={'font.size':8.0, 'font.sans-serif':['Arial']},
+                        mutation_elms_only=True):
 
         if rcParams:
             for k,v in iteritems(rcParams):
@@ -418,7 +473,10 @@ class Table:
                 self._plot_ptms(ax, df_i, ptm_types)
 
             if elm:
-                self._plot_elms(ax, df, df_i)
+                self._plot_elms(ax, df, df_i, mutation_elms_only=mutation_elms_only)
+
+            if structure:
+                self._plot_structures(ax, df, df_i)
 
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.6)

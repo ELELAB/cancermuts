@@ -442,6 +442,7 @@ class cBioPortal(DynamicSource, object):
                                        'start_position',
                                        'end_position',
                                        'reference_allele']].values)
+                        gd = [str(int(gd[0])), str(int(gd[1])), str(int(gd[2])), str(gd[3])]
                         gd = ['hg19'] + gd
                         out_metadata['genomic_coordinates'].append(gd)
                     if do_genomic_mutations:
@@ -449,7 +450,7 @@ class cBioPortal(DynamicSource, object):
                             self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
                             gm = None
                         else:
-                            gm = ['hg19', rmt['chr'], self.default_strand, gd[2], gd[4], rmt['variant_allele']]
+                            gm = ['hg19', str(int(rmt['chr'])), self.default_strand, gd[2], gd[4], rmt['variant_allele']]
                         out_metadata['genomic_mutations'].append(gm)
         return mutations, out_metadata
 
@@ -496,8 +497,8 @@ class COSMIC(DynamicSource, object):
 
     def _parse_db_file(self, gene_id, cancer_types=None, metadata=[], filter_snps=True):
 
-        site_kwd = ['Primary_site', 'Site_subtype_1', 'Site_subtype_2', 'Site_subtype_3']
-        histology_kwd = ['Primary_histology', 'Histology_subtype_1', 'Histology_subtype_2', 'Histology_subtype_3']
+        site_kwd = ['Primary site', 'Site subtype 1', 'Site subtype 2', 'Site subtype 3']
+        histology_kwd = ['Primary histology', 'Histology subtype 1', 'Histology subtype 2', 'Histology subtype 3']
 
         mutations = []
 
@@ -535,6 +536,7 @@ class COSMIC(DynamicSource, object):
 
         #df.columns = df.columns.str.replace(r'\s+', '_')
 
+
         for r in df.iterrows():
             r = r[1]
             mutations.append(r['Mutation AA'])
@@ -547,27 +549,30 @@ class COSMIC(DynamicSource, object):
                 grch = r['GRCh']
                 if grch == '38':
                     gd.append('hg38') # genome version
-                elif grch == '37':
+                elif grch == '37' or grch == '19':
                     gd.append('hg19')
                 else:
-                    out_metadata['genomic_coordinates'].append(None)
+                    gd = None
                     self.log.warning("Genome assembly not specified for mutation; genomic coordinates won't be annotated")
-                    continue
 
-                tmp2 = r.Mutation_genome_position.split(":")
-                gd.append(tmp2[0]) # chr
-                gd.extend(tmp2[1].split("-")) # [start, end]
-                gd.append(r['Mutation CDS'][-3]) # ref
+                if gd is not None:
+                    tmp2 = r['Mutation genome position'].split(":")
+                    gd.append(str(int(tmp2[0]))) # chr
+                    gd.extend(tmp2[1].split("-")) # [start, end]
+                    gd.append(r['Mutation CDS'][-3]) # ref
 
             if do_genomic_coordinates:
                 out_metadata['genomic_coordinates'].append(gd)
 
             if do_genomic_mutations:
-                if gd[2] != gd[3]:
+                if gd is None:
+                    self.log.warning("couldn't annotate genomic mutation")
+                    gm = None
+                elif gd[2] != gd[3]:
                     self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
                     gm = None
                 else:
-                    gm = [gd[0], gd[1], r['Mutation strand'], gd[2], gd[4], r['Mutation     CDS'][-1]]
+                    gm = [gd[0], gd[1], r['Mutation strand'], gd[2], gd[4], r['Mutation CDS'][-1]]
                 out_metadata['genomic_mutations'].append(gm)
 
             if do_site:
@@ -619,7 +624,6 @@ class COSMIC(DynamicSource, object):
             mutation_obj = Mutation(sequence.positions[site_seq_idx],
                                     mut,
                                     [self])
-
             for md in metadata:
                 mutation_obj.metadata[md] = []
                 for mi in mutation_indices:
@@ -671,9 +675,10 @@ class PhosphoSite(DynamicSource, object):
             p_regexp = '[A-Z][0-9]+-%s' % self._ptm_suffixes[ptm_idx]
             p_prog = re.compile(p_regexp)
             p_sites = []
-
             df = self._dataframes[ptm]
             df = df[ df['GENE'].str.upper() == gene_id.upper() ]
+            if df.empty:
+                continue
             df = df[ df.apply(lambda x: bool(p_prog.match(x['MOD_RSD'])), axis=1) ]
 
             sites[ptm] = [ x[:self._ptm_suffix_offsets[ptm_idx]] for x in df['MOD_RSD'].values  ]
@@ -703,7 +708,7 @@ class PhosphoSite(DynamicSource, object):
 
                 already_annotated = False
                 for prop in position.properties:
-                    if isinstance(prop, position_properties_classes[ptm]):
+                    if isinstance(prop, position_properties_classes[self._ptm_types_to_classes[ptm]]):
                         prop.sources.append(self)
                         self.log.info("site %s already annotated as %s; source will be added" % (m, position_properties_classes[ptm].name))
                         already_annotated = True
@@ -1010,7 +1015,7 @@ class ELMPredictions(DynamicSource, object):
 
             property_obj = sequence_properties_classes['linear_motif']  (sources=[self],
                                                                          positions=this_positions,
-                                                                         lmtype=self._elm_classes[d[0]][0])
+                                                                         name=self._elm_classes[d[0]][0])
 
             property_obj.metadata['function'] = [self._elm_classes[d[0]][0]]
             property_obj.metadata['ref']      = self.description
@@ -1272,7 +1277,7 @@ class ManualAnnotation(StaticSource):
     _expected_cols = ['name', 'site', 'type', 'function', 'reference']
     _ptm_keywords = ['ptm_cleavage', 'ptm_phosphorylation', 'ptm_ubiquitination', 'ptm_acetylation', 'ptm_sumoylation', 'ptm_nitrosylation', 'ptm_methylation']
     _supported_position_properties = _ptm_keywords
-    _supported_sequence_properties = ['linear_motif']
+    _supported_sequence_properties = ['linear_motif', 'structure']
 
     @logger_init
     def __init__(self, datafile, **parsing_options):
@@ -1283,9 +1288,9 @@ class ManualAnnotation(StaticSource):
         self._datafile = datafile
         self._df = None
         
-        try:
+        if True:
             self._parse_datafile(**parsing_options)
-        except:
+        else:
             self.log.error("An error occurred while parsing the input file %s; manual annotation will be skipped" % self._datafile)
             self._df = None
             return
@@ -1298,11 +1303,10 @@ class ManualAnnotation(StaticSource):
             df = pd.read_csv(self._datafile, **parsing_options)
         except IOError:
             self.log.error("Parsing of file %s failed. ")
-            raise IOError
         try:
             self._df = df[ self._expected_cols ]
-        except IndexError:
-            log.error("required columns not found in csv file (these are: %s). Manual annotation will be skipped" % ", ".join(self._expected_cols))
+        except:
+            self.log.error("required columns not found in csv file (these are: %s). Manual annotation will be skipped" % ", ".join(self._expected_cols))
             raise IndexError
 
         all_properties = set(self._supported_position_properties + self._supported_sequence_properties)
@@ -1358,13 +1362,16 @@ class ManualAnnotation(StaticSource):
 
         for idx, row in tmp_df.iterrows():
 
-            this_position = sequence.positions[sequence.seq2index(int(row['site']))]
-            
+            try:
+                this_position = sequence.positions[sequence.seq2index(int(row['site']))]
+            except:
+                log.error("position property refers to ")
+
             property_obj = position_properties_classes[row['type']](sources=[self],
                                                                     position=this_position)
 
-            property_obj.metadata['function'] = row['function']
-            property_obj.metadata['reference']      = row['reference']
+            property_obj.metadata['function']  = row['function']
+            property_obj.metadata['reference'] = row['reference']
 
             this_position.add_property(property_obj)
 
@@ -1398,10 +1405,10 @@ class ManualAnnotation(StaticSource):
 
             property_obj = sequence_properties_classes[row['type']](sources=[self],
                                                                     positions=positions,
-                                                                    lmtype=row['name'])
+                                                                    name=row['name'])
 
 
-            property_obj.metadata['function'] = row['function']
-            property_obj.metadata['reference']      = row['reference']
+            property_obj.metadata['function']  = row['function']
+            property_obj.metadata['reference'] = row['reference']
 
             sequence.add_property(property_obj)
