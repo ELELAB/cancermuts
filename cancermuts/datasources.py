@@ -79,17 +79,22 @@ class UniProt(DynamicSource, object):
     def get_sequence(self, gene_id, upid=None):
         if upid is None:
             self.log.info("retrieving UniProt ID for human gene %s" % gene_id)
-            upids = self._uniprot_service.search("gene:%s AND organism:human" % gene_id, columns="entry name").split()[2:]
+            try:
+                upids = self._uniprot_service.search("gene:%s AND organism:human" % gene_id, columns="entry name").split()[2:]
+            except:
+                self.log.error("Failed to retrieve list of Uniprot IDs")
+                return None
             upid = upids[0]
             if len(upids) > 1:
                 self.log.warning("the following UniProt entries were found for gene %s: %s; will use %s" %(gene_id, ', '.join(upids), upid))
             else:
                 self.log.info("will use Uniprot ID %s" % upid)
-            aliases = {}
         else:
-            aliases = {'uniprot':upid}
+            self.log.info("The user-provided Uniprot ID (%s) will be used" % upid)
 
-        self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s" % gene_id)
+        aliases = {'uniprot' : upid}
+
+        self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s, gene %s" % (upid, gene_id))
 
         try:
             sequence = self._uniprot_service.get_fasta_sequence(str(upid))
@@ -98,6 +103,8 @@ class UniProt(DynamicSource, object):
             return None
 
         return Sequence(gene_id, sequence, self, aliases=aliases)
+
+
 
 class cBioPortal(DynamicSource, object):
 
