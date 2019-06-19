@@ -291,6 +291,7 @@ class CancerSite(Metadata):
         super(CancerSite, self).__init__(source)
         self.source = source
         sites = [ i for i in sites if i != self.not_specified ]
+        sites = [ i for i in sites if i == i ] # remove nans
         self.sites = sites
 
     def get_value(self):
@@ -320,6 +321,7 @@ class CancerHistology(Metadata):
     def __init__(self, source, *histology):
         super(CancerHistology, self).__init__(source)
         histology = [ i for i in histology if i != self.not_specified ]
+        histology = [ i for i in histology if i == i ] # remove nans
         self.source = source
         self.histology = histology
 
