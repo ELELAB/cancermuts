@@ -710,7 +710,7 @@ class PhosphoSite(DynamicSource, object):
 
                 position = sequence.positions[site_seq_idx]
                 if position.wt_residue_type != wt:
-                    self.log.warning("for PTM %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
+                    self.log.warning("for PTM %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
                     continue
 
                 already_annotated = False
