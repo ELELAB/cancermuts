@@ -480,13 +480,21 @@ class COSMIC(DynamicSource, object):
 
         self._mut_regexp = 'p\.[A-Z][0-9]+[A-Z]$'
         self._mut_prog = re.compile(self._mut_regexp)
+        self._site_kwd = ['Primary site', 'Site subtype 1', 'Site subtype 2', 'Site subtype 3']
+        self._histology_kwd = ['Primary histology', 'Histology subtype 1', 'Histology subtype 2', 'Histology subtype 3']
+        self._use_cols = [  'Gene name',
+                            'SNP',
+                            'Mutation AA',
+                            'GRCh',
+                            'Mutation genome position',
+                            'Mutation CDS',
+                            'Mutation strand' ] + self._site_kwd + self._histology_kwd
+
         dataframes = []
 
         if database_files is None:
             database_dir   = '/data/databases/cosmic'
-            databases      = [  'CosmicMutantExport',
-                                'CosmicCompleteTargetedScreensMutantExport',
-                                'CosmicGenomeScreensMutantExport' ]
+            databases      = [  'CosmicMutantExport' ]
             self._database_files = [os.path.join(database_dir, i)+'.tsv' for i in databases]
         else:
             self._database_files = database_files
@@ -494,7 +502,7 @@ class COSMIC(DynamicSource, object):
         for f in self._database_files:
             try:
                 self.log.info("Parsing database file %s ..." % f)
-                dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS') )
+                dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols) )
             except:
                 self.log.error("Couldn't parse database file.")
                 self._df = None
@@ -503,9 +511,6 @@ class COSMIC(DynamicSource, object):
         self._df = pd.concat(dataframes, ignore_index=True, sort=False)
 
     def _parse_db_file(self, gene_id, cancer_types=None, metadata=[], filter_snps=True):
-
-        site_kwd = ['Primary site', 'Site subtype 1', 'Site subtype 2', 'Site subtype 3']
-        histology_kwd = ['Primary histology', 'Histology subtype 1', 'Histology subtype 2', 'Histology subtype 3']
 
         mutations = []
 
@@ -583,10 +588,10 @@ class COSMIC(DynamicSource, object):
                 out_metadata['genomic_mutations'].append(gm)
 
             if do_site:
-                out_metadata['cancer_site'].append([r.__getitem__(a) for a in site_kwd])
+                out_metadata['cancer_site'].append([r.__getitem__(a) for a in self._site_kwd])
 
             if do_histology:
-                out_metadata['cancer_histology'].append([r.__getitem__(a) for a in histology_kwd])
+                out_metadata['cancer_histology'].append([r.__getitem__(a) for a in self._histology_kwd])
 
         return mutations, out_metadata
 
@@ -710,7 +715,7 @@ class PhosphoSite(DynamicSource, object):
 
                 position = sequence.positions[site_seq_idx]
                 if position.wt_residue_type != wt:
-                    self.log.warning("for PTM %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
+                    self.log.warning("for PTM %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
                     continue
 
                 already_annotated = False
