@@ -104,8 +104,6 @@ class UniProt(DynamicSource, object):
 
         return Sequence(gene_id, sequence, self, aliases=aliases)
 
-
-
 class cBioPortal(DynamicSource, object):
 
     default_strand = '+'
@@ -204,7 +202,7 @@ class cBioPortal(DynamicSource, object):
             self._cache_cancer_studies = df[ df.apply(lambda x: x['cancer_study_id'] in cancer_studies, axis=1) ]
 
     def _get_genetic_profile(self, cancer_study_id):
-        #self.log.debug("fetching genetic profiles for cancer study %s" % cancer_study_id)
+        self.log.debug("fetching genetic profiles for cancer study %s" % cancer_study_id)
 
         try:
             response = rq.post(self._requests_url, {'cmd':'getGeneticProfiles',
@@ -233,11 +231,13 @@ class cBioPortal(DynamicSource, object):
         pool = Pool(len(cancer_study_ids))
 
         results = pool.map_async(self._get_genetic_profile, cancer_study_ids).get()
+        pool.close()
+        pool.join()
 
         self._cache_genetic_profiles = pd.concat(results, ignore_index=True)
 
     def _get_case_set(self, cancer_study_id):
-        #self.log.debug("fetching case sets for cancer study %s" % cancer_study_id)
+        self.log.debug("fetching case sets for cancer study %s" % cancer_study_id)
 
         try:
             response = rq.post(self._requests_url, {'cmd':'getCaseLists',
@@ -270,6 +270,8 @@ class cBioPortal(DynamicSource, object):
         pool = Pool(len(cancer_study_ids))
 
         results = pool.map_async(self._get_case_set, cancer_study_ids).get()
+        pool.close()
+        pool.join()
 
         self._cache_case_sets = pd.concat(results, ignore_index=True)
 
@@ -309,6 +311,8 @@ class cBioPortal(DynamicSource, object):
         pool = Pool(len(this_sets))
 
         results = pool.map_async(self._get_case_profile_data, data).get()
+        pool.close()
+        pool.join()
 
         return pd.concat(results, ignore_index=True)
 
@@ -352,6 +356,8 @@ class cBioPortal(DynamicSource, object):
         pool = Pool(len(this_sets))
 
         results = pool.map_async(self._get_single_mutation_data, data).get()
+        pool.close()
+        pool.join()
 
         for r in results:
             if r is not None:
@@ -1032,6 +1038,205 @@ class ELMPredictions(DynamicSource, object):
             property_obj.metadata['function'] = [self._elm_classes[d[0]][0]]
             property_obj.metadata['ref']      = self.description
             sequence.add_property(property_obj)
+
+class gnomAD(DynamicSource, object):
+    
+    description = "gnomAD"
+
+    @logger_init
+    def __init__(self, version='2.1'):
+        
+        self._versions = {  '2.1' :             'gnomad_r2_1',
+                            '3' :               'gnomad_r3',
+                            '2.1_controls' :    'gnomad_2.1_controls',
+                            '2.1_non-neuro' :   'gnomad_2.1_non_neuro',
+                            '2.1_non-cancer' :  'gnomad_2.1_non_cancer',
+                            '2.1_non-topmed' :  'gnomad_2.1_non_topmed',
+                            'exac' :            'exac',
+                            }
+
+        self._assembly = {  '2.1' :             'GRCh37',
+                            '3' :               'GRCh38',
+                            '2.1_controls' :    'GRCh37',
+                            '2.1_non-neuro' :   'GRCh37',
+                            '2.1_non-cancer' :  'GRCh37',
+                            '2.1_non-topmed' :  'GRCh37',
+                            'exac' :            'GRCh37',
+                            }
+
+        version = str(version)
+        if version not in self._versions.keys():
+            self.log.error("gnomAD version %s not supported by the current implementation" % version)
+            raise TypeError
+
+        super(gnomAD, self).__init__(name='gnomAD', version=version, description=self.description)
+
+        self._requests_url = 'https://gnomad.broadinstitute.org/api/'
+        self._cache = {}
+        self._supported_metadata = {'gnomad_exome_allele_frequency' : self._get_exome_allele_freq,
+                                    'gnomad_genome_allele_frequency' : self._get_genome_allele_freq}
+
+    def add_metadata(self, sequence, md_type=['gnomad_exome_allele_frequency'], use_alias=None):
+        
+        if use_alias is not None:
+            gene_id = sequence.aliases[use_alias]
+            self.log.info("using alias %s as gene name" % sequence.aliases[use_alias])
+        else:
+            gene_id = sequence.gene_id
+
+
+        self.log.debug("Adding metadata: " + ', '.join(md_type) )
+
+        if type(md_type) is str:
+            md_types = [md_type]
+        else:
+            md_types = md_type
+
+        metadata_functions = []
+
+        for md_type in md_types:
+            try:
+                metadata_functions.append(self._supported_metadata[md_type])
+            except KeyError:
+                self.log.warning("ExAC doesn't support metadata type %s" % md_type)
+
+        self.log.debug("collected metadata functions: %s" % ', '.join([i for i in metadata_functions.__repr__()]))
+
+        for pos in sequence.positions:
+            for mut in pos.mutations:
+                for i,add_this_metadata in enumerate(metadata_functions):
+                    mut.metadata[md_types[i]] = []
+    
+                if not 'genomic_mutations' in mut.metadata:
+                    self.log.warning("no genomic mutation data available for Exac SNP, mutation %s. It will be skipped" % mut)
+                    continue
+                elif mut.metadata['genomic_mutations'] is None or len(mut.metadata['genomic_mutations']) == 0:
+                    self.log.warning("no genomic mutation data available for Exac SNP, mutation %s. It will be skipped" % mut)
+                    continue
+
+                for i,add_this_metadata in enumerate(metadata_functions):
+                    self.log.debug("adding metadata %s to %s" % (md_types[i], mut))
+                    add_this_metadata(mut, gene_id)
+
+    def _get_exome_allele_freq(self, mutation, gene_id):
+        self.log.info("getting genome allele frequency")
+        self._get_metadata(mutation, gene_id, 'gnomad_exome_allele_frequency')
+
+    def _get_genome_allele_freq(self, mutation, gene_id):
+        self.log.info("getting genome allele frequency")
+        self._get_metadata(mutation, gene_id, 'gnomad_genome_allele_frequency')
+
+
+    def _get_metadata(self, mutation, gene_id, md_type):
+
+        exac_key = {    'gnomad_exome_allele_frequency'  : 'exome_af', 
+                        'gnomad_genome_allele_frequency' : 'genome_af'       }
+
+        ref_assembly = self._assembly[self.version]
+
+        if gene_id not in self._cache.keys():
+
+            data = self._get_gnomad_data(gene_id)
+
+            if data is None:
+                return
+            
+            assemblies = set(data['reference_genome'])
+            
+            if len(assemblies) != 1:
+                self.log.error("the downloaded data refers to more than one assembly!")
+                return None
+
+            if list(assemblies)[0] != ref_assembly:
+                self.log.error("the downloaded data refers to an unexpected assembly!")
+                return None
+
+            self._cache[gene_id] = data
+        
+        else:
+            self.log.info("data for gene %s already in cache" % gene_id)
+            data = self._cache[gene_id]
+
+        mutation.metadata[md_type] = list()
+
+        allele_frequencies = []
+
+        for variant in mutation.metadata['genomic_mutations']:
+            if type(variant) is GenomicMutation:
+                v_str = variant.as_assembly(ref_assembly).get_value_str(fmt='gnomad')
+            else:
+                v_str = variant
+
+            this_df = data[ data['variantId'] == v_str ]
+            
+            if len(this_df) == 0:
+                af = None
+                self.log.info("no entry found for %s" % v_str)
+            elif len(this_df) == 1:
+                af = this_df[exac_key[md_type]].values[0]
+                self.log.info("entry found for %s" % v_str)
+            elif len(this_df) > 1:
+                self.log.warning("more than one entry for %s! Skipping" % v_str)
+                af = None
+            
+            mutation.metadata[md_type].append(metadata_classes[md_type](self, af))
+
+    def _get_gnomad_data(self, gene_id):
+        headers = { "content-type": "application/graphql" }
+        request='''{
+          gene(gene_name: "%s") {
+            hgnc_id
+            name
+            canonical_transcript_id
+            omim_id
+            full_gene_name
+            variants(dataset: %s) {
+              variantId
+              reference_genome
+              chrom
+              pos
+              ref
+              alt
+              consequence
+              consequence_in_canonical_transcript
+              exome {
+                af
+              }
+              genome {
+                af
+              }
+            }
+          }
+        }
+        ''' % (gene_id, self._versions[self.version])
+        
+        self.log.info("retrieving data for gene %s" % gene_id)
+        
+        try:
+            response = rq.post(self._requests_url, data=request, headers=headers)
+        except:
+            self.log.error("Couldn't perform request for gnomAD")
+            return None
+
+        try:
+            data = json.loads(response.text)
+        except:
+            log.error("downloaded data couldn't be understood")
+            return None
+
+        if 'errors' in data.keys():
+            self.log.error('The following errors were reported when querying gnomAD:')
+            for e in data['errors']:
+                self.log.error('\t%s' % e['message'])
+            return None
+
+        df = pd.DataFrame.from_dict(data['data']['gene']['variants'])
+        df['exome_af'] = [ i['af'] if i is not None else None for i in df['exome'] ]
+        df['genome_af'] = [ i['af'] if i is not None else None for i in df['genome'] ]
+
+        return df
+
+
 
 class ExAC(DynamicSource, object):
     
