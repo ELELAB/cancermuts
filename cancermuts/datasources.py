@@ -1043,27 +1043,37 @@ class gnomAD(DynamicSource, object):
     
     description = "gnomAD"
 
+    _versions = {  '2.1' :             'gnomad_r2_1',
+                   '3' :               'gnomad_r3',
+                   '2.1_controls' :    'gnomad_2.1_controls',
+                   '2.1_non-neuro' :   'gnomad_2.1_non_neuro',
+                   '2.1_non-cancer' :  'gnomad_2.1_non_cancer',
+                   '2.1_non-topmed' :  'gnomad_2.1_non_topmed',
+                   'exac' :            'exac',
+                }
+
+    _assembly = {  '2.1' :             'GRCh37',
+                   '3' :               'GRCh38',
+                   '2.1_controls' :    'GRCh37',
+                   '2.1_non-neuro' :   'GRCh37',
+                   '2.1_non-cancer' :  'GRCh37',
+                   '2.1_non-topmed' :  'GRCh37',
+                   'exac' :            'GRCh37',
+                }
+
+    _version_str = {  '2.1' :              'gnomAD v2.1',
+                       '3' :               'gnomAD v3',
+                       '2.1_controls' :    'gnomAD v2.1 (controls)',
+                       '2.1_non-neuro' :   'gnomAD v2.1 (non-neuro)',
+                       '2.1_non-cancer' :  'gnomAD v2.1 (non-cancer)',
+                       '2.1_non-topmed' :  'gnomAD v2.1 (non-topmed)',
+                       'exac' :            'EXaC',
+                    }
+
+
     @logger_init
     def __init__(self, version='2.1'):
         
-        self._versions = {  '2.1' :             'gnomad_r2_1',
-                            '3' :               'gnomad_r3',
-                            '2.1_controls' :    'gnomad_2.1_controls',
-                            '2.1_non-neuro' :   'gnomad_2.1_non_neuro',
-                            '2.1_non-cancer' :  'gnomad_2.1_non_cancer',
-                            '2.1_non-topmed' :  'gnomad_2.1_non_topmed',
-                            'exac' :            'exac',
-                            }
-
-        self._assembly = {  '2.1' :             'GRCh37',
-                            '3' :               'GRCh38',
-                            '2.1_controls' :    'GRCh37',
-                            '2.1_non-neuro' :   'GRCh37',
-                            '2.1_non-cancer' :  'GRCh37',
-                            '2.1_non-topmed' :  'GRCh37',
-                            'exac' :            'GRCh37',
-                            }
-
         version = str(version)
         if version not in self._versions.keys():
             self.log.error("gnomAD version %s not supported by the current implementation" % version)
@@ -1075,6 +1085,9 @@ class gnomAD(DynamicSource, object):
         self._cache = {}
         self._supported_metadata = {'gnomad_exome_allele_frequency' : self._get_exome_allele_freq,
                                     'gnomad_genome_allele_frequency' : self._get_genome_allele_freq}
+
+        gnomADExomeAlleleFrequency.set_version_in_desc(self._version_str[version])
+        gnomADGenomeAlleleFrequency.set_version_in_desc(self._version_str[version])
 
     def add_metadata(self, sequence, md_type=['gnomad_exome_allele_frequency'], use_alias=None):
         

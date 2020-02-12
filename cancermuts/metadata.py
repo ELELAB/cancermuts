@@ -245,12 +245,12 @@ class DbnsfpRevel(Metadata):
     def __hash__(self):
         return hash((self.source, self.score))
 
-class gnomADExomeAlleleFrequency(Metadata):
+class gnomADAlleleFrequency(Metadata):
 
-    description = "Exome Allele Frequency (gnomAD)"
+    freq_type = 'generic'
 
     def __init__(self, source, frequency):
-        super(gnomADExomeAlleleFrequency, self).__init__(source)
+        super(gnomADAlleleFrequency, self).__init__(source)
         self.source = source
         self.frequency = frequency
 
@@ -259,47 +259,43 @@ class gnomADExomeAlleleFrequency(Metadata):
 
     def get_value_str(self):
         return "%f" % self.frequency
+
+    @classmethod
+    def set_version_in_desc(cls, version_string):
+        cls.description = "%s (%s)" % (cls.description, version_string)
+
+    def __eq__(self, other):
+        return self.source == other.source and \
+               self.frequency == other.frequency and \
+               self.freq_type == other.freq_type
+
+    def __hash__(self):
+        return hash((self.source, self.frequency, self.freq_type))
+
+    def __str__(self):
+        return self.__repr__()
+
+class gnomADExomeAlleleFrequency(gnomADAlleleFrequency):
+
+    freq_type = "Exome"
+    description = "%s allele frequency" % freq_type
+
+    def __init__(self, source, frequency):
+        super(gnomADExomeAlleleFrequency, self).__init__(source, frequency)
 
     def __repr__(self):
         return "<gnomADExomeAlleleFrequency, %f>" % self.frequency
 
-    def __str__(self):
-        return self.__repr__()
+class gnomADGenomeAlleleFrequency(gnomADAlleleFrequency):
 
-    def __eq__(self, other):
-        return self.source == other.source and \
-               self.frequency == other.frequency
-
-    def __hash__(self):
-        return hash((self.source, self.frequency))
-
-class gnomADGenomeAlleleFrequency(Metadata):
-
-    description = "Genome Allele Frequency (gnomAD)"
+    freq_type = "Genome"
+    description = "%s allele frequency" % freq_type
 
     def __init__(self, source, frequency):
-        super(gnomADGenomeAlleleFrequency, self).__init__(source)
-        self.source = source
-        self.frequency = frequency
-
-    def get_value(self):
-        return self.frequency
-
-    def get_value_str(self):
-        return "%f" % self.frequency
+        super(gnomADGenomeAlleleFrequency, self).__init__(source, frequency)
 
     def __repr__(self):
         return "<gnomADGenomeAlleleFrequency, %f>" % self.frequency
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __eq__(self, other):
-        return self.source == other.source and \
-               self.frequency == other.frequency
-
-    def __hash__(self):
-        return hash((self.source, self.frequency))
 
 class CancerSite(Metadata):
 
