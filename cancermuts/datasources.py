@@ -104,8 +104,6 @@ class UniProt(DynamicSource, object):
 
         return Sequence(gene_id, sequence, self, aliases=aliases)
 
-
-
 class cBioPortal(DynamicSource, object):
 
     default_strand = '+'
@@ -204,7 +202,7 @@ class cBioPortal(DynamicSource, object):
             self._cache_cancer_studies = df[ df.apply(lambda x: x['cancer_study_id'] in cancer_studies, axis=1) ]
 
     def _get_genetic_profile(self, cancer_study_id):
-        #self.log.debug("fetching genetic profiles for cancer study %s" % cancer_study_id)
+        self.log.debug("fetching genetic profiles for cancer study %s" % cancer_study_id)
 
         try:
             response = rq.post(self._requests_url, {'cmd':'getGeneticProfiles',
@@ -233,11 +231,13 @@ class cBioPortal(DynamicSource, object):
         pool = Pool(len(cancer_study_ids))
 
         results = pool.map_async(self._get_genetic_profile, cancer_study_ids).get()
+        pool.close()
+        pool.join()
 
         self._cache_genetic_profiles = pd.concat(results, ignore_index=True)
 
     def _get_case_set(self, cancer_study_id):
-        #self.log.debug("fetching case sets for cancer study %s" % cancer_study_id)
+        self.log.debug("fetching case sets for cancer study %s" % cancer_study_id)
 
         try:
             response = rq.post(self._requests_url, {'cmd':'getCaseLists',
@@ -270,6 +270,8 @@ class cBioPortal(DynamicSource, object):
         pool = Pool(len(cancer_study_ids))
 
         results = pool.map_async(self._get_case_set, cancer_study_ids).get()
+        pool.close()
+        pool.join()
 
         self._cache_case_sets = pd.concat(results, ignore_index=True)
 
@@ -309,6 +311,8 @@ class cBioPortal(DynamicSource, object):
         pool = Pool(len(this_sets))
 
         results = pool.map_async(self._get_case_profile_data, data).get()
+        pool.close()
+        pool.join()
 
         return pd.concat(results, ignore_index=True)
 
@@ -352,6 +356,8 @@ class cBioPortal(DynamicSource, object):
         pool = Pool(len(this_sets))
 
         results = pool.map_async(self._get_single_mutation_data, data).get()
+        pool.close()
+        pool.join()
 
         for r in results:
             if r is not None:
@@ -1033,22 +1039,65 @@ class ELMPredictions(DynamicSource, object):
             property_obj.metadata['ref']      = self.description
             sequence.add_property(property_obj)
 
-class ExAC(DynamicSource, object):
+class gnomAD(DynamicSource, object):
     
-    description = "ExAC"
+    description = "gnomAD"
+
+    _versions = {  '2.1' :             'gnomad_r2_1',
+                   '3' :               'gnomad_r3',
+                   '2.1_controls' :    'gnomad_2.1_controls',
+                   '2.1_non-neuro' :   'gnomad_2.1_non_neuro',
+                   '2.1_non-cancer' :  'gnomad_2.1_non_cancer',
+                   '2.1_non-topmed' :  'gnomad_2.1_non_topmed',
+                   'exac' :            'exac',
+                }
+
+    _assembly = {  '2.1' :             'GRCh37',
+                   '3' :               'GRCh38',
+                   '2.1_controls' :    'GRCh37',
+                   '2.1_non-neuro' :   'GRCh37',
+                   '2.1_non-cancer' :  'GRCh37',
+                   '2.1_non-topmed' :  'GRCh37',
+                   'exac' :            'GRCh37',
+                }
+
+    _version_str = {  '2.1' :              'gnomAD v2.1',
+                       '3' :               'gnomAD v3',
+                       '2.1_controls' :    'gnomAD v2.1 (controls)',
+                       '2.1_non-neuro' :   'gnomAD v2.1 (non-neuro)',
+                       '2.1_non-cancer' :  'gnomAD v2.1 (non-cancer)',
+                       '2.1_non-topmed' :  'gnomAD v2.1 (non-topmed)',
+                       'exac' :            'EXaC',
+                    }
+
 
     @logger_init
-    def __init__(self):
-
-        super(ExAC, self).__init__(name='ExAC', version='0.1', description=self.description)
-
-        self._requests_url = 'http://exac.broadinstitute.org/variant'
-        self._data_cache = {}
-        self._supported_metadata = {'exac_allele_frequency' : self._get_allele_freq,
-                                    'exac_af_filter'        : self._get_af_filter}
-
-    def add_metadata(self, sequence, md_type=['exac_allele_frequency','exac_af_filter']):
+    def __init__(self, version='2.1'):
         
+        version = str(version)
+        if version not in self._versions.keys():
+            self.log.error("gnomAD version %s not supported by the current implementation" % version)
+            raise TypeError
+
+        super(gnomAD, self).__init__(name='gnomAD', version=version, description=self.description)
+
+        self._requests_url = 'https://gnomad.broadinstitute.org/api/'
+        self._cache = {}
+        self._supported_metadata = {'gnomad_exome_allele_frequency' : self._get_exome_allele_freq,
+                                    'gnomad_genome_allele_frequency' : self._get_genome_allele_freq}
+
+        gnomADExomeAlleleFrequency.set_version_in_desc(self._version_str[version])
+        gnomADGenomeAlleleFrequency.set_version_in_desc(self._version_str[version])
+
+    def add_metadata(self, sequence, md_type=['gnomad_exome_allele_frequency'], use_alias=None):
+        
+        if use_alias is not None:
+            gene_id = sequence.aliases[use_alias]
+            self.log.info("using alias %s as gene name" % sequence.aliases[use_alias])
+        else:
+            gene_id = sequence.gene_id
+
+
         self.log.debug("Adding metadata: " + ', '.join(md_type) )
 
         if type(md_type) is str:
@@ -1062,7 +1111,7 @@ class ExAC(DynamicSource, object):
             try:
                 metadata_functions.append(self._supported_metadata[md_type])
             except KeyError:
-                self.log.warning("ExAC doesn't support metadata type %s" % md_type)
+                self.log.warning("gnomAD doesn't support metadata type %s" % md_type)
 
         self.log.debug("collected metadata functions: %s" % ', '.join([i for i in metadata_functions.__repr__()]))
 
@@ -1072,83 +1121,133 @@ class ExAC(DynamicSource, object):
                     mut.metadata[md_types[i]] = []
     
                 if not 'genomic_mutations' in mut.metadata:
-                    self.log.warning("no genomic mutation data available for Exac SNP, mutation %s. It will be skipped" % mut)
+                    self.log.warning("no genomic mutation data available for gnomAD, mutation %s. It will be skipped" % mut)
                     continue
                 elif mut.metadata['genomic_mutations'] is None or len(mut.metadata['genomic_mutations']) == 0:
-                    self.log.warning("no genomic mutation data available for Exac SNP, mutation %s. It will be skipped" % mut)
+                    self.log.warning("no genomic mutation data available for gnomAD, mutation %s. It will be skipped" % mut)
                     continue
 
                 for i,add_this_metadata in enumerate(metadata_functions):
                     self.log.debug("adding metadata %s to %s" % (md_types[i], mut))
-                    add_this_metadata(mut)
+                    add_this_metadata(mut, gene_id)
 
-    def _get_allele_freq(self, mutation):
-        self.log.debug("getting allele frequency")
-        self._get_metadata(mutation, md_type='exac_allele_frequency')
+    def _get_exome_allele_freq(self, mutation, gene_id):
+        self.log.info("getting genome allele frequency")
+        self._get_metadata(mutation, gene_id, 'gnomad_exome_allele_frequency')
 
-    def _get_af_filter(self, mutation):
-        self.log.debug("getting af filter")
-        self._get_metadata(mutation, md_type='exac_af_filter')
+    def _get_genome_allele_freq(self, mutation, gene_id):
+        self.log.info("getting genome allele frequency")
+        self._get_metadata(mutation, gene_id, 'gnomad_genome_allele_frequency')
 
 
-    def _get_metadata(self, mutation, md_type):
+    def _get_metadata(self, mutation, gene_id, md_type):
 
-        exac_key = {    'exac_allele_frequency' : 'allele_freq', 
-                        'exac_af_filter'        : 'af_filter'       }
+        exac_key = {    'gnomad_exome_allele_frequency'  : 'exome_af', 
+                        'gnomad_genome_allele_frequency' : 'genome_af'       }
+
+        ref_assembly = self._assembly[self.version]
+
+        if gene_id not in self._cache.keys():
+
+            data = self._get_gnomad_data(gene_id)
+
+            if data is None:
+                return
+            
+            assemblies = set(data['reference_genome'])
+            
+            if len(assemblies) != 1:
+                self.log.error("the downloaded data refers to more than one assembly!")
+                return None
+
+            if list(assemblies)[0] != ref_assembly:
+                self.log.error("the downloaded data refers to an unexpected assembly!")
+                return None
+
+            self._cache[gene_id] = data
+        
+        else:
+            self.log.info("data for gene %s already in cache" % gene_id)
+            data = self._cache[gene_id]
 
         mutation.metadata[md_type] = list()
 
-        gcs = mutation.metadata['genomic_mutations']
+        allele_frequencies = []
 
-        for gc in gcs:
-            try:
-                exac = self._data_cache[gc]
-            except KeyError:
-                self._data_cache[gc] = self._get_exac_data(gc)
+        for variant in mutation.metadata['genomic_mutations']:
+            if type(variant) is GenomicMutation:
+                v_str = variant.as_assembly(ref_assembly).get_value_str(fmt='gnomad')
+            else:
+                v_str = variant
 
-            if self._data_cache[gc] is None:
-                #self.log.warning("data for variant %s couldn't be retrieved" % gc)
-                continue
+            this_df = data[ data['variantId'] == v_str ]
             
-            exac = self._data_cache[gc]
+            if len(this_df) == 0:
+                af = None
+                self.log.info("no entry found for %s" % v_str)
+            elif len(this_df) == 1:
+                af = this_df[exac_key[md_type]].values[0]
+                self.log.info("entry found for %s" % v_str)
+            elif len(this_df) > 1:
+                self.log.warning("more than one entry for %s! Skipping" % v_str)
+                af = None
+            
+            mutation.metadata[md_type].append(metadata_classes[md_type](self, af))
 
-            mutation.metadata[md_type].append(metadata_classes[md_type](self, exac[exac_key[md_type]]))
-
-    def _parse_exac_page(self, text):
-        for line in text.split('\n'):
-            if line.strip().startswith('window.variant = '):
-                data = json.loads(line.split(' = ')[1][:-1])
-                return data
-
-    def _get_exac_data(self, variant):
-        if type(variant) is GenomicMutation:
-            v_str = variant.as_hg19().get_value_str(fmt='exac')
-        else:
-            v_str = variant
-
-        self.log.debug("variant string is %s" % v_str)  
+    def _get_gnomad_data(self, gene_id):
+        headers = { "content-type": "application/graphql" }
+        request='''{
+          gene(gene_name: "%s") {
+            hgnc_id
+            name
+            canonical_transcript_id
+            omim_id
+            full_gene_name
+            variants(dataset: %s) {
+              variantId
+              reference_genome
+              chrom
+              pos
+              ref
+              alt
+              consequence
+              consequence_in_canonical_transcript
+              exome {
+                af
+              }
+              genome {
+                af
+              }
+            }
+          }
+        }
+        ''' % (gene_id, self._versions[self.version])
+        
+        self.log.info("retrieving data for gene %s" % gene_id)
+        
+        try:
+            response = rq.post(self._requests_url, data=request, headers=headers)
+        except:
+            self.log.error("Couldn't perform request for gnomAD")
+            return None
 
         try:
-            self.log.info("fetching %s" % '/'.join( [ self._requests_url, v_str ] ) )
-            request = rq.get('/'.join( [ self._requests_url, v_str ] ))
+            data = json.loads(response.text)
         except:
-            self.log.error("Couldn't perform request for EXaC variant")
+            log.error("downloaded data couldn't be understood")
             return None
 
-        if request.status_code == 404:
-            self.log.warning("the specified variant %s wasn't found on ExAC" % v_str)
-            return None
-        elif request.status_code == 200:
-            try:
-                data = self._parse_exac_page(request.text)
-            except:
-                self.log.warning("Couldn't parse downloaded file for variant %s" % v_str)
-                return None
-        else:
-            self.log.error("The request for EXaC variant returneds an unexpected status code")
+        if 'errors' in data.keys():
+            self.log.error('The following errors were reported when querying gnomAD:')
+            for e in data['errors']:
+                self.log.error('\t%s' % e['message'])
             return None
 
-        return data
+        df = pd.DataFrame.from_dict(data['data']['gene']['variants'])
+        df['exome_af'] = [ i['af'] if i is not None else None for i in df['exome'] ]
+        df['genome_af'] = [ i['af'] if i is not None else None for i in df['genome'] ]
+
+        return df
 
 class MobiDB(DynamicSource):
 

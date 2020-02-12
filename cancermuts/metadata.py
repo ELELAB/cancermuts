@@ -27,6 +27,7 @@ from .log import logger_init
 import pyliftover
 
 lo_hg38_hg19 = pyliftover.LiftOver('hg38', 'hg19')
+lo_hg19_hg38 = pyliftover.LiftOver('hg19', 'hg38')
 
 class Metadata(object):
     def __init__(self, source):
@@ -152,9 +153,10 @@ class GenomicMutation(Metadata):
     def get_value_str(self, fmt='csv'):
         if fmt == 'csv':
             return "%s,chr%s:%s%s>%s" % (self.genome_version, self.chr, self.coord, self.get_sense_wt(), self.get_sense_mut())
-        if fmt == 'exac':
+        if fmt == 'gnomad':
             return '%s-%s-%s-%s' % (self.chr, self.coord, self.get_sense_wt(), self.get_sense_mut())
         return None
+
     def get_coord(self):
         return self.coord
 
@@ -180,6 +182,23 @@ class GenomicMutation(Metadata):
         else:
             raise TypeError
 
+    def as_hg38(self):
+        if self.genome_version == 'hg38':
+            return GenomicMutation(self.source, self.genome_version, self.chr, self.strand, self.coord, self.wt, self.mut)
+        elif self.genome_version == 'hg19':
+            converted_coords = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.get_coord()))
+            assert len(converted_coords) == 1
+            return GenomicMutation(self.source, 'hg38', converted_coords[0][0][3:], self.strand, converted_coords[0][1], self.wt, self.mut)
+        else:
+            raise TypeError
+
+    def as_assembly(self, assembly):
+        if assembly == 'hg19' or assembly == 'GRCh37':
+            return self.as_hg19()
+        elif assembly == 'hg38' or assembly == 'GRCh38':
+            return self.as_hg38()
+        else:
+            raise TypeError
 
     def __repr__(self):
         return "<GenomicMutation %s from %s>" % (self.get_value_str(), self.source.name)
@@ -226,12 +245,12 @@ class DbnsfpRevel(Metadata):
     def __hash__(self):
         return hash((self.source, self.score))
 
-class ExACAlleleFrequency(Metadata):
+class gnomADAlleleFrequency(Metadata):
 
-    description = "Allele Frequency (ExAC)"
+    freq_type = 'generic'
 
     def __init__(self, source, frequency):
-        super(ExACAlleleFrequency, self).__init__(source)
+        super(gnomADAlleleFrequency, self).__init__(source)
         self.source = source
         self.frequency = frequency
 
@@ -241,46 +260,42 @@ class ExACAlleleFrequency(Metadata):
     def get_value_str(self):
         return "%f" % self.frequency
 
-    def __repr__(self):
-        return "<ExACAlleleFrequency, %f>" % self.frequency
+    @classmethod
+    def set_version_in_desc(cls, version_string):
+        cls.description = "%s (%s)" % (cls.description, version_string)
+
+    def __eq__(self, other):
+        return self.source == other.source and \
+               self.frequency == other.frequency and \
+               self.freq_type == other.freq_type
+
+    def __hash__(self):
+        return hash((self.source, self.frequency, self.freq_type))
 
     def __str__(self):
         return self.__repr__()
 
-    def __eq__(self, other):
-        return self.source == other.source and \
-               self.frequency == other.frequency
+class gnomADExomeAlleleFrequency(gnomADAlleleFrequency):
 
-    def __hash__(self):
-        return hash((self.source, self.frequency))
+    freq_type = "Exome"
+    description = "%s allele frequency" % freq_type
 
-class ExACAFFilter(Metadata):
-
-    description = "Allele frequency filter (AF filter)"
-
-    def __init__(self, source, frequency_filter):
-        super(ExACAFFilter, self).__init__(source)
-        self.source = source
-        self.frequency_filter = frequency_filter
-
-    def get_value(self):
-        return self.frequency_filter
-
-    def get_value_str(self):
-        return "%f" % self.frequency_filter
+    def __init__(self, source, frequency):
+        super(gnomADExomeAlleleFrequency, self).__init__(source, frequency)
 
     def __repr__(self):
-        return "<ExacIsSNP, %f>" % self.frequency_filter
+        return "<gnomADExomeAlleleFrequency, %f>" % self.frequency
 
-    def __str__(self):
-        return self.__repr__()
+class gnomADGenomeAlleleFrequency(gnomADAlleleFrequency):
 
-    def __eq__(self, other):
-        return self.source == other.source and \
-               self.frequency_filter == other.frequency_filter
+    freq_type = "Genome"
+    description = "%s allele frequency" % freq_type
 
-    def __hash__(self):
-        return hash((self.source, self.frequency_filter))
+    def __init__(self, source, frequency):
+        super(gnomADGenomeAlleleFrequency, self).__init__(source, frequency)
+
+    def __repr__(self):
+        return "<gnomADGenomeAlleleFrequency, %f>" % self.frequency
 
 class CancerSite(Metadata):
 
@@ -350,8 +365,8 @@ metadata_classes = {
                      'genomic_coordinates'         : GenomicCoordinates,
                      'genomic_mutations'           : GenomicMutation,
                      'revel_score'                 : DbnsfpRevel,
-                     'exac_allele_frequency'       : ExACAlleleFrequency,
-                     'exac_af_filter'              : ExACAFFilter,
+                     'gnomad_genome_allele_frequency' : gnomADGenomeAlleleFrequency,
+                     'gnomad_exome_allele_frequency' : gnomADExomeAlleleFrequency,
                      'cancer_site'                 : CancerSite,
                      'cancer_histology'            : CancerHistology,
                    }
