@@ -1111,7 +1111,7 @@ class gnomAD(DynamicSource, object):
             try:
                 metadata_functions.append(self._supported_metadata[md_type])
             except KeyError:
-                self.log.warning("ExAC doesn't support metadata type %s" % md_type)
+                self.log.warning("gnomAD doesn't support metadata type %s" % md_type)
 
         self.log.debug("collected metadata functions: %s" % ', '.join([i for i in metadata_functions.__repr__()]))
 
@@ -1121,10 +1121,10 @@ class gnomAD(DynamicSource, object):
                     mut.metadata[md_types[i]] = []
     
                 if not 'genomic_mutations' in mut.metadata:
-                    self.log.warning("no genomic mutation data available for Exac SNP, mutation %s. It will be skipped" % mut)
+                    self.log.warning("no genomic mutation data available for gnomAD, mutation %s. It will be skipped" % mut)
                     continue
                 elif mut.metadata['genomic_mutations'] is None or len(mut.metadata['genomic_mutations']) == 0:
-                    self.log.warning("no genomic mutation data available for Exac SNP, mutation %s. It will be skipped" % mut)
+                    self.log.warning("no genomic mutation data available for gnomAD, mutation %s. It will be skipped" % mut)
                     continue
 
                 for i,add_this_metadata in enumerate(metadata_functions):
