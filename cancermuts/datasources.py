@@ -546,7 +546,7 @@ class COSMIC(DynamicSource, object):
             df = df[ df['SNP'] != 'y' ]
 
         if cancer_types is not None:
-            df = df[ df['Primary histology'] in cancer_types ]
+            df = df[ df['Primary histology'].isin(cancer_types) ]
 
         df = df[ df['Mutation AA'].notna() ]
 
