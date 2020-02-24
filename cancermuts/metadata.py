@@ -258,7 +258,7 @@ class gnomADAlleleFrequency(Metadata):
         return self.frequency
 
     def get_value_str(self):
-        return "%f" % self.frequency
+        return "%.16f" % self.frequency
 
     @classmethod
     def set_version_in_desc(cls, version_string):
