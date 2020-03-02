@@ -60,6 +60,7 @@ class Table:
             'CtBP ligand motif':'CtBP',
             'Cyclin docking motif':'Cyclin',
             'Cyclin recognition site':'Cyclin',
+            'Di-Tryptophan targeting motif to the Delta-COP MHD domain':'MHD',
             'DDB1-Cullin4 binding site':'DDB1-Cullin4',
             'DLC1/2 binding site':'DLC1/2',
             'Endosome-Lysosome-Basolateral sorting signals':'ELB ss',
@@ -307,8 +308,15 @@ class Table:
         else:
             df_m['Revel score'] = revel_not_annotated
 
-        (markerline, stemlines, baseline) = ax.stem(df_m[self.headers['position']], df_m[self.headers['revel_score']])
-        plt.setp(baseline, visible=False)
+        for col in list(set(df_m['stem_colors'])):
+
+            df_m_c = df_m[df_m['stem_colors'] == col]
+
+            (markerline, stemlines, baseline) = ax.stem(df_m_c[self.headers['position']], df_m_c[self.headers['revel_score']])
+            plt.setp(baseline, visible=False)
+            plt.setp(stemlines, 'color', col)
+            plt.setp(markerline, 'color', col)
+
 
         ladder = self._y_ladder(*y_ladder)
 
@@ -422,29 +430,51 @@ class Table:
                 pos[1] = df_i_range[-1]
             ax.add_patch(patches.Rectangle((pos[0],0), pos[1]-pos[0], 1.0, alpha=0.3, color="black", hatch='...', fill=False))
 
-    def plot_metatable( self, 
-                        df, 
-                        fname=None, 
-                        section_size=50, 
-                        figsize=(8.27,6), 
+    def plot_metatable( self,
+                        df,
+                        fname=None,
+                        section_size=50,
+                        figsize=(8.27,6),
                         mutations=True,
                         elm=True,
-                        ptms=True, 
-                        structure=True, 
-                        ptm_types=None, 
-                        mutations_revel=True, 
-                        revel_not_annotated=0.5, 
-                        filter_elms=True, 
-                        y_ladder=(0.65, 0.95, 4), 
+                        ptms=True,
+                        structure=True,
+                        ptm_types=None,
+                        mutations_revel=True,
+                        revel_not_annotated=0.5,
+                        filter_elms=True,
+                        y_ladder=(0.65, 0.95, 4),
                         revel_cutoff=0.4,
+                        stem_colors=None,
                         rcParams={'font.size':8.0, 'font.sans-serif':['Arial']},
                         mutation_elms_only=True):
+
 
         if rcParams:
             for k,v in iteritems(rcParams):
                 matplotlib.rcParams[k] = v
 
         df = df.copy()
+
+        stem_colors_present = not stem_colors is None
+
+        if stem_colors_present:
+            if "stem_colors" in df.columns:
+                self.log.warning("stem_colors column will be overridden")
+            if len(stem_colors) != df.shape[0]:
+                self.log.error("one stem color per dataframe line needs to be provided")
+                raise TypeError
+
+            df['stem_colors'] = stem_colors
+
+        elif not "stem_colors" in df.columns:
+            stem_colors = [plt.rcParams['axes.prop_cycle'].by_key()['color'][0]] * df.shape[0]
+            self.log.debug("default stem color will be used")
+
+            df['stem_colors'] = stem_colors
+
+        else:
+            self.log.debug("stem_colors column will be used for stem colors")
 
         dfs, position_ranges = self._splice_metatable(df, section_size)
 
