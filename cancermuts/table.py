@@ -441,7 +441,7 @@ class Table:
                         structure=True,
                         ptm_types=None,
                         mutations_revel=True,
-                        revel_not_annotated=0.5,
+                        revel_not_annotated=0.0,
                         filter_elms=True,
                         y_ladder=(0.65, 0.95, 4),
                         revel_cutoff=0.4,
