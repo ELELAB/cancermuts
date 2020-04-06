@@ -260,10 +260,6 @@ class gnomADAlleleFrequency(Metadata):
     def get_value_str(self):
         return "%.16f" % self.frequency
 
-    @classmethod
-    def set_version_in_desc(cls, version_string):
-        cls.description = "%s (%s)" % (cls.description, version_string)
-
     def __eq__(self, other):
         return self.source == other.source and \
                self.frequency == other.frequency and \
@@ -280,6 +276,10 @@ class gnomADExomeAlleleFrequency(gnomADAlleleFrequency):
     freq_type = "Exome"
     description = "%s allele frequency" % freq_type
 
+    @classmethod
+    def set_version_in_desc(cls, version_string):
+        cls.description = "%s (%s)" % (cls.description, version_string)
+
     def __init__(self, source, frequency):
         super(gnomADExomeAlleleFrequency, self).__init__(source, frequency)
 
@@ -290,6 +290,10 @@ class gnomADGenomeAlleleFrequency(gnomADAlleleFrequency):
 
     freq_type = "Genome"
     description = "%s allele frequency" % freq_type
+
+    @classmethod
+    def set_version_in_desc(cls, version_string):
+        cls.description = "%s (%s)" % (cls.description, version_string)
 
     def __init__(self, source, frequency):
         super(gnomADGenomeAlleleFrequency, self).__init__(source, frequency)
