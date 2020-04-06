@@ -316,8 +316,6 @@ class Table:
                 try:
                     this_score = np.float(row[self.headers['revel_score']])
                 except ValueError:
-                    print(row[self.headers['revel_score']])
-                    print(row[self.headers['revel_score']].split(", "))
                     this_score = np.max(np.array(row[self.headers['revel_score']].split(", "), dtype=np.float))
                     self.log.warning("The revel score for {0}{1}{2} had more than one value ({3}). The largest will be used".format(
                         row[self.headers['wt']],
