@@ -815,37 +815,47 @@ class MyVariant(DynamicSource, object):
             self.log.error("no residue information was found; it will be skipped")
             return False
 
-        if isinstance(aa, list):
-            if len(aa) == 1:
-                aa = aa[0]
-            else:
-                self.log.error("more than one aminoacid specified; it will be skipped")
-                return False
-        try:
-            hit_pos = aa['pos']
-            hit_ref = aa['ref']
-            hit_alt = aa['alt']
-        except:
-            self.log.warning("no residue information was found in the variant information; it will be skipped")
-            return False
-    
-        if not mutation.sequence_position.wt_residue_type == aa['ref']:
-            self.log.warning("reference residue in revel does not correspond; it will be skipped")
-            return False
+        if not isinstance(aa, list):
+            aa = [aa]
 
-        if not mutation.sequence_position.sequence_position == hit_pos:
+        aa_short = []
+        self.log.info("{0} residue definitions will be tested".format(len(aa)))
+        for idx_this_aa, this_aa in enumerate(aa):
             try:
-                if not mutation.sequence_position.sequence_position in [ int(a) for a in aa['pos'] ]:
-                    raise TypeError
+                this_hit_pos = this_aa['pos']
+                this_hit_ref = this_aa['ref']
+                this_hit_alt = this_aa['alt']
             except:
-                self.log.warning("sequence position in revel does not correspond for this hit; it will be skipped")
-                return False
+                self.log.info("no residue information was found in variant definition {0}".format(idx_this_aa))
+                continue
 
-        if mutation.mutated_residue_type != hit_alt:
-            self.log.info("protein mutation in revel does not correspond for this hit; it will be skipped")
+            if not mutation.sequence_position.wt_residue_type == this_hit_ref:
+                self.log.info("reference residue in revel does not correspond in variant definition {0}".format(idx_this_aa))
+                continue
+
+            if not mutation.sequence_position.sequence_position == this_hit_pos:
+                try:
+                    if not mutation.sequence_position.sequence_position in [ int(a) for a in this_hit_pos ]:
+                        raise TypeError
+                except:
+                    self.log.info("sequence position in revel does not correspond for in variant definition {0}".format(idx_this_aa))
+                    continue
+
+            if mutation.mutated_residue_type != this_hit_alt:
+                self.log.info("protein mutation in revel does not correspond for this in variant definition {0}".format(idx_this_aa))
+                continue
+
+            aa_short.append(idx_this_aa)
+
+        if len(aa_short) == 1:
+            self.log.info("A single valid residue entry was found for revel score in mutation {0}".format(mutation))
+            return True
+        elif len(aa_short) > 1:
+            self.log.warning("More than one valid residue entry found for revel score in mutation {0}".format(mutation))
+            return True
+        elif len(aa_short) == 0:
+            self.log.warning("No valid residue entry found for revel score in mutation {0}".format(mutation))
             return False
-
-        return True
 
     def _convert_hg38_to_hg19(self, gc):
         if gc.genome_version == 'hg38':
@@ -1020,7 +1030,7 @@ class ELMPredictions(DynamicSource, object):
 
         for d in data:
             if d[5]:
-                self.log.info("%s was filtered out by ELM")
+                self.log.info("%s was filtered out by ELM" % d[0])
                 continue
 
             if re.match(exclude_elm_classes, d[0]):
@@ -1399,9 +1409,9 @@ class ManualAnnotation(StaticSource):
         self._datafile = datafile
         self._df = None
         
-        if True:
+        try:
             self._parse_datafile(**parsing_options)
-        else:
+        except pd.errors.ParserError:
             self.log.error("An error occurred while parsing the input file %s; manual annotation will be skipped" % self._datafile)
             self._df = None
             return
@@ -1419,6 +1429,9 @@ class ManualAnnotation(StaticSource):
         except:
             self.log.error("required columns not found in csv file (these are: %s). Manual annotation will be skipped" % ", ".join(self._expected_cols))
             raise IndexError
+
+        self.log.info("Parsed file:")
+        self.log.info('\n{0}'.format(str(self._df)))
 
         all_properties = set(self._supported_position_properties + self._supported_sequence_properties)
 
