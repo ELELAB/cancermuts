@@ -290,8 +290,7 @@ class Table:
         return dfs, position_ranges
 
     def _y_ladder(self, miny, maxy, nelm):
-        return cycle(np.linspace(miny, maxy, nelm))
-
+        return cycle(np.linspace(miny, maxy, nelm))        
 
     def _plot_mutations(self, ax, df_i, revel, revel_not_annotated, revel_cutoff, y_ladder):
 
@@ -312,11 +311,23 @@ class Table:
 
             df_m_c = df_m[df_m['stem_colors'] == col]
 
-            (markerline, stemlines, baseline) = ax.stem(df_m_c[self.headers['position']], df_m_c[self.headers['revel_score']])
+            scores = []
+            for s, row in df_m_c.iterrows():
+                try:
+                    this_score = np.float(row[self.headers['revel_score']])
+                except ValueError:
+                    this_score = np.max(np.array(row[self.headers['revel_score']].split(", "), dtype=np.float))
+                    self.log.warning("The revel score for {0}{1}{2} had more than one value ({3}). The largest will be used".format(
+                        row[self.headers['wt']],
+                        row[self.headers['position']],
+                        row[self.headers['mutated']],
+                        row[self.headers['revel_score']]))
+                scores.append(this_score)
+
+            (markerline, stemlines, baseline) = ax.stem(df_m_c[self.headers['position']], scores)
             plt.setp(baseline, visible=False)
             plt.setp(stemlines, 'color', col)
             plt.setp(markerline, 'color', col)
-
 
         ladder = self._y_ladder(*y_ladder)
 
@@ -444,6 +455,7 @@ class Table:
                         revel_not_annotated=0.0,
                         filter_elms=True,
                         y_ladder=(0.65, 0.95, 4),
+                        elm_y_ladder=(-0.2, -0.6, 5),
                         revel_cutoff=0.4,
                         stem_colors=None,
                         rcParams={'font.size':8.0, 'font.sans-serif':['Arial']},
@@ -508,7 +520,7 @@ class Table:
                 self._plot_ptms(ax, df_i, ptm_types)
 
             if elm:
-                self._plot_elms(ax, df, df_i, mutation_elms_only=mutation_elms_only)
+                self._plot_elms(ax, df, df_i, mutation_elms_only=mutation_elms_only, y_ladder=elm_y_ladder)
 
             if structure:
                 self._plot_structures(ax, df, df_i)
