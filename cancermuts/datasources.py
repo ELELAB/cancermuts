@@ -518,7 +518,7 @@ class COSMIC(DynamicSource, object):
                 self.log.info("Parsing database file %s ..." % f)
                 dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols, encoding=encodings[fi]) )
             except:
-                self.log.error("Couldn't parse database file.")
+                self.log.error("Couldn't parse database file {}".format(fi))
                 self._df = None
                 return
 
