@@ -480,7 +480,7 @@ class cBioPortal(DynamicSource, object):
 
 class COSMIC(DynamicSource, object):
     @logger_init
-    def __init__(self, database_files=None, cancer_type=None):
+    def __init__(self, database_files=None, database_encoding=None, cancer_type=None):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
 
@@ -505,12 +505,20 @@ class COSMIC(DynamicSource, object):
         else:
             self._database_files = database_files
 
-        for f in self._database_files:
+        if database_encoding is None or isinstance(database_encoding, str):
+            encodings = [ database_encoding for i in self._database_files ]
+        else:
+            if len(database_encoding) != len(self._database_files):
+                raise TypeError("encoding for COSMIC database files must be None, a single string, or "
+                        "a list of strings, one per file")
+            encodings = database_encoding
+
+        for fi, f in enumerate(self._database_files):
             try:
                 self.log.info("Parsing database file %s ..." % f)
-                dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols) )
+                dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols, encoding=encodings[fi]) )
             except:
-                self.log.error("Couldn't parse database file.")
+                self.log.error("Couldn't parse database file {}".format(fi))
                 self._df = None
                 return
 
