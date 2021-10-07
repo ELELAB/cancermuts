@@ -25,6 +25,8 @@ Classes to handle metadata
 
 from .log import logger_init
 import pyliftover
+from parse import parse
+import re
 
 lo_hg38_hg19 = pyliftover.LiftOver('hg38', 'hg19')
 lo_hg19_hg38 = pyliftover.LiftOver('hg19', 'hg38')
@@ -90,25 +92,25 @@ class GenomicCoordinates(Metadata):
 
     description = "Genomic coordinates"
 
-    def __init__(self, source, genome_version, chromosome, coord_start, coord_end, ref):
+    def __init__(self, source, genome_build, chromosome, coord_start, coord_end, ref):
         super(GenomicCoordinates, self).__init__(source)
-        self.genome_version = genome_version
+        self.genome_build = genome_build
         self.chr = chromosome
         self.coord_start = coord_start
         self.coord_end = coord_end
         self.ref = ref
 
     def get_value(self):
-        return [self.genome_version, self.chr, self.coord_start, self.coord_end, self.ref]
+        return [self.genome_build, self.chr, self.coord_start, self.coord_end, self.ref]
 
     def get_value_str(self):
-        return "%s,chr%s:%s-%s" % (self.genome_version, self.chr, self.coord_start, self.coord_end)
+        return "%s,chr%s:%s-%s" % (self.genome_build, self.chr, self.coord_start, self.coord_end)
 
     def get_coord(self):
         return self.coord_start
 
     def __repr__(self):
-        return "<GenomicCoordinates %s:%s-%s in %s from %s>" % (self.chr, self.coord_start, self.coord_end, self.genome_version, self.source.name)
+        return "<GenomicCoordinates %s:%s-%s in %s from %s>" % (self.chr, self.coord_start, self.coord_end, self.genome_build, self.source.name)
 
     def __str__(self):
         return self.__repr__()
@@ -119,10 +121,10 @@ class GenomicCoordinates(Metadata):
         self.coord_start == other.coord_start and \
         self.coord_end == other.coord_end and \
         self.ref == other.ref and \
-        self.genome_version == other.genome_version
+        self.genome_build == other.genome_build
 
     def __hash__(self):
-        return hash((self.source, self.chr, self.coord_start, self.coord_end, self.ref, self.genome_version))
+        return hash((self.source, self.chr, self.coord_start, self.coord_end, self.ref, self.genome_build))
 
 class GenomicMutation(Metadata):
 
@@ -130,67 +132,76 @@ class GenomicMutation(Metadata):
 
     allowed_bases = ['A', 'C', 'G', 'T']
 
-    complementarity = {'A':'T', 'C':'G', 'G':'C', 'T':'A'}
+    _mut_snv_regexp = '^[0-9]+:g\.[0-9]+[ACTG]>[ACTG]'
+    _mut_snv_prog = re.compile(_mut_snv_regexp)
+    _mut_snv_parse = '{chr:d}:g.{coord:d}{ref:l}>{alt:l}'
 
     @logger_init
-    def __init__(self, source, genome_version, chromosome, strand, coord, wt, mut):
+    def __init__(self, source, genome_build, definition):
         super(GenomicMutation, self).__init__(source)
-        if mut not in self.allowed_bases or wt not in self.allowed_bases:
-            raise TypeError
-        self.genome_version = genome_version
-        self.chr = chromosome
-        self.coord = coord
-        self.wt = wt
-        self.mut = mut
-        if strand == '':
-            self.log.info("strand will be defaulted to + for %s" % self)
-            strand = '+'
-        self.strand = strand
+
+        self.genome_build = genome_build
+
+        if self._mut_snv_prog.match(definition):
+            tokens = parse(self._mut_snv_parse, definition)
+            if tokens['ref'] not in self.allowed_bases or \
+               tokens['alt'] not in self.allowed_bases:
+                self.log.warning(f'this mutation does not specify allowed nucleotides:  {genome_build}, {chromosome}, {strand}, {coord}, {wt}, {mut}')
+                return None
+
+            self.chr = tokens['chr']
+            self.coord = tokens['coord']
+            self.ref = tokens['ref']
+            self.alt = tokens['alt']
+            self.definition = definition
+            self.is_snv = True
+
+        else:
+            self.chr = None
+            self.coord = None
+            self.ref = None
+            self.alt = None
+            self.definition = definition
+            self.is_snv = False
 
     def get_value(self):
-        return [self.genome_version, self.chr, self.coord, self.strand, self.wt, self.mut]
+        return [self.genome_build, self.chr, self.coord, self.wt, self.mut]
 
     def get_value_str(self, fmt='csv'):
         if fmt == 'csv':
-            return "%s,chr%s:%s%s>%s" % (self.genome_version, self.chr, self.coord, self.get_sense_wt(), self.get_sense_mut())
+            return f"{self.genome_build},{self.definition}"
         if fmt == 'gnomad':
-            return '%s-%s-%s-%s' % (self.chr, self.coord, self.get_sense_wt(), self.get_sense_mut())
-        return None
+            if self.is_snv:
+                return f"{self.chr}-{self.coord}-{self.wt}-{self.mut}"
+            else:
+                return None
+        else:
+            return None
 
     def get_coord(self):
         return self.coord
 
-    def get_sense_wt(self):
-        return self._get_sense_base(self.wt)
-
-    def get_sense_mut(self):
-        return self._get_sense_base(self.mut)
-
-    def _get_sense_base(self, base):
-        if self.strand == '+':
-            return base
-        elif self.strand == '-':
-            return self.complementarity[base]
-
     def as_hg19(self):
-        if self.genome_version == 'hg19':
-            return GenomicMutation(self.source, self.genome_version, self.chr, self.strand, self.coord, self.wt, self.mut)
-        elif self.genome_version == 'hg38':
-            converted_coords = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.get_coord()))
-            assert len(converted_coords) == 1
-            return GenomicMutation(self.source, 'hg19', converted_coords[0][0][3:], self.strand, converted_coords[0][1], self.wt, self.mut)
-        else:
-            raise TypeError
+        if self.is_snv:
+            if self.genome_build == 'hg19':
+                return GenomicMutation(self.source, self.genome_build, self.chr, self.coord, self.wt, self.mut)
+            elif self.genome_build == 'hg38':
+                converted_coords = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.get_coord()))
+                assert len(converted_coords) == 1
+                return GenomicMutation(self.source, 'hg19', converted_coords[0][0][3:], converted_coords[0][1], self.wt, self.mut)
+            else:
+                raise TypeError
 
     def as_hg38(self):
-        if self.genome_version == 'hg38':
-            return GenomicMutation(self.source, self.genome_version, self.chr, self.strand, self.coord, self.wt, self.mut)
-        elif self.genome_version == 'hg19':
-            converted_coords = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.get_coord()))
-            assert len(converted_coords) == 1
-            return GenomicMutation(self.source, 'hg38', converted_coords[0][0][3:], self.strand, converted_coords[0][1], self.wt, self.mut)
-        else:
-            raise TypeError
+        if self.is_snv:
+            if self.genome_build == 'hg38':
+                return GenomicMutation(self.source, self.genome_build, self.chr, self.coord, self.wt, self.mut)
+            elif self.genome_build == 'hg19':
+                converted_coords = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.get_coord()))
+                assert len(converted_coords) == 1
+                return GenomicMutation(self.source, 'hg38', converted_coords[0][0][3:], converted_coords[0][1], self.wt, self.mut)
+            else:
+                raise TypeError
 
     def as_assembly(self, assembly):
         if assembly == 'hg19' or assembly == 'GRCh37':
@@ -207,15 +218,12 @@ class GenomicMutation(Metadata):
         return self.__repr__()
 
     def __eq__(self, other):
+
         return self.source == other.source and \
-        self.chr == other.chr and \
-        self.strand == other.strand and \
-        self.coord == other.coord and \
-        self.wt == other.wt and \
-        self.mut == other.mut
+        self.definition == other.definition
 
     def __hash__(self):
-        return hash((self.source, self.chr, self.strand, self.coord, self.wt, self.mut))
+        return hash((self.source, self.definition))
 
 class DbnsfpRevel(Metadata):
 
