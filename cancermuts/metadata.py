@@ -130,38 +130,54 @@ class GenomicMutation(Metadata):
 
     description = "Genomic mutation"
 
-    allowed_bases = ['A', 'C', 'G', 'T']
+    allowed_bases = set(['A', 'C', 'G', 'T'])
 
-    _mut_snv_regexp = '^[0-9]+:g\.[0-9]+[ACTG]>[ACTG]'
+    _mut_snv_regexp = '^[0-9XY]+:g\.[0-9]+[ACTG]>[ACTG]'
+    _mut_insdel_regexp = '^[0-9XY]+:g\.[0-9]+_[0-9]+delins[ACTG]+'
     _mut_snv_prog = re.compile(_mut_snv_regexp)
+    _mut_insdel_prog = re.compile(_mut_insdel_regexp)
     _mut_snv_parse = '{chr:d}:g.{coord:d}{ref:l}>{alt:l}'
+    _mut_insdel_parse = '{chr:d}:g.{coord_start:d}_{coord_end:d}delins{substitution}'
 
     @logger_init
     def __init__(self, source, genome_build, definition):
         super(GenomicMutation, self).__init__(source)
 
         self.genome_build = genome_build
+        self.definition = definition
 
         if self._mut_snv_prog.match(definition):
             tokens = parse(self._mut_snv_parse, definition)
             if tokens['ref'] not in self.allowed_bases or \
                tokens['alt'] not in self.allowed_bases:
-                self.log.warning(f'this mutation does not specify allowed nucleotides:  {genome_build}, {chromosome}, {strand}, {coord}, {wt}, {mut}')
+                self.log.error(f'this mutation does not specify allowed nucleotides: {definition}')
                 return None
 
             self.chr = tokens['chr']
             self.coord = tokens['coord']
             self.ref = tokens['ref']
             self.alt = tokens['alt']
-            self.definition = definition
             self.is_snv = True
+            self.is_insdel = False
+
+        elif self._mut_insdel_prog.match(definition):
+            tokens = parse(self._mut_insdel_parse, definition)
+            if not set(tokens['substitution']).issubset(self.allowed_bases):
+                self.log.error(f'this mutation does not specify allowed nucleotides: {definition}')
+                return None
+
+            self.chr = tokens['chr']
+            self.coord_start = tokens['coord_start']
+            self.coord_end = tokens['coord_end']
+            self.substitution = tokens['substitution']
+            self.is_snv = False
+            self.is_insdel = True
 
         else:
             self.chr = None
             self.coord = None
             self.ref = None
             self.alt = None
-            self.definition = definition
             self.is_snv = False
 
     def get_value(self):
@@ -172,7 +188,9 @@ class GenomicMutation(Metadata):
             return f"{self.genome_build},{self.definition}"
         if fmt == 'gnomad':
             if self.is_snv:
-                return f"{self.chr}-{self.coord}-{self.wt}-{self.mut}"
+                return f"{self.chr}-{self.coord}-{self.mut}"
+            elif self.is_insdel:
+                return f"{self.chr}-{self.start_coord}-{self.mut}"
             else:
                 return None
         else:
@@ -184,7 +202,7 @@ class GenomicMutation(Metadata):
     def as_hg19(self):
         if self.is_snv:
             if self.genome_build == 'hg19':
-                return GenomicMutation(self.source, self.genome_build, self.chr, self.coord, self.wt, self.mut)
+                return GenomicMutation(self.source, self.genome_build, self.description)
             elif self.genome_build == 'hg38':
                 converted_coords = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.get_coord()))
                 assert len(converted_coords) == 1
