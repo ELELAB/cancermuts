@@ -463,7 +463,8 @@ class cBioPortal(DynamicSource, object):
                             self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
                             gm = None
                         else:
-                            gm = ['hg19', str(int(rmt['chr'])), self.default_strand, gd[2], gd[4], rmt['variant_allele']]
+                            gm_fmt = f"{rmt['chr']}:g.{rmt['start_position']}{rmt['reference_allele']}>{rmt['variant_allele']}"
+                            gm = ['hg19', gm_fmt]
                         out_metadata['genomic_mutations'].append(gm)
         return mutations, out_metadata
 
@@ -486,6 +487,8 @@ class COSMIC(DynamicSource, object):
 
         self._mut_regexp = 'p\.[A-Z][0-9]+[A-Z]$'
         self._mut_prog = re.compile(self._mut_regexp)
+        self._mut_snv_regexp = '^[0-9]+:g\.[0-9+][ACTG]>[ACTG]'
+        self._mut_snv_prog = re.compile(self._mut_snv_regexp)
         self._site_kwd = ['Primary site', 'Site subtype 1', 'Site subtype 2', 'Site subtype 3']
         self._histology_kwd = ['Primary histology', 'Histology subtype 1', 'Histology subtype 2', 'Histology subtype 3']
         self._use_cols = [  'Gene name',
@@ -494,7 +497,8 @@ class COSMIC(DynamicSource, object):
                             'GRCh',
                             'Mutation genome position',
                             'Mutation CDS',
-                            'Mutation strand' ] + self._site_kwd + self._histology_kwd
+                            'Mutation strand',
+                            'HGVSG' ] + self._site_kwd + self._histology_kwd
 
         dataframes = []
 
@@ -572,7 +576,7 @@ class COSMIC(DynamicSource, object):
 
             if do_genomic_coordinates or do_genomic_mutations:
                 gd = []
-                grch = r['GRCh']
+                grch = str(r['GRCh'])
                 if grch == '38':
                     gd.append('hg38') # genome version
                 elif grch == '37' or grch == '19':
@@ -594,11 +598,8 @@ class COSMIC(DynamicSource, object):
                 if gd is None:
                     self.log.warning("couldn't annotate genomic mutation")
                     gm = None
-                elif gd[2] != gd[3]:
-                    self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
-                    gm = None
                 else:
-                    gm = [gd[0], gd[1], r['Mutation strand'], gd[2], gd[4], r['Mutation CDS'][-1]]
+                    gm = [gd[0], r['HGVSG']]
                 out_metadata['genomic_mutations'].append(gm)
 
             if do_site:
@@ -866,12 +867,12 @@ class MyVariant(DynamicSource, object):
             return False
 
     def _convert_hg38_to_hg19(self, gc):
-        if gc.genome_version == 'hg38':
+        if gc.genome_build == 'hg38':
             self.log.info("%s has genomic data in hg38 assembly - will be converted to hg19" % gc)
             converted_coords = self._lo.convert_coordinate('chr%s' % gc.chr, int(gc.get_coord()))
             assert len(converted_coords) == 1
             converted_coords = (converted_coords[0][0], converted_coords[0][1])
-        elif gc.genome_version == 'hg19':
+        elif gc.genome_build == 'hg19':
             converted_coords = ('chr%s' % gc.chr, int(gc.get_coord()))
         else:
             self.log.error("genomic coordinates are not expressed either in hg38 or hg19 for %s; it will be skipped" % gc)
@@ -880,11 +881,14 @@ class MyVariant(DynamicSource, object):
 
     def _get_revel_from_gm(self, mutation, gm):
 
+        if not gm.is_snv:
+            return None
+
         converted_coords = self._convert_hg38_to_hg19(gm)
         if converted_coords is None:
             return None
 
-        query_str = '%s:g.%d%s>%s' % (converted_coords[0], converted_coords[1], gm.get_sense_wt(), gm.get_sense_mut())
+        query_str = '%s:g.%d%s>%s' % (converted_coords[0], converted_coords[1], gm.ref, gm.alt)
 
         hit = self._mv.getvariant(query_str)
 
@@ -1115,7 +1119,6 @@ class gnomAD(DynamicSource, object):
         else:
             gene_id = sequence.gene_id
 
-
         self.log.debug("Adding metadata: " + ', '.join(md_type) )
 
         if type(md_type) is str:
@@ -1193,7 +1196,7 @@ class gnomAD(DynamicSource, object):
         allele_frequencies = []
 
         for variant in mutation.metadata['genomic_mutations']:
-            if type(variant) is GenomicMutation:
+            if type(variant) is GenomicMutation and variant.is_snv:
                 v_str = variant.as_assembly(ref_assembly).get_value_str(fmt='gnomad')
             else:
                 v_str = variant
