@@ -358,7 +358,7 @@ class Table:
                 ax.text(r, self.y_ptm, self.ptm_codes[t], color=self.ptm_colors[t], horizontalalignment='center') #bbox=dict(facecolor='red', alpha=0.5),
                 ax.axvline(x=r, color=self.ptm_colors[t], lw=0.5)
 
-    def _plot_elms(self, ax, df, df_i, mutation_elms_only=True, color='lightblue', y_ladder=(-0.2, -0.6, 5)):
+    def _plot_elms(self, ax, df, df_i, mutation_elms_only=True, color='lightblue', color_manual='orange', y_ladder=(-0.2, -0.6, 5)):
         
         all_elms = []
 
@@ -389,8 +389,9 @@ class Table:
 
             if mutation_elms_only:
                 elm_range = set(range(pos[0], pos[1]+1))
-                if df_mut_pos.isdisjoint(elm_range):
-                    continue
+                if source != 'Manual annotations':
+                    if df_mut_pos.isdisjoint(elm_range):
+                        continue
 
             if pos[0] < df_i_range[0]:
                 pos[0] = df_i_range[0]
@@ -399,7 +400,13 @@ class Table:
 
             # XXX: add colors predicted/manual
 
-            ax.add_patch(patches.Rectangle((pos[0],0), pos[1]-pos[0], 1.0, alpha=0.8, color=color))
+            if source == 'Manual annotations':
+                this_color = color_manual
+            else:
+                this_color = color
+
+
+            ax.add_patch(patches.Rectangle((pos[0],0), pos[1]-pos[0], 1.0, alpha=0.8, color=this_color))
 
             if x >= df_i_range[0] and x <= df_i_range[-1]:
                 if name in self.labels:
