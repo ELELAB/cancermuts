@@ -1449,16 +1449,20 @@ class ManualAnnotation(StaticSource):
     _ptm_keywords = ['ptm_cleavage', 'ptm_phosphorylation', 'ptm_ubiquitination', 'ptm_acetylation', 'ptm_sumoylation', 'ptm_nitrosylation', 'ptm_methylation']
     _supported_position_properties = _ptm_keywords
     _supported_sequence_properties = ['linear_motif', 'structure']
+    _supported_mutation            = ['mutation']
+    _mut_prot_parse = 'p.{wt:3l}{position:d}{mut:3l}'
 
     @logger_init
     def __init__(self, datafile, **parsing_options):
 
         description="Annotations from %s" % datafile
-        super(ManualAnnotation, self).__init__(name='Manual annotations', version='', description=description)
+        super(ManualAnnotation, self).__init__(name=f"Manual annotations from {datafile}",
+            version='',
+            description=description)
 
         self._datafile = datafile
         self._df = None
-        
+
         try:
             self._parse_datafile(**parsing_options)
         except pd.errors.ParserError:
@@ -1471,7 +1475,7 @@ class ManualAnnotation(StaticSource):
         self.log.info("Parsing annotations from %s" % self._datafile)
 
         try:
-            df = pd.read_csv(self._datafile, **parsing_options)
+            df = pd.read_csv(self._datafile, **parsing_options, keep_default_na=False)
         except IOError:
             self.log.error("Parsing of file %s failed. ")
         try:
@@ -1483,27 +1487,37 @@ class ManualAnnotation(StaticSource):
         self.log.info("Parsed file:")
         self.log.info('\n{0}'.format(str(self._df)))
 
-        all_properties = set(self._supported_position_properties + self._supported_sequence_properties)
+        all_properties = set(self._supported_position_properties + self._supported_sequence_properties + self._supported_mutation)
 
         diff = set(df['type']).difference(all_properties)
         if len(diff) > 0:
             self.log.warning("the following annotation types were not recognized: %s" % ", ".join(diff))
 
-    def add_mutations(self, sequence):
+    def add_mutations(self, sequence, metadata=[]):
 
         if self._df is None:
             return
 
         tmp_df = self._df[ self._df['type'] == 'mutation' ]
 
+        if 'genomic_mutations' in metadata:
+            out_metadata = { 'genomic_mutations' : tmp_df['function'].str.split(',').tolist() }
+
+        mutations = tmp_df['site'].tolist()
+
         unique_mutations = list(set(tmp_df['site']))
 
-        self.log.info("unique mutations found in datafile: %s" % (", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1])))))
+        self.log.info("unique mutations found in datafile: %s" % (", ".join(sorted(unique_mutations))))
 
         for m in unique_mutations:
-            wt = m[0]
-            mut = m[-1]
-            num = int(m[1:-1])
+            tokens = parse(self._mut_prot_parse, m)
+            if tokens is None:
+                self.log.error(f"Failed to parse mutation {m}; check that the format is correct (i.e. HGVS protein single amino acid substitution)")
+                continue
+
+            num = int(tokens['position'])
+            wt  = three_to_one(str.upper(tokens['wt']))
+            mut = three_to_one(str.upper(tokens['mut']))
 
             if wt == mut:
                 self.log.info("synonymous mutation %s discarded" % m)
@@ -1521,11 +1535,22 @@ class ManualAnnotation(StaticSource):
                 self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, num, position.wt_residue_type))
                 continue
 
+            mutation_indices = [i for i, x in enumerate(mutations) if x == m]
+
             mutation_obj = Mutation(sequence.positions[site_seq_idx],
                                     mut,
                                     [self])
 
+            for md in metadata:
+                mutation_obj.metadata[md] = []
+                for mi in mutation_indices:
+                    if out_metadata[md][mi] is not None:
+                        tmp_md = [self] + out_metadata[md][mi]
+                        this_md = metadata_classes[md](*tmp_md)
+                        mutation_obj.metadata[md].append(this_md)
+
             position.add_mutation(mutation_obj)
+
 
     def add_position_properties(self, sequence, prop=_supported_position_properties):
 
@@ -1539,7 +1564,7 @@ class ManualAnnotation(StaticSource):
             try:
                 this_position = sequence.positions[sequence.seq2index(int(row['site']))]
             except:
-                log.error("position property refers to ")
+                self.log.error("position property refers to a position outside of the sequence")
 
             property_obj = position_properties_classes[row['type']](sources=[self],
                                                                     position=this_position)
@@ -1580,7 +1605,6 @@ class ManualAnnotation(StaticSource):
             property_obj = sequence_properties_classes[row['type']](sources=[self],
                                                                     positions=positions,
                                                                     name=row['name'])
-
 
             property_obj.metadata['function']  = row['function']
             property_obj.metadata['reference'] = row['reference']
