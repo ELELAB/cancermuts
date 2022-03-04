@@ -179,18 +179,16 @@ class GenomicMutation(Metadata):
             self.ref = None
             self.alt = None
             self.is_snv = False
-
-    def get_value(self):
-        return [self.genome_build, self.chr, self.coord, self.wt, self.mut]
+            self.is_insdel=False
 
     def get_value_str(self, fmt='csv'):
         if fmt == 'csv':
             return f"{self.genome_build},{self.definition}"
         if fmt == 'gnomad':
             if self.is_snv:
-                return f"{self.chr}-{self.coord}-{self.mut}"
+                return f"{self.chr}-{self.coord}-{self.ref}-{self.alt}"
             elif self.is_insdel:
-                return f"{self.chr}-{self.start_coord}-{self.mut}"
+                return f"{self.chr}-{self.coord_start}-?-{self.substitution}"
             else:
                 return None
         else:
@@ -200,24 +198,36 @@ class GenomicMutation(Metadata):
         return self.coord
 
     def as_hg19(self):
-        if self.is_snv:
-            if self.genome_build == 'hg19':
-                return GenomicMutation(self.source, self.genome_build, self.description)
-            elif self.genome_build == 'hg38':
-                converted_coords = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.get_coord()))
+        if self.genome_build == 'hg19':
+            return self
+        elif self.genome_build == 'hg38':
+            if self.is_snv:
+                converted_coords = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.coord))
                 assert len(converted_coords) == 1
-                return GenomicMutation(self.source, 'hg19', converted_coords[0][0][3:], converted_coords[0][1], self.wt, self.mut)
+                return GenomicMutation(self.source, 'hg19', f"{self.chr}:g.{converted_coords[0][1]}{self.ref}>{self.alt}")
+            elif self.is_insdel:
+                converted_coords_start = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.coord_start))
+                converted_coords_end   = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.coord_end))
+                assert len(converted_coords_start) == 1
+                assert len(converted_coords_end)   == 1
+                return GenomicMutation(self.source, 'hg19', f"{self.chr}:g.{converted_coords_start[0][1]}_{converted_coords_end[0][1]}delins{self.substitution}")
             else:
                 raise TypeError
 
     def as_hg38(self):
-        if self.is_snv:
-            if self.genome_build == 'hg38':
-                return GenomicMutation(self.source, self.genome_build, self.chr, self.coord, self.wt, self.mut)
-            elif self.genome_build == 'hg19':
-                converted_coords = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.get_coord()))
+        if self.genome_build == 'hg38':
+            return self
+        elif self.genome_build == 'hg19':
+            if self.is_snv:
+                converted_coords = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.coord))
                 assert len(converted_coords) == 1
-                return GenomicMutation(self.source, 'hg38', converted_coords[0][0][3:], converted_coords[0][1], self.wt, self.mut)
+                return GenomicMutation(self.source, 'hg38', f"{self.chr}:g.{converted_coords[0][1]}{self.ref}>{self.alt}")
+            elif self.is_insdel:
+                converted_coords_start = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.coord_start))
+                converted_coords_end   = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.coord_end))
+                assert len(converted_coords_start) == 1
+                assert len(converted_coords_end)   == 1
+                return GenomicMutation(self.source, 'hg38', f"{self.chr}:g.{converted_coords_start[0][1]}{converted_coords_end[0][1]}delins{self.substitution}")
             else:
                 raise TypeError
 
