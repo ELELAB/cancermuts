@@ -26,6 +26,7 @@ Classes to interrogate data sources and annotate various data
 import time
 import requests as rq
 from bioservices.uniprot import UniProt as bsUniProt
+from Bio.PDB.Polypeptide import three_to_one
 import pandas as pd
 from .core import Sequence, Mutation
 from .properties import *
@@ -39,6 +40,7 @@ import os
 import csv
 import myvariant
 import pyliftover
+from parse import parse
 from multiprocessing.dummy import Pool
 from future.utils import iteritems
 
@@ -459,13 +461,20 @@ class cBioPortal(DynamicSource, object):
                         gd = ['hg19'] + gd
                         out_metadata['genomic_coordinates'].append(gd)
                     if do_genomic_mutations:
-                        if rmt['start_position'] != rmt['end_position']:
-                            self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
-                            gm = None
-                        else:
+                        if rmt['start_position'] == rmt['end_position']:
                             gm_fmt = f"{rmt['chr']}:g.{rmt['start_position']}{rmt['reference_allele']}>{rmt['variant_allele']}"
                             gm = ['hg19', gm_fmt]
+                        elif (len(rmt['reference_allele']) == len(rmt['variant_allele'])) and \
+                                 ((rmt['end_position'] - rmt['start_position'] + 1) == len(rmt['variant_allele'])):
+                            gm_fmt = f"{rmt['chr']}:g.{rmt['start_position']}_{rmt['end_position']}delins{rmt['variant_allele']}"
+                            gm = ['hg19', gm_fmt]
+                            self.log.info("Added delins! " + gm_fmt)
+                        else:
+                            self.log.warning("mutation corresponds to neither a substitution or, genomic mutation won't be annotated")
+                            gm = None
+
                         out_metadata['genomic_mutations'].append(gm)
+
         return mutations, out_metadata
 
     def _convert_isoform(self, mutation, main_isoform, alternate_isoform, mapping):
@@ -1103,7 +1112,7 @@ class gnomAD(DynamicSource, object):
 
         super(gnomAD, self).__init__(name='gnomAD', version=version, description=self.description)
 
-        self._requests_url = 'https://gnomad.broadinstitute.org/api/'
+        self._gnomad_endpoint = 'https://gnomad.broadinstitute.org/api/'
         self._cache = {}
         self._supported_metadata = {'gnomad_exome_allele_frequency' : self._get_exome_allele_freq,
                                     'gnomad_genome_allele_frequency' : self._get_genome_allele_freq}
@@ -1160,6 +1169,11 @@ class gnomAD(DynamicSource, object):
         self.log.info("getting genome allele frequency")
         self._get_metadata(mutation, gene_id, 'gnomad_genome_allele_frequency')
 
+    def _edit_variant_id(self, row):
+        split_id = row['variant_id'].split('-')
+        if len(split_id[2]) > 1 or len(split_id[3]) > 1:
+            split_id[2] = '?'
+        return "-".join(split_id)
 
     def _get_metadata(self, mutation, gene_id, md_type):
 
@@ -1170,7 +1184,7 @@ class gnomAD(DynamicSource, object):
 
         if gene_id not in self._cache.keys():
 
-            data = self._get_gnomad_data(gene_id)
+            data = self._get_gnomad_data(gene_id, self._assembly[self.version], self._versions[self.version])
 
             if data is None:
                 return
@@ -1196,13 +1210,20 @@ class gnomAD(DynamicSource, object):
         allele_frequencies = []
 
         for variant in mutation.metadata['genomic_mutations']:
-            if type(variant) is GenomicMutation and variant.is_snv:
+            if type(variant) is GenomicMutation and (variant.is_snv or variant.is_insdel):
                 v_str = variant.as_assembly(ref_assembly).get_value_str(fmt='gnomad')
             else:
-                v_str = variant
+                v_str = None
 
-            this_df = data[ data['variantId'] == v_str ]
-            
+            if variant.is_snv:
+                this_df = data[ data['variant_id'] == v_str ]
+            elif variant.is_insdel:
+                this_df = data[ data['edited_variant_id'] == v_str ]
+            else:
+                self.log.info(f"variant not supported by gnomad {variant.description}")
+                mutation.metadata[md_type].append(metadata_classes[md_type](self, None))
+                continue
+
             if len(this_df) == 0:
                 af = None
                 self.log.info("no entry found for %s" % v_str)
@@ -1215,60 +1236,78 @@ class gnomAD(DynamicSource, object):
             
             mutation.metadata[md_type].append(metadata_classes[md_type](self, af))
 
-    def _get_gnomad_data(self, gene_id):
-        headers = { "content-type": "application/graphql" }
-        request='''{
-          gene(gene_name: "%s") {
-            hgnc_id
-            name
-            canonical_transcript_id
-            omim_id
-            full_gene_name
-            variants(dataset: %s) {
-              variantId
-              reference_genome
-              chrom
-              pos
-              ref
-              alt
-              consequence
-              consequence_in_canonical_transcript
-              exome {
-                af
-              }
-              genome {
-                af
-              }
-            }
-          }
-        }
-        ''' % (gene_id, self._versions[self.version])
+    def _get_gnomad_data(self, gene_id, reference_genome, dataset):
+        headers = { "content-type": "application/json" }
+        request="""query getGene($geneSymbol : String!,
+                              $refBuild : ReferenceGenomeId!,
+                              $dataset : DatasetId!) {
+                gene(gene_symbol : $geneSymbol, reference_genome: $refBuild) {
+                    gene_id
+                    symbol
+                    hgnc_id
+                    variants(dataset : $dataset) {
+                        variant_id
+                        reference_genome
+                        chrom
+                        pos
+                        ref
+                        alt
+                        rsids
+                        exome {
+                            ac
+                            an
+                        }
+                        genome {
+                            ac
+                            an
+                        }
+                    }
+                }
+            }"""
         
         self.log.info("retrieving data for gene %s" % gene_id)
         
         try:
-            response = rq.post(self._requests_url, data=request, headers=headers)
+            response = rq.post(self._gnomad_endpoint,
+                data=json.dumps({
+                                "query": request,
+                                "variables": { "geneSymbol": gene_id,
+                                               "refBuild"  : reference_genome,
+                                               "dataset"   : dataset }
+                                }),
+                headers={"Content-Type": "application/json"})
         except:
             self.log.error("Couldn't perform request for gnomAD")
             return None
 
         try:
-            data = json.loads(response.text)
+            response_json = response.json()
         except:
             log.error("downloaded data couldn't be understood")
             return None
 
-        if 'errors' in data.keys():
+        if 'errors' in response_json.keys():
             self.log.error('The following errors were reported when querying gnomAD:')
-            for e in data['errors']:
+            for e in response_json['errors']:
                 self.log.error('\t%s' % e['message'])
             return None
 
-        df = pd.DataFrame.from_dict(data['data']['gene']['variants'])
-        df['exome_af'] = [ i['af'] if i is not None else None for i in df['exome'] ]
-        df['genome_af'] = [ i['af'] if i is not None else None for i in df['genome'] ]
+        variants = pd.json_normalize(response_json['data']['gene']['variants'])
+        variants = variants.rename(columns={'exome.ac':'exome_ac',
+                                            'exome.an':'exome_an',
+                                            'genome.ac':'genome_ac',
+                                            'genome.an':'genome_an'
+                                            })
+        variants['edited_variant_id'] = variants.apply(self._edit_variant_id, axis=1)
 
-        return df
+        variants['total_ac'] = variants['exome_ac'] + variants['genome_ac']
+        variants['total_an'] = variants['exome_an'] + variants['genome_an']
+
+        variants['exome_af']  =  variants['exome_ac'] / variants['exome_an']
+        variants['genome_af'] = variants['genome_ac'] / variants['genome_an']
+        variants['total_af'] = variants['total_ac'] / variants['total_an']
+
+        return variants
 
 class MobiDB(DynamicSource):
 
