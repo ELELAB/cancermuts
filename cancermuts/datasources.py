@@ -26,6 +26,7 @@ Classes to interrogate data sources and annotate various data
 import time
 import requests as rq
 from bioservices.uniprot import UniProt as bsUniProt
+from Bio.PDB.Polypeptide import three_to_one
 import pandas as pd
 from .core import Sequence, Mutation
 from .properties import *
@@ -39,6 +40,7 @@ import os
 import csv
 import myvariant
 import pyliftover
+from parse import parse
 from multiprocessing.dummy import Pool
 from future.utils import iteritems
 from bravado.client import SwaggerClient
@@ -509,13 +511,19 @@ class cBioPortal(DynamicSource, object):
                         gd = ['hg19', str(int(gd[0])), str(int(gd[1])), str(int(gd[2])), str(gd[3])]
                         out_metadata['genomic_coordinates'].append(gd)
                     if do_genomic_mutations:
-                        if row['startPosition'] != row['endPosition']:
-                            self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
-                            gm = None
+                        if row['startPosition'] == row['endPosition']:
+                            gm_fmt = f"{row['chr']}:g.{row['startPosition']}{row['referenceAllele']}>{row['variantAllele']}"
+                            gm = ['hg19', gm_fmt]
+                        elif (len(row['referenceAllele']) == len(row['variantAllele'])) and \
+                                 ((row['endPosition'] - row['startPosition'] + 1) == len(row['variantAllele'])):
+                            gm_fmt = f"{row['chr']}:g.{row['startPosition']}_{row['endPosition']}delins{row['variantAllele']}"
+                            gm = ['hg19', gm_fmt]
+                            self.log.info("Added delins! " + gm_fmt)
                         else:
-                            gm = ['hg19', str(int(row['chr'])), self.default_strand, gd[2], gd[4], row['variantAllele']]
+                            self.log.warning("mutation corresponds to neither a substitution or delins, genomic mutation won't be annotated")
+                            gm = None
+
                         out_metadata['genomic_mutations'].append(gm)
-            print(mutations)
         return mutations, out_metadata
 
     def _convert_isoform(self, mutation, main_isoform, alternate_isoform, mapping):
@@ -531,12 +539,14 @@ class cBioPortal(DynamicSource, object):
 
 class COSMIC(DynamicSource, object):
     @logger_init
-    def __init__(self, database_files=None, cancer_type=None):
+    def __init__(self, database_files=None, database_encoding=None, cancer_type=None):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
 
         self._mut_regexp = 'p\.[A-Z][0-9]+[A-Z]$'
         self._mut_prog = re.compile(self._mut_regexp)
+        self._mut_snv_regexp = '^[0-9]+:g\.[0-9+][ACTG]>[ACTG]'
+        self._mut_snv_prog = re.compile(self._mut_snv_regexp)
         self._site_kwd = ['Primary site', 'Site subtype 1', 'Site subtype 2', 'Site subtype 3']
         self._histology_kwd = ['Primary histology', 'Histology subtype 1', 'Histology subtype 2', 'Histology subtype 3']
         self._use_cols = [  'Gene name',
@@ -545,7 +555,8 @@ class COSMIC(DynamicSource, object):
                             'GRCh',
                             'Mutation genome position',
                             'Mutation CDS',
-                            'Mutation strand' ] + self._site_kwd + self._histology_kwd
+                            'Mutation strand',
+                            'HGVSG' ] + self._site_kwd + self._histology_kwd
 
         dataframes = []
 
@@ -556,12 +567,20 @@ class COSMIC(DynamicSource, object):
         else:
             self._database_files = database_files
 
-        for f in self._database_files:
+        if database_encoding is None or isinstance(database_encoding, str):
+            encodings = [ database_encoding for i in self._database_files ]
+        else:
+            if len(database_encoding) != len(self._database_files):
+                raise TypeError("encoding for COSMIC database files must be None, a single string, or "
+                        "a list of strings, one per file")
+            encodings = database_encoding
+
+        for fi, f in enumerate(self._database_files):
             try:
                 self.log.info("Parsing database file %s ..." % f)
-                dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols) )
+                dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols, encoding=encodings[fi]) )
             except:
-                self.log.error("Couldn't parse database file.")
+                self.log.error("Couldn't parse database file {}".format(fi))
                 self._df = None
                 return
 
@@ -615,7 +634,7 @@ class COSMIC(DynamicSource, object):
 
             if do_genomic_coordinates or do_genomic_mutations:
                 gd = []
-                grch = r['GRCh']
+                grch = str(r['GRCh'])
                 if grch == '38':
                     gd.append('hg38') # genome version
                 elif grch == '37' or grch == '19':
@@ -637,11 +656,8 @@ class COSMIC(DynamicSource, object):
                 if gd is None:
                     self.log.warning("couldn't annotate genomic mutation")
                     gm = None
-                elif gd[2] != gd[3]:
-                    self.log.warning("mutation corresponds to multiple genomic mutations, genomic mutation won't be annotated")
-                    gm = None
                 else:
-                    gm = [gd[0], gd[1], r['Mutation strand'], gd[2], gd[4], r['Mutation CDS'][-1]]
+                    gm = [gd[0], r['HGVSG']]
                 out_metadata['genomic_mutations'].append(gm)
 
             if do_site:
@@ -909,12 +925,12 @@ class MyVariant(DynamicSource, object):
             return False
 
     def _convert_hg38_to_hg19(self, gc):
-        if gc.genome_version == 'hg38':
+        if gc.genome_build == 'hg38':
             self.log.info("%s has genomic data in hg38 assembly - will be converted to hg19" % gc)
             converted_coords = self._lo.convert_coordinate('chr%s' % gc.chr, int(gc.get_coord()))
             assert len(converted_coords) == 1
             converted_coords = (converted_coords[0][0], converted_coords[0][1])
-        elif gc.genome_version == 'hg19':
+        elif gc.genome_build == 'hg19':
             converted_coords = ('chr%s' % gc.chr, int(gc.get_coord()))
         else:
             self.log.error("genomic coordinates are not expressed either in hg38 or hg19 for %s; it will be skipped" % gc)
@@ -923,11 +939,14 @@ class MyVariant(DynamicSource, object):
 
     def _get_revel_from_gm(self, mutation, gm):
 
+        if not gm.is_snv:
+            return None
+
         converted_coords = self._convert_hg38_to_hg19(gm)
         if converted_coords is None:
             return None
 
-        query_str = '%s:g.%d%s>%s' % (converted_coords[0], converted_coords[1], gm.get_sense_wt(), gm.get_sense_mut())
+        query_str = '%s:g.%d%s>%s' % (converted_coords[0], converted_coords[1], gm.ref, gm.alt)
 
         hit = self._mv.getvariant(query_str)
 
@@ -1142,7 +1161,7 @@ class gnomAD(DynamicSource, object):
 
         super(gnomAD, self).__init__(name='gnomAD', version=version, description=self.description)
 
-        self._requests_url = 'https://gnomad.broadinstitute.org/api/'
+        self._gnomad_endpoint = 'https://gnomad.broadinstitute.org/api/'
         self._cache = {}
         self._supported_metadata = {'gnomad_exome_allele_frequency' : self._get_exome_allele_freq,
                                     'gnomad_genome_allele_frequency' : self._get_genome_allele_freq}
@@ -1157,7 +1176,6 @@ class gnomAD(DynamicSource, object):
             self.log.info("using alias %s as gene name" % sequence.aliases[use_alias])
         else:
             gene_id = sequence.gene_id
-
 
         self.log.debug("Adding metadata: " + ', '.join(md_type) )
 
@@ -1200,6 +1218,11 @@ class gnomAD(DynamicSource, object):
         self.log.info("getting genome allele frequency")
         self._get_metadata(mutation, gene_id, 'gnomad_genome_allele_frequency')
 
+    def _edit_variant_id(self, row):
+        split_id = row['variant_id'].split('-')
+        if len(split_id[2]) > 1 or len(split_id[3]) > 1:
+            split_id[2] = '?'
+        return "-".join(split_id)
 
     def _get_metadata(self, mutation, gene_id, md_type):
 
@@ -1210,7 +1233,7 @@ class gnomAD(DynamicSource, object):
 
         if gene_id not in self._cache.keys():
 
-            data = self._get_gnomad_data(gene_id)
+            data = self._get_gnomad_data(gene_id, self._assembly[self.version], self._versions[self.version])
 
             if data is None:
                 return
@@ -1236,13 +1259,20 @@ class gnomAD(DynamicSource, object):
         allele_frequencies = []
 
         for variant in mutation.metadata['genomic_mutations']:
-            if type(variant) is GenomicMutation:
+            if type(variant) is GenomicMutation and (variant.is_snv or variant.is_insdel):
                 v_str = variant.as_assembly(ref_assembly).get_value_str(fmt='gnomad')
             else:
-                v_str = variant
+                v_str = None
 
-            this_df = data[ data['variantId'] == v_str ]
-            
+            if variant.is_snv:
+                this_df = data[ data['variant_id'] == v_str ]
+            elif variant.is_insdel:
+                this_df = data[ data['edited_variant_id'] == v_str ]
+            else:
+                self.log.info(f"variant not supported by gnomad {variant.description}")
+                mutation.metadata[md_type].append(metadata_classes[md_type](self, None))
+                continue
+
             if len(this_df) == 0:
                 af = None
                 self.log.info("no entry found for %s" % v_str)
@@ -1255,60 +1285,78 @@ class gnomAD(DynamicSource, object):
             
             mutation.metadata[md_type].append(metadata_classes[md_type](self, af))
 
-    def _get_gnomad_data(self, gene_id):
-        headers = { "content-type": "application/graphql" }
-        request='''{
-          gene(gene_name: "%s") {
-            hgnc_id
-            name
-            canonical_transcript_id
-            omim_id
-            full_gene_name
-            variants(dataset: %s) {
-              variantId
-              reference_genome
-              chrom
-              pos
-              ref
-              alt
-              consequence
-              consequence_in_canonical_transcript
-              exome {
-                af
-              }
-              genome {
-                af
-              }
-            }
-          }
-        }
-        ''' % (gene_id, self._versions[self.version])
+    def _get_gnomad_data(self, gene_id, reference_genome, dataset):
+        headers = { "content-type": "application/json" }
+        request="""query getGene($geneSymbol : String!,
+                              $refBuild : ReferenceGenomeId!,
+                              $dataset : DatasetId!) {
+                gene(gene_symbol : $geneSymbol, reference_genome: $refBuild) {
+                    gene_id
+                    symbol
+                    hgnc_id
+                    variants(dataset : $dataset) {
+                        variant_id
+                        reference_genome
+                        chrom
+                        pos
+                        ref
+                        alt
+                        rsids
+                        exome {
+                            ac
+                            an
+                        }
+                        genome {
+                            ac
+                            an
+                        }
+                    }
+                }
+            }"""
         
         self.log.info("retrieving data for gene %s" % gene_id)
         
         try:
-            response = rq.post(self._requests_url, data=request, headers=headers)
+            response = rq.post(self._gnomad_endpoint,
+                data=json.dumps({
+                                "query": request,
+                                "variables": { "geneSymbol": gene_id,
+                                               "refBuild"  : reference_genome,
+                                               "dataset"   : dataset }
+                                }),
+                headers={"Content-Type": "application/json"})
         except:
             self.log.error("Couldn't perform request for gnomAD")
             return None
 
         try:
-            data = json.loads(response.text)
+            response_json = response.json()
         except:
             log.error("downloaded data couldn't be understood")
             return None
 
-        if 'errors' in data.keys():
+        if 'errors' in response_json.keys():
             self.log.error('The following errors were reported when querying gnomAD:')
-            for e in data['errors']:
+            for e in response_json['errors']:
                 self.log.error('\t%s' % e['message'])
             return None
 
-        df = pd.DataFrame.from_dict(data['data']['gene']['variants'])
-        df['exome_af'] = [ i['af'] if i is not None else None for i in df['exome'] ]
-        df['genome_af'] = [ i['af'] if i is not None else None for i in df['genome'] ]
+        variants = pd.json_normalize(response_json['data']['gene']['variants'])
+        variants = variants.rename(columns={'exome.ac':'exome_ac',
+                                            'exome.an':'exome_an',
+                                            'genome.ac':'genome_ac',
+                                            'genome.an':'genome_an'
+                                            })
+        variants['edited_variant_id'] = variants.apply(self._edit_variant_id, axis=1)
 
-        return df
+        variants['total_ac'] = variants['exome_ac'] + variants['genome_ac']
+        variants['total_an'] = variants['exome_an'] + variants['genome_an']
+
+        variants['exome_af']  =  variants['exome_ac'] / variants['exome_an']
+        variants['genome_af'] = variants['genome_ac'] / variants['genome_an']
+        variants['total_af'] = variants['total_ac'] / variants['total_an']
+
+        return variants
 
 class MobiDB(DynamicSource):
 
@@ -1450,16 +1498,20 @@ class ManualAnnotation(StaticSource):
     _ptm_keywords = ['ptm_cleavage', 'ptm_phosphorylation', 'ptm_ubiquitination', 'ptm_acetylation', 'ptm_sumoylation', 'ptm_nitrosylation', 'ptm_methylation']
     _supported_position_properties = _ptm_keywords
     _supported_sequence_properties = ['linear_motif', 'structure']
+    _supported_mutation            = ['mutation']
+    _mut_prot_parse = 'p.{wt:3l}{position:d}{mut:3l}'
 
     @logger_init
     def __init__(self, datafile, **parsing_options):
 
         description="Annotations from %s" % datafile
-        super(ManualAnnotation, self).__init__(name='Manual annotations', version='', description=description)
+        super(ManualAnnotation, self).__init__(name=f"Manual annotations from {datafile}",
+            version='',
+            description=description)
 
         self._datafile = datafile
         self._df = None
-        
+
         try:
             self._parse_datafile(**parsing_options)
         except pd.errors.ParserError:
@@ -1472,7 +1524,7 @@ class ManualAnnotation(StaticSource):
         self.log.info("Parsing annotations from %s" % self._datafile)
 
         try:
-            df = pd.read_csv(self._datafile, **parsing_options)
+            df = pd.read_csv(self._datafile, **parsing_options, keep_default_na=False)
         except IOError:
             self.log.error("Parsing of file %s failed. ")
         try:
@@ -1484,27 +1536,37 @@ class ManualAnnotation(StaticSource):
         self.log.info("Parsed file:")
         self.log.info('\n{0}'.format(str(self._df)))
 
-        all_properties = set(self._supported_position_properties + self._supported_sequence_properties)
+        all_properties = set(self._supported_position_properties + self._supported_sequence_properties + self._supported_mutation)
 
         diff = set(df['type']).difference(all_properties)
         if len(diff) > 0:
             self.log.warning("the following annotation types were not recognized: %s" % ", ".join(diff))
 
-    def add_mutations(self, sequence):
+    def add_mutations(self, sequence, metadata=[]):
 
         if self._df is None:
             return
 
         tmp_df = self._df[ self._df['type'] == 'mutation' ]
 
+        if 'genomic_mutations' in metadata:
+            out_metadata = { 'genomic_mutations' : tmp_df['function'].str.split(',').tolist() }
+
+        mutations = tmp_df['site'].tolist()
+
         unique_mutations = list(set(tmp_df['site']))
 
-        self.log.info("unique mutations found in datafile: %s" % (", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1])))))
+        self.log.info("unique mutations found in datafile: %s" % (", ".join(sorted(unique_mutations))))
 
         for m in unique_mutations:
-            wt = m[0]
-            mut = m[-1]
-            num = int(m[1:-1])
+            tokens = parse(self._mut_prot_parse, m)
+            if tokens is None:
+                self.log.error(f"Failed to parse mutation {m}; check that the format is correct (i.e. HGVS protein single amino acid substitution)")
+                continue
+
+            num = int(tokens['position'])
+            wt  = three_to_one(str.upper(tokens['wt']))
+            mut = three_to_one(str.upper(tokens['mut']))
 
             if wt == mut:
                 self.log.info("synonymous mutation %s discarded" % m)
@@ -1522,11 +1584,22 @@ class ManualAnnotation(StaticSource):
                 self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, num, position.wt_residue_type))
                 continue
 
+            mutation_indices = [i for i, x in enumerate(mutations) if x == m]
+
             mutation_obj = Mutation(sequence.positions[site_seq_idx],
                                     mut,
                                     [self])
 
+            for md in metadata:
+                mutation_obj.metadata[md] = []
+                for mi in mutation_indices:
+                    if out_metadata[md][mi] is not None:
+                        tmp_md = [self] + out_metadata[md][mi]
+                        this_md = metadata_classes[md](*tmp_md)
+                        mutation_obj.metadata[md].append(this_md)
+
             position.add_mutation(mutation_obj)
+
 
     def add_position_properties(self, sequence, prop=_supported_position_properties):
 
@@ -1540,7 +1613,7 @@ class ManualAnnotation(StaticSource):
             try:
                 this_position = sequence.positions[sequence.seq2index(int(row['site']))]
             except:
-                log.error("position property refers to ")
+                self.log.error("position property refers to a position outside of the sequence")
 
             property_obj = position_properties_classes[row['type']](sources=[self],
                                                                     position=this_position)
@@ -1581,7 +1654,6 @@ class ManualAnnotation(StaticSource):
             property_obj = sequence_properties_classes[row['type']](sources=[self],
                                                                     positions=positions,
                                                                     name=row['name'])
-
 
             property_obj.metadata['function']  = row['function']
             property_obj.metadata['reference'] = row['reference']
