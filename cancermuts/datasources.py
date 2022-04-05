@@ -40,10 +40,14 @@ import os
 import csv
 import myvariant
 import pyliftover
+import itertools
 from parse import parse
-from multiprocessing.dummy import Pool
+from multiprocessing.dummy import Pool as threadPool
 from future.utils import iteritems
 from bravado.client import SwaggerClient
+from bravado.requests_client import RequestsClient
+from requests.adapters import HTTPAdapter
+
 
 import sys
 if sys.version_info[0] >= 3:
@@ -116,7 +120,6 @@ class UniProt(DynamicSource, object):
             responses = self._uniprot_service.mapping( fr = fr,
                                                        to = t,
                                                        query = gene_id )#[gene_id]
-            print(responses)
 
             if len(responses) == 0:
                 log.warning(f"No {t} found for {gene_id}")
@@ -131,7 +134,6 @@ class UniProt(DynamicSource, object):
                 log.warning("The first one will be used")
 
             out[t] = ids[0]
-        print(out)
         return out
 
 
@@ -140,17 +142,26 @@ class cBioPortal(DynamicSource, object):
     default_strand = '+'
     
     @logger_init
-    def __init__(self, cancer_studies=None):
+    def __init__(self, cancer_studies=None, max_connections=10000, max_threads=40):
         description = "cBioPortal"
 
         super(cBioPortal, self).__init__(name='cBioPortal', version='1.0', description=description)
 
         self._api_endpoint = 'https://www.cbioportal.org/api/api-docs'
+        self._max_connections = max_connections
+        self._max_threads = max_threads
+
+        custom_adapter = HTTPAdapter(pool_maxsize=self._max_connections)
+        reqs_client = RequestsClient()
+        reqs_client.session.mount('http://',  custom_adapter)
+        reqs_client.session.mount('https://', custom_adapter)
+
         try:    # no validation as recommended on the cBioPortal website
                 self._client = SwaggerClient.from_url(self._api_endpoint,
-                                                  config={"validate_requests":False,
-                                                          "validate_responses":False,
-                                                          "validate_swagger_spec": False})
+                                                      http_client=reqs_client,
+                                                      config={"validate_requests":False,
+                                                              "validate_responses":False,
+                                                              "validate_swagger_spec": False})
         except Exception as e:
             self.log.error("Could not initialize the Swagger client for cBioPortal")
             return None
@@ -269,7 +280,7 @@ class cBioPortal(DynamicSource, object):
 
         cancer_study_ids = self._cache_cancer_studies['studyId'].values
 
-        pool = Pool(len(cancer_study_ids))
+        pool = threadPool(self._max_threads)
 
         results = pool.map_async(self._get_genetic_profile, cancer_study_ids).get()
         pool.close()
@@ -288,28 +299,20 @@ class cBioPortal(DynamicSource, object):
         df = pd.DataFrame(dict(
             [ (attr, [ getattr(entry, attr) for entry in result ]) for attr in dir(result[0]) ]))
 
-        print(df, "MUTTS")
-        print(gene_id, "GENID")
         df = df[df['entrezGeneId'] == int(gene_id)] 
-        print(df, "MUTTS2")
         df = df[df['mutationType'] == 'Missense_Mutation']
-        print(df, "MUTTS3")
         df = df[df['proteinChange'].str.match(self._mut_regexp, case=True)]
-        print("MUTTS4", df)
 
         return df
 
     def _get_mutation_data(self, gene_id, cancer_study, mol_prof_ids):
 
-        print("mpif", mol_prof_ids)
         data = [ (gene_id, cancer_study, row[1]['molecularProfileId']) for row in mol_prof_ids.iterrows() ]
-
-        print("DATA", data)
 
         if len(data) == 0:
             return pd.DataFrame()
 
-        pool = Pool(len(data))
+        pool = threadPool(self._max_threads)
 
         results = pool.starmap_async(self._get_mutation_data_one_list, data).get()
         pool.close()
@@ -317,9 +320,10 @@ class cBioPortal(DynamicSource, object):
 
         return pd.concat(results, ignore_index=True)
 
-    def _get_profile_data(self, gene_id, cancer_studies=None, metadata=[], mapisoform=None, mainisoform=1):
 
-        self.log.info("fetching profile data")
+    def _get_profile_data_one_profile(self, gene_id, cancer_study, metadata):
+
+        #self.log.info(f"fetching profile data for {cancer_study[1]['studyId']}")
 
         out_metadata = dict(list(zip(metadata, [list() for i in range(len(metadata))])))
 
@@ -346,85 +350,98 @@ class cBioPortal(DynamicSource, object):
             out_metadata['genomic_mutations'] = []
             do_genomic_mutations = True
 
-        for row in self._cache_cancer_studies.iterrows():
-            print(row)
-            cancer_study_id = row[1]['studyId']
-            short_desc      = row[1]['name']
-            long_desc       = row[1]['description']
-            cancer_type     = row[1]['cancerType']
-            cancer_type_id  = row[1]['cancerTypeId']
+        cancer_study_id = cancer_study[1]['studyId']
+        short_desc      = cancer_study[1]['name']
+        long_desc       = cancer_study[1]['description']
+        cancer_type     = cancer_study[1]['cancerType']
+        cancer_type_id  = cancer_study[1]['cancerTypeId']
 
-            cancer_study_isoform = 1
-            self.log.debug("fetching profile data for study %s" % cancer_study_id)
+        cancer_study_isoform = 1
 
+        if do_cancer_type:
+            if cancer_type is not None:
+                try:
+                    cancer_type = self._cancer_types[ self._cancer_types['cancerTypeId'] == cancer_type_id ]
+                    if len(cancer_type) != 1:
+                        raise KeyError
+                    cancer_type = cancer_type.values[0, 'name']
+                except KeyError:
+                    #self.log.warning("cancer type for %s not found - cancer type ID will be used instead" % cancer_type_id)
+                    cancer_type = cancer_type_id
+
+        this_profiles = self._cache_genetic_profiles[ self._cache_genetic_profiles['studyId'] == cancer_study_id ]
+        cancer_study_mutation_ids     = this_profiles[ this_profiles['molecularAlterationType'] == 'MUTATION' ]
+        cancer_study_mutation_ext_ids = this_profiles[ this_profiles['molecularAlterationType'] == 'MUTATION_EXTENDED' ]
+
+        if len(cancer_study_mutation_ids) > 0:
+            mutations_df = self._get_mutation_data(cancer_study_id, cancer_study_mutation_ids)
+
+            this_mutations = mutations_df['proteinChange'].tolist()
+
+            mutations.extend(this_mutations)
             if do_cancer_type:
-                if cancer_type is not None:
-                    try:
-                        cancer_type = self._cancer_types[ self._cancer_types['cancerTypeId'] == cancer_type_id ]
-                        if len(cancer_type) != 1:
-                            raise KeyError
-                        cancer_type = cancer_type.values[0, 'name']
-                    except KeyError:
-                        self.log.warning("cancer type for %s not found - cancer type ID will be used instead" % cancer_type_id)
-                        cancer_type = cancer_type_id
+                out_metadata['cancer_type'].extend([[cancer_type]]*len(this_mutations))
+            if do_cancer_study:
+                out_metadata['cancer_study'].extend([[cancer_study_id]]*len(this_mutations))
+            if do_genomic_coordinates:
+                out_metadata['genomic_coordinates'].extend([[None]]*len(this_mutations))
+            if do_genomic_mutations:
+                out_metadata['genomic_mutations'].extend([[None]]*len(this_mutations))
 
-            print("CSID", cancer_study_id)
-            this_profiles = self._cache_genetic_profiles[ self._cache_genetic_profiles['studyId'] == cancer_study_id ]
-            cancer_study_mutation_ids     = this_profiles[ this_profiles['molecularAlterationType'] == 'MUTATION' ]
-            cancer_study_mutation_ext_ids = this_profiles[ this_profiles['molecularAlterationType'] == 'MUTATION_EXTENDED' ]
-            print(cancer_study_mutation_ext_ids.molecularProfileId)
+        if len(cancer_study_mutation_ext_ids) > 0:
 
-            if len(cancer_study_mutation_ids) > 0:
-                mutations_df = self._get_mutation_data(cancer_study_id, cancer_study_mutation_ids)
+            mutations_df = self._get_mutation_data(gene_id, cancer_study_id, cancer_study_mutation_ext_ids)
 
-                this_mutations = mutations_df['proteinChange'].tolist()
+            for row in mutations_df.iterrows():
+                row = row[1]
+                mutations.append(row['proteinChange'])
 
-                mutations.extend(this_mutations)
                 if do_cancer_type:
-                    out_metadata['cancer_type'].extend([[cancer_type]]*len(this_mutations))
+                    out_metadata['cancer_type'].append([cancer_type])
                 if do_cancer_study:
-                    out_metadata['cancer_study'].extend([[cancer_study_id]]*len(this_mutations))
-                if do_genomic_coordinates:
-                    out_metadata['genomic_coordinates'].extend([[None]]*len(this_mutations))
+                    out_metadata['cancer_study'].append([cancer_study_id])
+                if do_genomic_coordinates or do_genomic_mutations:
+                    gd = list(row[['chr',
+                                   'startPosition',
+                                   'endPosition',
+                                   'referenceAllele']].values)
+                    gd = ['hg19', str(int(gd[0])), str(int(gd[1])), str(int(gd[2])), str(gd[3])]
+                    out_metadata['genomic_coordinates'].append(gd)
                 if do_genomic_mutations:
-                    out_metadata['genomic_mutations'].extend([[None]]*len(this_mutations))
+                    if row['startPosition'] == row['endPosition']:
+                        gm_fmt = f"{row['chr']}:g.{row['startPosition']}{row['referenceAllele']}>{row['variantAllele']}"
+                        gm = ['hg19', gm_fmt]
+                    elif (len(row['referenceAllele']) == len(row['variantAllele'])) and \
+                             ((row['endPosition'] - row['startPosition'] + 1) == len(row['variantAllele'])):
+                        gm_fmt = f"{row['chr']}:g.{row['startPosition']}_{row['endPosition']}delins{row['variantAllele']}"
+                        gm = ['hg19', gm_fmt]
+                        #self.log.info("Added delins! " + gm_fmt)
+                    else:
+                        #self.log.warning("mutation corresponds to neither a substitution or delins, genomic mutation won't be annotated")
+                        gm = None
 
-            if len(cancer_study_mutation_ext_ids) > 0:
+                    out_metadata['genomic_mutations'].append(gm)
+        return mutations, out_metadata
 
-                mutations_df = self._get_mutation_data(gene_id, cancer_study_id, cancer_study_mutation_ext_ids)
 
-                print(mutations_df, 'ASDOMAR')
-                    
-                for row in mutations_df.iterrows():
-                    row = row[1]
-                    print("SINGLEMUT", row)
-                    mutations.append(row['proteinChange'])
+    def _get_profile_data(self, gene_id, metadata=[], mapisoform=None, mainisoform=1):
+        data = [ (gene_id, row, metadata) for row in self._cache_cancer_studies.iterrows() ]
 
-                    if do_cancer_type:
-                        out_metadata['cancer_type'].append([cancer_type])
-                    if do_cancer_study:
-                        out_metadata['cancer_study'].append([cancer_study_id])
-                    if do_genomic_coordinates or do_genomic_mutations:
-                        gd = list(row[['chr',
-                                       'startPosition',
-                                       'endPosition',
-                                       'referenceAllele']].values)
-                        gd = ['hg19', str(int(gd[0])), str(int(gd[1])), str(int(gd[2])), str(gd[3])]
-                        out_metadata['genomic_coordinates'].append(gd)
-                    if do_genomic_mutations:
-                        if row['startPosition'] == row['endPosition']:
-                            gm_fmt = f"{row['chr']}:g.{row['startPosition']}{row['referenceAllele']}>{row['variantAllele']}"
-                            gm = ['hg19', gm_fmt]
-                        elif (len(row['referenceAllele']) == len(row['variantAllele'])) and \
-                                 ((row['endPosition'] - row['startPosition'] + 1) == len(row['variantAllele'])):
-                            gm_fmt = f"{row['chr']}:g.{row['startPosition']}_{row['endPosition']}delins{row['variantAllele']}"
-                            gm = ['hg19', gm_fmt]
-                            self.log.info("Added delins! " + gm_fmt)
-                        else:
-                            self.log.warning("mutation corresponds to neither a substitution or delins, genomic mutation won't be annotated")
-                            gm = None
+        if len(data) == 0:
+            return None
 
-                        out_metadata['genomic_mutations'].append(gm)
+        with threadPool(self._max_threads) as pool:
+            results = pool.starmap_async(self._get_profile_data_one_profile, data).get()
+            pool.close()
+            pool.join()
+
+        mutations, metadata = list(zip(*results))
+        mutations = list(itertools.chain.from_iterable(mutations))
+        out_metadata = dict([(x, list()) for x in metadata[0].keys()])
+        for d in metadata:
+            for k, v in d.items():
+                out_metadata[k].extend(v)
+
         return mutations, out_metadata
 
     def _convert_isoform(self, mutation, main_isoform, alternate_isoform, mapping):
@@ -522,9 +539,6 @@ class COSMIC(DynamicSource, object):
         df = df[ df['Mutation AA'].notna() ]
 
         df = df[ df.apply(lambda x: bool(self._mut_prog.match(x['Mutation AA'])), axis=1) ]
-
-        #df.columns = df.columns.str.replace(r'\s+', '_')
-
 
         for r in df.iterrows():
             r = r[1]
