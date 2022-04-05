@@ -211,11 +211,18 @@ class Table:
                 for md in mutation_metadata:
                     md_values = []
                     try:
+                        self.log.info(f"mutation {p.mutations[m]}")
                         for single_md in p.mutations[m].metadata[md]:
-                            md_values.append(single_md.get_value_str())
-
+                            if single_md is None:
+                                continue
+                            this_value = single_md.get_value_str()
+                            if this_value is None or this_value != this_value: # hacky check for np.nan
+                                continue
+                            md_values.append(this_value)
+                            self.log.info(f"appending {single_md.get_value_str()}")
+                        self.log.info(f"values to be joined {md}: {sorted(list(set(md_values)))}")
                         md_str = ", ".join(sorted(list(set(md_values))))
-                    except:
+                    except KeyError:
                         md_str = None
                     this_row.append(md_str)
                 positions_mutlist.append(gi)
