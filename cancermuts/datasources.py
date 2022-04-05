@@ -730,6 +730,8 @@ class MyVariant(DynamicSource, object):
         self._lo = pyliftover.LiftOver('hg38', 'hg19')
 
         self._supported_metadata = {'revel_score' : self._get_revel}
+        self._revel_cache_gc = {}
+        self._revel_cache_gm = {}
 
 
     def add_metadata(self, sequence, md_type=['revel_score']):
@@ -750,7 +752,6 @@ class MyVariant(DynamicSource, object):
             for mut in pos.mutations:
                 for add_this_metadata in metadata_functions:
                     add_this_metadata(mut)
-
 
     def _get_revel(self, mutation):
 
@@ -777,18 +778,20 @@ class MyVariant(DynamicSource, object):
         gcs_gms = list(zip(gcs, gms))
 
         for gc,gm in gcs_gms:
+            self.log.debug(f"pulling revel score for {mutation}, {gc}, {gm}")
             if gm is not None:
-                self.log.info("genomic mutation will be used to retrieve revel score for mutation %s" % mutation)
+                self.log.debug("genomic mutation will be used to retrieve revel score for mutation %s" % mutation)
                 revel_score = self._get_revel_from_gm(mutation, gm)
-            if gc is not None and revel_score is None:
-                self.log.info("genomic coordinates will be used to retrieve revel score for mutation %s" % mutation)
+            elif gc is not None:
+                self.log.debug("genomic coordinates will be used to retrieve revel score for mutation %s" % mutation)
                 revel_score = self._get_revel_from_gc(mutation, gc)
-            if revel_score is None:
+            else:
                 self.log.warning("mutations %s has no genomic coordinates or genomic mutation available; it will be skipped" % mutation)
-                return
 
+            self.log.debug(f"final revel score for {gc} {gm} {revel_score}")
             mutation.metadata['revel_score'].append(revel_score)
 
+        self.log.debug(f"final revel metadata for {mutation} {mutation.metadata['revel_score']}")
     def _validate_revel_hit(self, mutation, hit):
 
         try:
@@ -801,7 +804,7 @@ class MyVariant(DynamicSource, object):
             aa = [aa]
 
         aa_short = []
-        self.log.info("{0} residue definitions will be tested".format(len(aa)))
+        self.log.debug("{0} residue definitions will be tested".format(len(aa)))
         for idx_this_aa, this_aa in enumerate(aa):
             try:
                 this_hit_pos = this_aa['pos']
@@ -829,14 +832,14 @@ class MyVariant(DynamicSource, object):
 
             aa_short.append(idx_this_aa)
 
-        if len(aa_short) == 1:
-            self.log.info("A single valid residue entry was found for revel score in mutation {0}".format(mutation))
-            return True
-        elif len(aa_short) > 1:
-            self.log.warning("More than one valid residue entry found for revel score in mutation {0}".format(mutation))
-            return True
-        elif len(aa_short) == 0:
-            self.log.warning("No valid residue entry found for revel score in mutation {0}".format(mutation))
+            if len(aa_short) == 1:
+                self.log.info("A single valid residue entry was found for revel score in mutation {0}".format(mutation))
+                return True
+            elif len(aa_short) > 1:
+                self.log.warning("More than one valid residue entry found for revel score in mutation {0}".format(mutation))
+                return True
+            elif len(aa_short) == 0:
+                self.log.warning("No valid residue entry found for revel score in mutation {0}".format(mutation))
             return False
 
     def _convert_hg38_to_hg19(self, gc):
@@ -863,6 +866,13 @@ class MyVariant(DynamicSource, object):
 
         query_str = '%s:g.%d%s>%s' % (converted_coords[0], converted_coords[1], gm.ref, gm.alt)
 
+        try:
+            revel_score = self._revel_cache_gm[query_str]
+            self.log.info(f"Revel score for {query_str} retrieved from cache")
+            return DbnsfpRevel(source=self, score=revel_score)
+        except KeyError:
+            pass
+
         hit = self._mv.getvariant(query_str)
 
         if hit is None:
@@ -877,6 +887,8 @@ class MyVariant(DynamicSource, object):
         except KeyError:
             self.log.warning("no revel score found for mutation %s in this hit; it will be skipped" % mutation)
             return None
+
+        self._revel_cache_gm[query_str] = revel_score
 
         return DbnsfpRevel(source=self, score=revel_score)
 
