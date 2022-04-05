@@ -104,7 +104,7 @@ class GenomicCoordinates(Metadata):
         return [self.genome_build, self.chr, self.coord_start, self.coord_end, self.ref]
 
     def get_value_str(self):
-        return "%s,chr%s:%s-%s" % (self.genome_build, self.chr, self.coord_start, self.coord_end)
+        return "%s,%s:%s-%s" % (self.genome_build, self.chr, self.coord_start, self.coord_end)
 
     def get_coord(self):
         return self.coord_start
@@ -294,6 +294,8 @@ class gnomADAlleleFrequency(Metadata):
         return self.frequency
 
     def get_value_str(self):
+        if self.frequency is None:
+            return ''
         return "%.16f" % self.frequency
 
     def __eq__(self, other):
