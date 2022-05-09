@@ -53,15 +53,38 @@ import sys
 if sys.version_info[0] >= 3:
     unicode = str
 
-
 class Source(object):
+    """Base class for implementing data sources.
+
+    Attributes
+    ----------
+
+    name : :obj:`str`
+        name of the data source
+    version : :obj:`str`
+        version of the data source
+    description : :obj:`str`
+        short description of the data source
+    """
     def __init__(self, name, version, description):
+        """Class constructor
+
+        Parameters
+        ----------
+        name : :obj:`str`
+            name of the data source
+        version : :obj:`str`
+            version of the data source
+        description : :obj:`str`
+            short description of the data source
+        """
+
         self.name = name
         self.version = version
         self.description = description
     def get_sequence(self, gene_id):
         return None
-    def get_mutations(self, ene_id):
+    def get_mutations(self, gene_id):
         return None
     def get_position_properties(self, position):
         return None
@@ -69,14 +92,24 @@ class Source(object):
         return None
 
 class DynamicSource(Source, object):
+    """Base class for implementing dynamic data sources. Dynamic data sources
+    are remote data sources that can be queried through the internet."""
+
     def __init__(self, *args, **kwargs):
         super(DynamicSource, self).__init__(*args, **kwargs)
-
 class StaticSource(Source, object):
+    """Base class for implementing static data sources. Static data sources
+    are local to the system in use and need to be provided manually. They
+    don't change without manual intervention"""
+
     def __init__(self, *args, **kwargs):
         super(StaticSource, self).__init__(*args, **kwargs)
 
 class UniProt(DynamicSource, object):
+    """Class for the UniProt data source. It is used to download the protein
+    sequence of the main UniProt isoform for a certain gene and build the 
+    Sequence object, which is the main entry point for annotations in cancermuts"""
+
     @logger_init
     def __init__(self, *args, **kwargs):
         description = "Uniprot knowledge-base"
