@@ -24,7 +24,6 @@ Logging facilities for cancermuts
 """
 
 import logging
-from functools import wraps as _wraps
 
 logger_name = 'cancermuts'
 date_format = "%d/%m/%Y,%H:%M"
@@ -43,7 +42,6 @@ def start_logging(logfile=None, level=logging.DEBUG, format=message_format, date
 	return logger
 
 def logger_init(function):
-	@_wraps(function)
 	def wrapper(*args, **kwargs):
 		this_self = args[0]
 		this_self.log = logging.getLogger('.'.join([logger_name, this_self.__class__.__name__]))

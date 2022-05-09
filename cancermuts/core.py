@@ -31,43 +31,6 @@ from .properties import *
 from .log import logger_init
 
 class Sequence(object):
-    """The most fundamental class of Cancermuts, this class starts from a
-    protein sequence definition. It acts as a collection of ordered 
-    `SequencePosition` objects which depend on the specific
-    sequence itself.
-
-    Parameters
-    ----------
-    gene_id : :obj:`str`
-        ID of the gene (gene name) to which the sequence belongs
-    sequence : `str`
-        Protein sequence corresponding to the gene and isoform of interest
-    source: :obj:`cancermuts.datasources.DataSource`
-        source from where the Sequence has been downloaded from
-    aliases : :obj:`dict` of :obj:`str`, both for key and value, or None, optional
-        This argument assigns the `aliases` dictionary for the Sequence class.
-        if None, an empty dictionary is created. 
-
-    Attributes
-    ----------
-    source : :obj:`cancermuts.datasources.Datasource`
-        Source from where the protein sequence is downloaded from
-    gene_id : :obj:`int`, optional
-        gene name to which the sequence to be downloaded belongs to
-    sequence : :obj:`str`
-        protein sequence as obtained from the data source
-    sequence_numbering : :obj:`list of int`
-        list of integers, starting from one, each representing a position
-    properties : :obj:`dict`
-        dictionary including the downloaded protein-associated properties.
-        These can span one or more residues.
-    aliases : :obj:`dict`
-        This dictionary maps different "aliases" (i.e. identifiers) for the
-        protein of interest. The key should represent the type of identifier
-        it's being stored in the value and can be any string. For instance,
-        one could have "cosmic" : "AMBRA1" to mean that the protein AMBRA1
-        has identifier AMBRA1 in cosmic
-    """
 
     @logger_init
     def __init__(self, gene_id, sequence, source, aliases=None):
@@ -86,38 +49,9 @@ class Sequence(object):
             self.sequence_numbering.append(i+1)
 
     def index2seq(self, idx):
-        """
-        Returns the sequence numbering corresponding to the `idx`-th
-        residue, starting from 0. usually this corresponds to idx+1.
-
-        Parameters
-        ----------
-        idx : :obj:`int`
-            0-index position in the protein sequence
-
-        Returns
-        ----------
-        i:obj:`int`
-            sequence number corresponding to the idx-th position
-        """
-
+        return self.sequence_numbering[idx]
 
     def seq2index(self, seqn):
-        """
-        Returns the 0-indexed position number in the sequence corresponding
-        to sequence number `seqn`. It is usually equal to `seqn-1`..
-
-        Parameters
-        ----------
-        seqn : :obj:`int`
-            residue position number in the protein sequence
-
-        Returns
-        ----------
-        :obj:`int`
-            sequential number corresponding to the position in the sequence
-            (starting from 0)
-        """
         return self.sequence_numbering.index(seqn)
 
     def __iter__(self):
@@ -127,17 +61,6 @@ class Sequence(object):
         return "<Sequence of %s from %s, %d positions>" % (self.gene_id, self.source.name, len(self.positions))
 
     def add_property(self, prop):
-        """
-        Adds sequence property to sequence object. If a property of the same
-        category is already present, the property will be added to the same
-        category; otherwise the category will be created anew
-
-        Parameters
-        ----------
-        prop : :obj:`cancermuts.properties.SequenceProperty`
-            new property to be added
-        """
-
         if prop.category in self.properties:
             self.properties[prop.category].append(prop)
             add_type = "appending"
@@ -149,67 +72,18 @@ class Sequence(object):
 
 
 class SequencePosition(object):
-    """This class describe a certain sequence position in a protein.
-    SequencePositions usually belong to a Sequence object.
-    It is possible to annotate a Sequence position with either a Mutation
-    or a PositionProperty.
 
-    Attributes
-    ----------
-    source : :obj:`cancermuts.datasources.Datasource`
-    wt_residue_type : :obj:`str`
-        single-letter code wild-type residue for this position
-    sequence_position : :obj:`int`
-        number corresponding to the sequence position for this position
-    mutations : :obj:`list` of `cancermuts.core.Mutation` objects
-        list of mutations for this sequence position (if any)
-    properties : :obj:`dict`
-        dictionary encoding position properties. This dictionary needs to have
-        :obj:`str` as key and `cancermuts.properties.PositionProperty` as value.
-    """
     description = 'Position'
     @logger_init
     def __init__(self, wt_residue_type, sequence_position, mutations=None, properties=None):
-        """Constructor for the SequencePosition class.
-
-        Parameters
-        ----------
-        wt_residue_type : :obj:`str`
-            single-letter code wild-type residue for this position
-        sequence_position : :obj:`int`
-            number corresponding to the sequence position for this position
-        mutations : :obj:`list` of `cancermuts.core.Mutation` objects or None
-            list of mutations for this sequence position to be added
-        properties : :obj:`dict` or :obj:`None`
-            dictionary encoding position properties. This dictionary needs to have
-            :obj:`str` as key and `cancermuts.properties.PositionProperty` as value.
-        """
-
-
         self.wt_residue_type = wt_residue_type
         self.sequence_position = sequence_position
         if mutations is None:
             self.mutations = []
-        else:
-            self.mutations = mutations
         if properties is None:
             self.properties = {} # static properties for position (dependent of WT residue)
-        else:
-            self.properties = properties
-
+    
     def add_mutation(self, mut):
-        """
-        Adds mutation to a :obj:`SequencePosition` object. If the mutation (in
-        terms of amino-acid substitution) is already present, source and 
-        metadata will be added to the already-present mutation. Otherwise
-        the mutation is added anew.
-
-        Parameters
-        ----------
-        mut : :obj:`cancermuts.core.Mutation`
-            new Mutation object to be added to the SequencePosition
-        """
-
         if mut not in self.mutations:
 
             #print "appendo da capo"
@@ -229,17 +103,6 @@ class SequencePosition(object):
                     self.log.debug("    metadata %s was added anew" % k)
 
     def add_property(self, prop):
-        """
-        Adds position property to a :obj:`SequencePosition` object. If a
-        property of the same category is already present, it will be overwritten.
-        Otherwise, the property is just added to the object.
-
-        Parameters
-        ----------
-        prop : :obj:`cancermuts.properties.PositionProperty`
-            new Mutation object to be added to the SequencePosition
-        """
-
         if prop.category in self.properties:
             self.log.info("property %s was replaced with %s" % (self.properties[prop.category], prop))
         else:
@@ -252,42 +115,8 @@ class SequencePosition(object):
 
 
 class Mutation(object):
-    """This class describe a missense mutation as amino-acid replacement.
-
-    Attributes
-    ----------
-    sequence_position : :obj:`cancermuts.core.SequencePosition`
-        `SequencePosition` object to which this mutation belongs, corresponding
-        to the residue that is mutated
-    sources : :obj:`list` of :obj:`cancermuts.datasources.Datasource`
-        source the mutation was derived from
-    mutated_residue_type : :obj:`str`
-        single-letter code for the mutated residue type for this position
-    mutations : :obj:`list` of `cancermuts.core.Mutation` objects
-        list of mutations for this sequence position (if any)
-    properties : :obj:`dict`
-        dictionary encoding position properties. This dictionary needs to have
-        :obj:`str` as key and `cancermuts.properties.PositionProperty` as value.
-    """
-
     @logger_init
     def __init__(self, sequence_position, mutated_residue_type, sources=None, metadata=None):
-        """Constructor for the Mutation class.
-
-        Parameters
-        ----------
-        sequence_position : :obj:`cancermuts.core.SequencePosition`
-            `SequencePosition` object to which this mutation belongs, corresponding
-            to the residue that is mutated
-            single-letter code wild-type residue for this position
-        mutated_residue_type : :obj:`str`
-            single-letter code for the mutated residue type for this position
-        sources : :obj:`list` of :obj:`cancermuts.datasources.Datasource`
-            list of one or more sources the mutation was derived from
-        metadata : :obj:`dict` or :obj:`None`
-            dictionary encoding position properties. This dictionary needs to have
-            :obj:`str` as key and `cancermuts.properties.PositionProperty` as value.
-        """
 
         self.sequence_position = sequence_position
         self.mutated_residue_type = mutated_residue_type
@@ -300,6 +129,8 @@ class Mutation(object):
         else:
             self.metadata = metadata
 
+    def add_source(self, source):
+        self.sources.append(source)
     def __eq__(self, other):
         return self.sequence_position == other.sequence_position and self.mutated_residue_type == other.mutated_residue_type
     def __repr__(self):
@@ -311,3 +142,20 @@ class Mutation(object):
         return "%s%d%s" % ( self.sequence_position.wt_residue_type, 
                             self.sequence_position.sequence_position, 
                             self.mutated_residue_type )
+
+class Source(object):
+    def __init__(self):
+        self.name = name
+        self.version = version
+    def get_sequence(self, gene_id):
+        return None
+    def get_mutations(self, ene_id):
+        return None
+    def get_position_properties(self, position):
+        return None
+    def get_mutation_properties(self, mutation):
+        return None
+
+    def __hash__(self):
+        return hash((self.name, self.version))
+
