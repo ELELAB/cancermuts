@@ -18,6 +18,8 @@ API Reference
 
 .. automodule:: cancermuts.datasources
     :members:
+    :show-inheritance:
+    :inherited-members:
 
 .. automodule:: cancermuts.metadata
     :members:
