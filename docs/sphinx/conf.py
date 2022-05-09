@@ -53,7 +53,3 @@ html_theme = 'alabaster'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
-
-napoleon_google_docstrings = False
-napoleon_numpy_docstrings = True
-napoleon_include_init_with_doc = True
