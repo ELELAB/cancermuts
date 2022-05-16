@@ -135,7 +135,7 @@ if we are interested in e.g. a certain cancer type or some other specific studie
 using the cBioPortal study identifier:
 
 ```py
-cb = cBioPortal(cancer_studies=['brca_broad', 'brca_sander'])
+cb = cBioPortal(cancer_studies=['brca_broad', 'brca_sanger'])
 ```
 
 Finally, we use this object to gather the mutations from the selected cancer
