@@ -2,7 +2,11 @@
 
 ## Requirements
 
-Cancermuts relies on a number of open source packages, such as:
+Cancermuts is a Python package and requires at minimum Python 3.7 to run. All
+modern linux distributions and Mac OS include a distribution of Python that you
+can start using right away.
+
+Furthermore, Cancermuts relies on a number of open source packages, such as:
 
 * requests
 * bioservices
@@ -20,8 +24,29 @@ Please refer to the `setup.py` file in the distribution for an up to date
 list of requirements. It should be noted that requirements are installed
 automatically during the installation process described below.
 
+The installation steps also assume you have either the virtualenv Python package
+ or Conda installed on your system. You can install the virtualenv package
+ by running:
+
+```
+$ python -m pip install --user virtualenv
+```
+
+that should give you access to the `virtualenv` executable:
+
+```
+$ virtualenv
+Running virtualenv with interpreter /usr/bin/python2
+You must provide a DEST_DIR
+Usage: virtualenv.py [OPTIONS] DEST_DIR
+...
+```
+
+if you'd rather use the Conda package manager, you can follow the instructions
+available on their [website](https://docs.conda.io/en/latest/miniconda.html)
+
 The following instructions are meant for Mac OS or a Linux-based operating
-operating system. Cancermuts should also run on a Windows system, even though
+ system. Cancermuts should also run on Windows, even though
 it hasn't been tested on it and we currently don't support it. If you want to 
 use Cancermuts on Windows, we recommend doing so through the [Windows Subsystem
 for Linux](https://docs.microsoft.com/en-us/windows/wsl/install) or by means
@@ -63,7 +88,7 @@ virtualenv package, if available:
     or conda:
 
     ```
-    conda activate cancermuts_env
+    conda activate ./cancermuts_env
     ```
 
     either way you should end up with an active Python environment, i.e.
