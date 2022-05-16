@@ -118,6 +118,49 @@ seq.positions[0:3]
 Now that we have the Sequence ready, we can start adding annotations to it.
 We will first download cancer mutations from cBioPortal and COSMIC.
 
-```
+For cBioPortal, we first create the respective source object:
+
+```py 
+# import data sources classes
 from cancermuts.datasources import cBioPortal, COSMIC
-cb = cBioPortal()	
+
+cb = cBioPortal()
+```
+
+In this case, cBioPortal will gather mutations from all cancer studies available
+in cBioPortal.
+
+It is possible to specify a set of cancer studies Cancermuts should use instead,
+if we are interested in e.g. a certain cancer type or some other specific studies, 
+using the cBioPortal study identifier:
+
+```py
+cb = cBioPortal(cancer_studies=['brca_broad', 'brca_sander'])
+```
+
+Finally, we use this object to gather the mutations from the selected cancer
+studies and add them to our Sequence object we created earlier:
+
+```py
+cb.
+```
+
+{% hint style='info' %}
+Finding the correct set of identifier for the studies of interest can
+be tricky, as it isn't obvious from the cBioPortal website which study
+IDs are connected to specific studies. When creating a cBioPortal object
+without the `cancer_studies` argument, two attributes of the object can
+be helpful to this regard. `cb.cancer_types` is a list of cancer types
+as classified by cBioPortal and `cb.cancer_studies` is the full list of
+studies available on cBioPortal. These list are regular pandas dataframes
+and can be manipulated as such, including saved to csv files or similar.
+
+Alternatively, one can visit the (https://www.cbioportal.org/datasets)[cBioPortal datasets page]
+which contains a list of all the available studies. While this list doesn't
+contain a column with study IDs, the web links that link the studies in the
+"Name" column do contain the IDs. For instance, the study named 
+"Breast Invasive Carcinoma (Broad, Nature 2012)" links the page
+https://www.cbioportal.org/study?id=brca_broad - meaning the corresponding
+study ID is `brca_broad`.
+{% endhint %}
+
