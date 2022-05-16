@@ -1,4 +1,24 @@
-## Installation
+# Installation
+
+## Requirements
+
+Cancermuts relies on a number of open source packages, such as:
+
+* Bio
+* bioservices
+* bravado
+* matplotlib
+* requests
+* myvariant
+* numpy
+* pandas
+* pyliftover
+
+Please refer to the `setup.py` file in the distribution for an up to date
+list of requirements. It should be noted that requirements are installed
+automatically during the installation process described below.
+
+## Installation procedure
 
 Cancermuts is easily installed as a regular Python package on any supported
 platform, as follows:
@@ -15,22 +35,42 @@ so that it is isolated from the rest of the system. For instance, using
 virtualenv package, if available:
 
 ```
-virtualenv -p python3.7 ./venv
+virtualenv -p python3.7 ./cancermuts_env
 ```
 
 another popular choice would be using a conda environment:
 
 ```
-conda create cancermuts python=3.7
+conda create cancermuts_env python=3.7
 ```
 
-3. install the package. This should also install all the requirements:
+3. Activate the Python environment, for instance if you used virtualenv:
+
+```
+source venv/bin/activate
+```
+
+or conda:
+
+```
+conda activate cancermuts_env
+```
+
+either way you should end up with an activate Python environment, i.e.
+there should be a `(cancermuts_env)` string before your command prompt:
+
+```
+teo@my-computer:my_folder$ . cancermuts_env/bin/activate
+(cancermuts_env) teo@my-computer:my_folder$
+```
+
+4. install the package. This should also install all the requirements:
 
 ```
 python setup.py install
 ```
 
-4. you're now ready to use Cancermuts! Please head to the tutorial section 
+5. you're now ready to use Cancermuts! Please head to the tutorial section 
 
 {% hint style='info' %}
 You can use cancermuts by means of a Python script or interactively, in a
