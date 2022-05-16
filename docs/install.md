@@ -20,6 +20,13 @@ Please refer to the `setup.py` file in the distribution for an up to date
 list of requirements. It should be noted that requirements are installed
 automatically during the installation process described below.
 
+The following instructions are meant for Mac OS or a Linux-based operating
+operating system. Cancermuts should also run on a Windows system, even though
+it hasn't been tested on it and we currently don't support it. If you want to 
+use Cancermuts on Windows, we recommend doing so through the [Windows Subsystem
+for Linux](https://docs.microsoft.com/en-us/windows/wsl/install) or by means
+of a container (e.g. [Docker](https://www.docker.com))
+
 ## Installation procedure
 
 Cancermuts is easily installed as a regular Python package on any supported
