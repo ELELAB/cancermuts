@@ -76,7 +76,7 @@ virtualenv package, if available:
     another popular choice would be using a conda environment:
 
     ```
-    conda create cancermuts_env python=3.7
+    conda create -p cancermuts_env python=3.7
     ```
 
 3. Activate the Python environment, for instance if you used virtualenv:
@@ -105,7 +105,22 @@ virtualenv package, if available:
     pip install ./cancermuts
     ```
 
-5. you're now ready to use Cancermuts!
+5. you're now ready to use Cancermuts! In order to use it in the future, you
+will just need to activate the environment you created following point 3.
+
+{% hint style='info' %}
+You can check if Cancermuts was installed correctly by importing its package
+from within Python, which shouldn't result in any error:
+
+```
+$ python
+Python 3.7.13 (default, Mar 29 2022, 02:18:16)
+[GCC 7.5.0] :: Anaconda, Inc. on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import cancermuts
+>>>
+```
+{% endhint %}
 
 {% hint style='info' %}
 You can use cancermuts by means of a Python script or interactively, in a
