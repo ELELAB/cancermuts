@@ -49,7 +49,7 @@ In [2]:
 
 you shouldn't receive any error. If you receive an error instead we recommend
 checking that your installation was performed correctly and/or open an Issue
-on our GitHub repository so we can help you.
+on our GitHub repository to receive assistance.
 
 ## Introduction
 
@@ -91,6 +91,7 @@ gene name. Alternatively, it is possible to provide the UniProt ID manually as a
 
 This is done as follows:
 
+
 ```py
 # import the UniProt data source class
 from cancermuts.datasources import UniProt 
@@ -102,7 +103,6 @@ up = UniProt()
 seq = up.get_sequence('MAP1LC3B')
 
 # alternatively, we can specifically ask for a Uniprot ID
-# (these are usually equivalent)
 seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
 
 # this prints the downloaded protein sequence
@@ -135,14 +135,9 @@ if we are interested in e.g. a certain cancer type or some other specific studie
 using the cBioPortal study identifier:
 
 ```py
-cb = cBioPortal(cancer_studies=['brca_broad', 'brca_sanger'])
-```
-
-Finally, we use this object to gather the mutations from the selected cancer
-studies and add them to our Sequence object we created earlier:
-
-```py
-cb.
+cb = cBioPortal(cancer_studies=['coadread_dfci_2016', 
+	                            'coadread_genentech',
+	                            'coadread_tcga_pan_can_atlas_2018'])
 ```
 
 {% hint style='info' %}
@@ -163,4 +158,63 @@ contain a column with study IDs, the web links that link the studies in the
 https://www.cbioportal.org/study?id=brca_broad - meaning the corresponding
 study ID is `brca_broad`.
 {% endhint %}
+
+Finally, we use this object to gather the mutations from the selected cancer
+studies and add them to our Sequence object we created earlier:
+
+```py
+cb.add_mutations(seq)
+```
+
+It is possible to downloaded metadata about the downloaded aminoacid mutations
+as well by using the `metadata` argument of `add_mutations`, which supports
+a list of strings, one for each metadata type. By default no metadata are added.
+Supported metadata for cBioPortal are:
+
+* `cancer_type`: type of cancer the mutation was found in, depending on the study
+* `cancer_study`: cBioPortal study the mutation was found in
+* `genomic_coordinates`: Genomic coordinates of the corresponding genomic mutation
+* `genomic_mutations`: Genomic coordinates and base pair substitution
+    of the corresponding genomic mutation
+
+So for instance:
+
+```py
+cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
+```
+
+
+This step might take a few minutes as Cancermuts interrogates the cBioPortal
+online database. The final result of this step will have modified the `seq`
+Sequence object we have created by adding mutations to the positions of the
+respective residues. In this case, Cancermuts identified only three
+mutations for cBioPortal:
+
+```py
+In [27]: print(seq.positions[38].mutations)
+[<Mutation K39R from cBioPortal>]
+
+In [28]: print(seq.positions[64].mutations)
+[<Mutation K65E from cBioPortal>]
+
+In [29]: print(seq.positions[122].mutations)
+[<Mutation L123S from cBioPortal>]
+```
+
+
+
+Each mutation is recorded in a Mutation object that can be further explored:
+
+```py
+In [31]: seq.positions[38].mutations[0].sources
+[<cancermuts.datasources.cBioPortal at 0x1520cc263810>]
+
+In [32]: seq.positions[38].mutations[0].mutated_residue_type
+R
+```
+
+Furthermore, Mutation object can be further decorated by adding metadata.
+
+
+
 
