@@ -112,20 +112,23 @@ print(seq.sequence)
 seq.positions[0:3]
 ```
 
-
 ### Collecting cancer mutations
 
 Now that we have the Sequence ready, we can start adding annotations to it.
 We will first download cancer mutations from cBioPortal and COSMIC.
 
-For cBioPortal, we first create the respective source object:
+We first import the required datasource classes for them:
 
-```py 
+```py
 # import data sources classes
 from cancermuts.datasources import cBioPortal, COSMIC
+```
+
+#### cBioPortal
+
+For cBioPortal, we first create the respective source object:
 
 cb = cBioPortal()
-```
 
 In this case, cBioPortal will gather mutations from all cancer studies available
 in cBioPortal.
@@ -183,6 +186,11 @@ So for instance:
 cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
 ```
 
+{% hint style='info' %}
+the gene or protein name is not among the arguments - this is
+because it is inferred from the `seq` object. Only mutations
+of the corresponding gene will be annotated.
+{% endhint %}
 
 This step might take a few minutes as Cancermuts interrogates the cBioPortal
 online database. The final result of this step will have modified the `seq`
@@ -201,20 +209,168 @@ In [29]: print(seq.positions[122].mutations)
 [<Mutation L123S from cBioPortal>]
 ```
 
-
-
 Each mutation is recorded in a Mutation object that can be further explored:
 
 ```py
-In [31]: seq.positions[38].mutations[0].sources
-[<cancermuts.datasources.cBioPortal at 0x1520cc263810>]
+In [31]: seq.positions[64].mutations
+[<Mutation K65E from cBioPortal>]
 
-In [32]: seq.positions[38].mutations[0].mutated_residue_type
-R
+In [9]: seq.positions[64].mutations[0].sources
+[<cancermuts.datasources.cBioPortal at 0x1510a0455c50>]
+
+In [32]: seq.positions[64].mutations[0].mutated_residue_type
+'E'
+
+In [12]: seq.positions[38].mutations[0].metadata
+{'cancer_type': [<CancerType Colorectal Adenocarcinoma from cBioPortal>],
+ 'cancer_study': [<CancerStudy coadread_genentech from cBioPortal>],
+ 'genomic_mutations': [<GenomicMutation hg19,16:g.87435877A>G from cBioPortal>],
+ 'genomic_coordinates': [<GenomicCoordinates 16:87435877-87435877 in hg19 from cBioPortal>]}
+ ```
+
+{% hint style='info' %}
+The cancer type is not always present in the data downloaded from cBioPortal.
+In this cases, Cancermuts tries its best to infer it from the study name.
+{% endhint %}
+
+#### COSMIC
+
+As before, we first create a COSMIC data source object:
+
+```py
+cosmic = COSMIC(database_files=['/data/user/teo/test_cancermuts/cancermuts/lc3b.csv'])
 ```
 
-Furthermore, Mutation object can be further decorated by adding metadata.
+here the `database_files` argument is a list of strings, each of them is a
+database file to be considered. Usually, the argument for this file would be
+the COSMIC database file that was downloaded as detailed in the Install section.
 
+We can then add mutations from the COSMIC data source:
 
+```py
+cosmic.add_mutations(seq, 
+					 cancer_sites=['large_intestine'],
+					 cancer_site_subtype_1=['colon'],
+					 cancer_types=['carcinoma'],
+					 cancer_histology_subtype_1=['adenocarcinoma'], 
+					 metadata=['genomic_coordinates', 'genomic_mutations', 
+					 			'cancer_site', 'cancer_histology'])
+```
 
+Here we restrict the search to those mutations that are involved in colon
+adenocarcinoma. It should be noted that COSMIC supports up to four 
+cancer histology types and four cancer histology subtypes and Cancermuts
+allows to filter by any of this. In particular, only the mutations that 
+correspond to *all* the selected criteria are retained. Please see the
+(https://cancer.sanger.ac.uk/cosmic/classification)[COSMIC phenotype classification]
+for the classification that COSMIC uses.
+
+Furthermore, similarly to cBioPortal, we retain some metadata:
+
+* `cancer_histology`: histology information on the cancer(s) in which this mutation was found
+* `cancer_site`: site information on the cancer(s) in which this mutation was found
+* `genomic_coordinates`: Genomic coordinates of the corresponding genomic mutation
+* `genomic_mutations`: Genomic coordinates and base pair substitution
+    of the corresponding genomic mutation
+
+In this case, filtering the database allows to add only a single mutation,
+which is K65E. It should be noted that the same amino acid substitution 
+was already identified by cBioPortal. This means that the mutation object
+corresponding to this aminoacid substitution is annotated with metadata for
+this newfound mutation. We see now that the details obtained by both cBioPortal
+and COSMIC are present:
+
+```py
+In [13]: seq.positions[64].mutations[0]
+<Mutation K65E from cBioPortal,COSMIC>
+
+In [14]: seq.positions[64].mutations[0].sources
+[<cancermuts.datasources.cBioPortal at 0x1510a0455c50>,
+ <cancermuts.datasources.COSMIC at 0x15109ff10050>]
+
+In [15]: seq.positions[64].mutations[0].metadata
+{'cancer_type': [<CancerType Colorectal Adenocarcinoma from cBioPortal>],
+ 'cancer_study': [<CancerStudy coadread_genentech from cBioPortal>],
+ 'genomic_mutations': [<GenomicMutation hg19,16:g.87435877A>G from cBioPortal>,
+  <GenomicMutation hg38,16:g.87402271A>G from COSMIC>],
+ 'genomic_coordinates': [<GenomicCoordinates 16:87435877-87435877 in hg19 from cBioPortal>,
+  <GenomicCoordinates 16:87402271-87402271 in hg38 from COSMIC>],
+ 'cancer_site': [<CancerSite, large_intestine, colon>],
+ 'cancer_histology': [<TumorHistology, carcinoma, adenocarcinoma>]}
+```
+
+### Additional mutation metadata
+
+Cancermuts allows to enrich the downloaded mutations with further metadata. We
+will see now how to download the REVEL pathogenicy score and the gnomAD allele
+frequency for each specific variant.
+
+#### REVEL score from MyVariant
+
+We will download scores for the REVEL predictor of pathogenicity from the
+(https://myvariant.info)[MyVariant.info] database. REVEL is associated to
+genomic mutations and not to amino-acid mutations, therefore our amino acid
+mutations need to be annotated with the genomic mutations metadata in order
+for this to be possible. This is performed as detailed above. In order to
+download the associated REVEL score, we can use the appropriate data source
+class:
+
+```py
+from cancermuts.datasources import MyVariant
+
+mv = MyVariant()
+mv.add_metadata(seq)
+```
+
+we can check that the mutations have been annotated with the REVEL score:
+
+```py
+seq.positions[64].mutations[0].metadata['revel_score']
+Out[23]: [<DbnsfpRevel, 0.314>, <DbnsfpRevel, 0.314>]
+```
+
+In this case we see the same score twice, as the mutation was previously
+annotated with two genomic mutations. The two genomic mutations corresponded
+to the same mutations annotated in two different genome assemblies, therefore
+the two scores we are able to gather have the same value.
+
+#### gnomAD allele frequencies
+
+Similarly, we annotate mutations with their exome or genome allele frequencies
+as found in the (https://www.gnomad.org)[gnomAD database]. This works as you 
+would expect by now:
+
+```py
+from cancermuts.datasources import gnomAD
+
+gnomad = gnomAD(version='2.1')
+gnomad.add_metadata(seq, md_type=['gnomad_exome_allele_frequency',
+	                              'gnomad_genome_allele_frequency'])
+```
+
+here, we specify the `version` argument to specify the version of gnomAD to be 
+considered. Please refer to the API documentation for all the available versions.
+
+The `md_type` keyword allows to select which metadata type(s) to annotate, i.e.
+choose between exome or allele frequency (or both as in the example).
+
+We calculate the allele frequency as the ratio between the total allele count over
+the allele number as found in gnomAD, if the entry for the corresponding variant 
+is available.
+
+Finally we can check the downloaded metadata:
+
+```py
+In [31]: seq.positions[64].mutations[0].metadata['gnomad_exome_allele_frequency']
+[<gnomADExomeAlleleFrequency, 0.000028>,
+ <gnomADExomeAlleleFrequency, 0.000028>]
+
+In [32]: seq.positions[64].mutations[0].metadata['gnomad_genome_allele_frequency']
+[<gnomADGenomeAlleleFrequency, nan>,
+ <gnomADGenomeAlleleFrequency, nan>]
+```
+
+here Cancermuts could assign an exome allele frequency for the associated genomic
+mutations, however it wasn't able to download or calculate the corresponding
+genome allele frequency.
 
