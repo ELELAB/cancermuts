@@ -2,7 +2,7 @@ Cancer Structural Biology, Danish Cancer Society Research Center, 2100, Copenhag
 
 Repository associated to the publication:
 
-The Cancermuts software package for the prioritization of missense cancer variants: a case study of AMBRA1 in melanoma. Matteo Tiberti, Luca Di Leo, Mette Vixø Vistesen, Rikke Kuhre, Francesco Cecconi, Daniela De Zio, Elena Papaleo. Submitted to bioRxiv.
+The Cancermuts software package for the prioritization of missense cancer variants: a case study of AMBRA1 in melanoma. Matteo Tiberti*, Luca Di Leo, Mette Vixø Vistesen, Rikke Kuhre, Francesco Cecconi, Daniela De Zio*, Elena Papaleo. Submitted to bioRxiv.
 
 contacts for this repository: elenap-at-cancer.dk, tiberti-at-cancer.dk
 
