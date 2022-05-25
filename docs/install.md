@@ -129,6 +129,8 @@ You can use cancermuts by means of a Python script or interactively, in a
 
 ## Offline resources
 
+### COSMIC database
+
 As it will become more clear later, Cancermuts expects some resources to be
 available on the local computer to be used. Currently, this is only true
 for the COSMIC Mutant Export, which contains a list of cancer mutations.
@@ -136,12 +138,12 @@ for the COSMIC Mutant Export, which contains a list of cancer mutations.
 In order to obtain it:
 
 1. head to the [COSMIC website](https://cancer.sanger.ac.uk/cosmic), 
-register and log in
+    register and log in
 
 2. head to the Data menu at the top and select the Downloads option
 
 3. head to the "COSMIC Mutation Data" section and downlaod the corresponding
-Whole file (CosmicMutantExport.tsv.gz)
+    Whole file (CosmicMutantExport.tsv.gz)
 
 4. decompress the file, e.g. using `gzip`:
 
@@ -156,4 +158,31 @@ The downloaded file will take a significant amount of disk space, at least 15GB.
 {% hint style='tip' %}
 Make note of the location of this file as it will come handy in the Tutorial
 {% endhint %}
+
+### PhosphositePlus
+
+If you intend to use PhosphoSite Plus as a resource to annotate post-translational
+modifications you should download its data files so they can be used by 
+Cancermuts, using the following steps:
+
+1. head to the [PhosphoSite Plus website download page](https://www.phosphosite.org/staticDownloads)
+
+2. accept the terms and conditions, as adequate
+
+3. download the files containing the post-translational mutation data in a
+    folder of your choice. Depending on which PTM you're interested it, you
+    might need either (one or more, possibly all):
+    * Acetylation_site_dataset.gz   
+    * Methylation_site_dataset.gz
+    * O-GalNAc_site_dataset.gz
+    * O-GlcNAc_site_dataset.gz
+    * Phosphorylation_site_dataset.gz
+    * Sumoylation_site_dataset.gz
+
+4. decompress all the files, for instance using `gzip` in Linux or macOS:
+    ```
+    for f in *.gz; do gunzip -d $f; done
+    ```
+
+5. Keep note of the location of this directory as it will come handy in the tutorial
 
