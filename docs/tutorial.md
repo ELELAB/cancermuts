@@ -374,3 +374,168 @@ here Cancermuts could assign an exome allele frequency for the associated genomi
 mutations, however it wasn't able to download or calculate the corresponding
 genome allele frequency.
 
+### Position properties
+
+We will further annotate our sequence object with properties connected to each single
+residue. For the moment, these are post-translation modifications from Phosphosite and
+order/disorder propensity from MobiDB.
+
+We import the relative data source class, similarly as what done previously:
+
+```py
+from cancermuts.datasources import Phosphosite, MobiDB
+```
+
+#### Post-translational modifications with phosphosite
+
+We will annotate post-translational modifications identified in experiments from
+the PhosphoSite Plus database. In order to do so we need a local copy of the
+Phosphosite dataset - please see the instructions in the installation guide.
+
+We first create the Phosphosite data source object. We will need to supply the
+location of the database files:
+
+```py
+ps = PhosphoSite('/data/databases/phosphosite/')
+```
+
+by default, Cancermuts expect the file names in the database to be the default
+ones. However it's possible to specify the file name for each post-translational
+modifications by supplying the `database_files` argument, which should be a
+dictionary associating each PTM to a file name:
+
+```py
+my_databse_files = {  'acetylation'     : 'my_Acetylation_site_dataset',
+                      'methylation'     : 'my_Methylation_site_dataset',
+                      ... }
+```
+
+the keys of the dictionaries should be the options supported in the `properties`
+argument of the `add_position_properties` (see below).
+
+Once the object is created we can add the position properties to our sequence
+object. If no `properties` is supplied, all of them will be considered. Otherwise,
+the `properties` object should be a list of the keywords corresponding to the PTMs 
+that we want to be annotated, as follows:
+
+| Keyword | Description |
+| ------- | ----------- |
+| `acetylation` | Acetylation | 
+| `methylation` | Methylation
+| `O-GalNAc` | O-linked β-N-acetylglucosamine |
+| `O-GlcNAc` | O-linked α-N-acetylgalactosamine |
+| `phosphorylation` | Phosphorylation |
+| `sumoylation` | Sumoylation
+| `ubiquitination` | Ubiquitination |
+
+So, for instance:
+
+```py
+ps.add_position_properties(seq, 
+	                       properties=['phosphorylation', 'ubiquitination'])
+```
+
+However, in this case we will consider all of them:
+
+```py
+ps.add_position_properties(seq)
+```
+
+Once again, we can check the result:
+
+```py
+>>> seq.positions[4].properties
+{'ptm_ubiquitination': <PositionProperty Ubiquitination Site from PhosphoSite>}
+
+>>> seq.positions[28].properties
+{'ptm_phosphorylation': <PositionProperty Phosphorylation Site from PhosphoSite>}
+```
+
+#### structured regions with MobiDB
+
+We use the MobiDB website to predict structured or unstructured regions in our
+protein of interest. This works similarly as before:
+
+```py
+mdb = MobiDB()
+mdb.add_position_properties(seq)
+```
+
+we can then check the annotation as done previously:
+
+```py
+>>> seq.positions[0].properties['mobidb_disorder_propensity']
+<StructuralDisorder, C>
+
+>>> seq.positions[10].properties['mobidb_disorder_propensity']
+<StructuralDisorder, S>
+```
+
+here an annotation of "C" means coil (disoredered), while an annotation of "S"
+means "structured".
+
+### Sequence properties
+
+We further annotate properties to the sequence, i.e. properties that cover
+multiple residues. We first import the respective classes:
+
+```py
+from cancermuts.datasources import ELMPredictions
+```
+
+#### Predictions of short linear motifs from ELM
+
+We annotate the sequence using predictions for short linear motifs from the
+[Eukaryotic Linear Motif](http://elm.eu.org) database:
+
+```py
+elm = ELMPredictions()
+elm.add_sequence_properties(seq,
+							exclude_elm_classes="MOD_.")
+```
+
+here `exclude_elm_classes` is a single regular expression that allows to remove
+specific ELM classes by specifying a regular expression that matches one or more
+[ELM class identifier](http://elm.eu.org/elms). Here we use `"MOD_."` to exclude
+post-translational modifications which are already supplied by PhosphoSite.
+
+We can check the linear motifs we have collected:
+
+```py
+>>> seq.properties
+{'linear_motif': [<SequenceProperty Linear motif from ELM, positions 10,11,12>,
+  <SequenceProperty Linear motif from ELM, positions 69,70,71>,
+  <SequenceProperty Linear motif from ELM, positions 5,6,7,8,9>,
+  ...
+```
+
+and their specifics:
+
+```py
+>>> seq.properties['linear_motif'][0].type
+'NRD cleavage site'
+
+>>> seq.properties['linear_motif'][0].positions
+[<SequencePosition, residue R at position 10>,
+ <SequencePosition, residue R at position 11>,
+ <SequencePosition, residue T at position 12>]
+```
+
+### Custom annotations
+
+We can further add annotations manually to our dataset. This is for data that
+is not available in the databases as of yet, but is useful to have annotated
+in the pipeline to have a complete picture. This can be done by using a custom
+CSV file as data source. The CSV can contain different types and levels of
+information. The file should have the following columns:
+
+| Column | Description |
+| ------ | ----------- |
+| `name` | name that is given to this feature () | 
+| `site` | position of this feature; see below | 
+| `type` | type of this feature; see below |
+| `function` | O-linked α-N-acetylgalactosamine |
+| `reference` | Phosphorylation |
+
+
+
