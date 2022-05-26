@@ -100,7 +100,8 @@ class UniProt(DynamicSource, object):
             self.log.info("The user-provided Uniprot ID (%s) will be used" % upid)
 
         aliases = {'uniprot' : upid,
-                   'entrez' : self._get_aliases(upid, ['P_ENTREZGENEID'])['P_ENTREZGENEID']}
+                   'entrez' :       self._get_aliases(upid, ['P_ENTREZGENEID'])['P_ENTREZGENEID'],
+                   'uniprot_acc' : self._get_aliases(upid, ['ACC+ID'])['ACC+ID']}
 
         self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s, gene %s" % (upid, gene_id))
 
