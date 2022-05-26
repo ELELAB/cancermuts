@@ -760,7 +760,7 @@ class PhosphoSite(DynamicSource, object):
         self._database_dir = database_dir
 
         if database_files is None:
-            self._database_files = dict([(i, "%s/%s_site_dataset"%(self._database_dir,i)) for i in self._ptm_types])
+            self._database_files = dict([(i, "%s/%s_site_dataset"%(self._database_dir, i.capitalize()[0] + i[1:])) for i in self._ptm_types])
 
         else:
             self._database_files = database_files
@@ -772,8 +772,7 @@ class PhosphoSite(DynamicSource, object):
                 self._dataframes[k] = self._dataframes[k][ self._dataframes[k]['ORGANISM'] == 'human']
             except:
                 self.log.error("couldn't read database file %s" % f)
-
-
+                raise IOError
 
     def _parse_db_file(self, gene_id):
 
