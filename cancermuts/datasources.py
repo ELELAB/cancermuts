@@ -27,6 +27,7 @@ import time
 import requests as rq
 from bioservices.uniprot import UniProt as bsUniProt
 from Bio.PDB.Polypeptide import three_to_one
+import numpy as np
 import pandas as pd
 from .core import Sequence, Mutation
 from .properties import *
@@ -133,7 +134,8 @@ class UniProt(DynamicSource, object):
             self.log.info("The user-provided Uniprot ID (%s) will be used" % upid)
 
         aliases = {'uniprot' : upid,
-                   'entrez' : self._get_aliases(upid, ['P_ENTREZGENEID'])['P_ENTREZGENEID']}
+                   'entrez' :       self._get_aliases(upid, ['P_ENTREZGENEID'])['P_ENTREZGENEID'],
+                   'uniprot_acc' : self._get_aliases(upid, ['ACC+ID'])['ACC+ID']}
 
         self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s, gene %s" % (upid, gene_id))
 
@@ -212,6 +214,14 @@ class cBioPortal(DynamicSource, object):
         self._mut_regexp = '[A-Z][0-9]+[A-Z]$'
         self._mut_prog = re.compile(self._mut_regexp)
 
+    @property
+    def cancer_types(self):
+        return self._cancer_types
+
+    @property
+    def cancer_studies(self):
+        return self._cache_cancer_studies
+
     def add_mutations(self, sequence, metadata=[], mainisoform=1, mapisoform=None):
         mutations, out_metadata = self._get_profile_data(sequence.aliases['entrez'], metadata=metadata, mainisoform=mainisoform, mapisoform=mapisoform)
         unique_mutations = list(set(mutations))
@@ -254,13 +264,13 @@ class cBioPortal(DynamicSource, object):
 
     def _get_cancer_types(self):
         self.log.info("fetching cancer types")
-        if True:
+        try:
             result = self._client.Cancer_Types.getAllCancerTypesUsingGET().result()
-        else:
+        except:
             self.log.error("failed retrieving cancer types")
             self._cancer_types = None
 
-        return pd.DataFrame(dict(
+        self._cancer_types = pd.DataFrame(dict(
             [ (attr, [ getattr(entry, attr) for entry in result ]) for attr in dir(result[0]) ]))
  
     def _get_cancer_studies(self, cancer_studies=None):
@@ -365,19 +375,25 @@ class cBioPortal(DynamicSource, object):
 
         responses = []
         mutations = []
-        do_cancer_type = False
 
+        if 'genomic_mutations' in metadata and not 'genomic_coordinates' in metadata:
+            metadata.append('genomic_coordinates')
+
+        do_cancer_type = False
         if 'cancer_type' in metadata:
             out_metadata['cancer_type'] = []
             do_cancer_type = True
+
         do_cancer_study = False
         if 'cancer_study' in metadata:
             out_metadata['cancer_study'] = []
             do_cancer_study = True
+
         do_genomic_coordinates = False
         if 'genomic_coordinates' in metadata:
             out_metadata['genomic_coordinates'] = []
             do_genomic_coordinates = True
+
         do_genomic_mutations = False
         if 'genomic_mutations' in metadata:
             out_metadata['genomic_mutations'] = []
@@ -392,15 +408,19 @@ class cBioPortal(DynamicSource, object):
         cancer_study_isoform = 1
 
         if do_cancer_type:
-            if cancer_type is not None:
+            if cancer_type_id is None:
+                 self.log.warning("cancer type ID not found - cancer type ID will be inferred from study ID")
+                 cancer_type_id = cancer_study_id.split('_')[0]
+
+            if cancer_type is None:
                 try:
                     cancer_type = self._cancer_types[ self._cancer_types['cancerTypeId'] == cancer_type_id ]
                     if len(cancer_type) != 1:
                         raise KeyError
-                    cancer_type = cancer_type.values[0, 'name']
+                    cancer_type = cancer_type.values[0][2]
                 except KeyError:
-                    #self.log.warning("cancer type for %s not found - cancer type ID will be used instead" % cancer_type_id)
                     cancer_type = cancer_type_id
+                    self.log.warning("cancer type for %s not found - cancer type ID will be used instead" % cancer_type_id)
 
         this_profiles = self._cache_genetic_profiles[ self._cache_genetic_profiles['studyId'] == cancer_study_id ]
         cancer_study_mutation_ids     = this_profiles[ this_profiles['molecularAlterationType'] == 'MUTATION' ]
@@ -490,7 +510,7 @@ class cBioPortal(DynamicSource, object):
 
 class COSMIC(DynamicSource, object):
     @logger_init
-    def __init__(self, database_files=None, database_encoding=None, cancer_type=None):
+    def __init__(self, database_files=None, database_encoding=None):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
 
@@ -500,8 +520,16 @@ class COSMIC(DynamicSource, object):
         self._mut_snv_prog = re.compile(self._mut_snv_regexp)
         self._site_kwd = ['Primary site', 'Site subtype 1', 'Site subtype 2', 'Site subtype 3']
         self._histology_kwd = ['Primary histology', 'Histology subtype 1', 'Histology subtype 2', 'Histology subtype 3']
+        self._use_cols_snp = [  'Gene name',
+                                 'Mutation AA',
+                                 'GRCh',
+                                 'Mutation genome position',
+                                 'Mutation CDS',
+                                 'Mutation strand',
+                                 'SNP',
+                                 'HGVSG' ] + self._site_kwd + self._histology_kwd
+
         self._use_cols = [  'Gene name',
-                            'SNP',
                             'Mutation AA',
                             'GRCh',
                             'Mutation genome position',
@@ -527,17 +555,28 @@ class COSMIC(DynamicSource, object):
             encodings = database_encoding
 
         for fi, f in enumerate(self._database_files):
+            self.log.info("Parsing database file %s ..." % f)
             try:
-                self.log.info("Parsing database file %s ..." % f)
-                dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols, encoding=encodings[fi]) )
-            except:
-                self.log.error("Couldn't parse database file {}".format(fi))
-                self._df = None
-                return
+                dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_snp, encoding=encodings[fi]) )
+            except ValueError:
+                try:
+                    dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols, encoding=encodings[fi]) )
+                except ValueError:
+                    self.log.error("Couldn't parse database file {}".format(fi))
+                    self._df = None
+                    return
 
         self._df = pd.concat(dataframes, ignore_index=True, sort=False)
 
-    def _parse_db_file(self, gene_id, cancer_types=None, metadata=[], filter_snps=True):
+    def _parse_db_file(self, gene_id, cancer_types=None,
+                       cancer_histology_subtype_1=None,
+                       cancer_histology_subtype_2=None,
+                       cancer_histology_subtype_3=None,
+                       cancer_sites=None,
+                       cancer_site_subtype_1=None,
+                       cancer_site_subtype_2=None,
+                       cancer_site_subtype_3=None,
+                       metadata=[], filter_snps=True):
 
         mutations = []
 
@@ -564,10 +603,28 @@ class COSMIC(DynamicSource, object):
         df = self._df[ self._df['Gene name'] == gene_id ]
 
         if filter_snps:
-            df = df[ df['SNP'] != 'y' ]
+            if 'SNP' in df.columns:
+                df = df[ df['SNP'] != 'y' ]
+            else:
+                self.log.warning("Could not filter COSMIC for SNP as SNP column is not present")
 
         if cancer_types is not None:
-            df = df[ df['Primary histology'].isin(cancer_types) ]
+            df = df[ df['Primary histology'  ].isin(cancer_types) ]
+        if cancer_histology_subtype_1 is not None:
+            df = df[ df['Histology subtype 1'].isin(cancer_histology_subtype_1) ]
+        if cancer_histology_subtype_2 is not None:
+            df = df[ df['Histology subtype 2'].isin(cancer_histology_subtype_2) ]
+        if cancer_histology_subtype_3 is not None:
+            df = df[ df['Histology subtype 3'].isin(cancer_histology_subtype_3) ]
+
+        if cancer_sites is not None:
+            df = df[ df['Primary site'  ].isin(cancer_sites) ]
+        if cancer_site_subtype_1 is not None:
+            df = df[ df['Site subtype 1'].isin(cancer_site_subtype_1) ]
+        if cancer_site_subtype_2 is not None:
+            df = df[ df['Site subtype 2'].isin(cancer_site_subtype_2) ]
+        if cancer_site_subtype_3 is not None:
+            df = df[ df['Site subtype 3'].isin(cancer_site_subtype_3) ]
 
         df = df[ df['Mutation AA'].notna() ]
 
@@ -616,7 +673,15 @@ class COSMIC(DynamicSource, object):
 
         return mutations, out_metadata
 
-    def add_mutations(self, sequence, cancer_types=None, use_alias=None, filter_snps=True, metadata=[]):
+    def add_mutations(self, sequence, cancer_types=None,
+                    cancer_histology_subtype_1=None,
+                    cancer_histology_subtype_2=None,
+                    cancer_histology_subtype_3=None,
+                    cancer_sites=None,
+                    cancer_site_subtype_1=None,
+                    cancer_site_subtype_2=None,
+                    cancer_site_subtype_3=None,
+                    use_alias=None, filter_snps=True, metadata=[]):
 
         if cancer_types is None:
             self.log.info("no cancer type specified; will use all of them")
@@ -626,7 +691,16 @@ class COSMIC(DynamicSource, object):
         else:
             gene_id = sequence.gene_id
 
-        raw_mutations, out_metadata = self._parse_db_file(gene_id, cancer_types=cancer_types, metadata=metadata)
+        raw_mutations, out_metadata = self._parse_db_file(gene_id, cancer_types=cancer_types,
+                                                            cancer_histology_subtype_1=cancer_histology_subtype_1,
+                                                            cancer_histology_subtype_2=cancer_histology_subtype_2,
+                                                            cancer_histology_subtype_3=cancer_histology_subtype_3,
+                                                            cancer_sites=cancer_sites,
+                                                            cancer_site_subtype_1=cancer_site_subtype_1,
+                                                            cancer_site_subtype_2=cancer_site_subtype_2,
+                                                            cancer_site_subtype_3=cancer_site_subtype_3,
+                                                            metadata=metadata)
+
         mutations = [x[2:] for x in raw_mutations]
         unique_mutations = list(set(mutations))
         self.log.info("unique mutations found in %s: %s" % (self.name, ", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1])))))
@@ -668,7 +742,7 @@ class COSMIC(DynamicSource, object):
 
 class PhosphoSite(DynamicSource, object):
     @logger_init
-    def __init__(self, database_files=None):
+    def __init__(self, database_dir, database_files=None):
         description = "PhosphoSite Database"
         super(PhosphoSite, self).__init__(name='PhosphoSite', version='1.0', description=description)
 
@@ -683,8 +757,9 @@ class PhosphoSite(DynamicSource, object):
         self._ptm_suffixes = ['ac', 'm[0-9]', 'ga', 'gl', 'p', 'sm', 'ub']
         self._ptm_suffix_offsets = [-3, -3, -3, -3, -2, -3, -3]
 
+        self._database_dir = database_dir
+
         if database_files is None:
-            self._database_dir = "/data/databases/phosphosite/"
             self._database_files = dict([(i, "%s/%s_site_dataset"%(self._database_dir,i)) for i in self._ptm_types])
 
         else:
@@ -718,9 +793,13 @@ class PhosphoSite(DynamicSource, object):
 
         return sites
 
-    def add_position_properties(self, sequence):
+    def add_position_properties(self, sequence, properties=None):
+
+        if properties is None:
+            properties = self._ptm_types
+
         sites = self._parse_db_file(sequence.gene_id)
-        for ptm_idx,ptm in enumerate(self._ptm_types):
+        for ptm_idx,ptm in enumerate(properties):
 
             p_sites = sites[ptm]
             unique_p_sites = list(set(p_sites))
@@ -1050,7 +1129,7 @@ class ELMPredictions(DynamicSource, object):
             out.append(tmp2)
         return out
 
-    def add_sequence_properties(self, sequence, exclude_elm_classes='{100}', use_alias=None):
+    def add_sequence_properties(self, sequence, exclude_elm_classes='{100}', use_alias='uniprot'):
         self.log.info("adding ELM predictions to sequence ...")
         if use_alias is None:
             data = self._get_prediction(sequence.gene_id)
@@ -1236,12 +1315,16 @@ class gnomAD(DynamicSource, object):
             if len(this_df) == 0:
                 af = None
                 self.log.info("no entry found for %s" % v_str)
-            elif len(this_df) == 1:
-                af = this_df[exac_key[md_type]].values[0]
-                self.log.info("entry found for %s" % v_str)
             elif len(this_df) > 1:
                 self.log.warning("more than one entry for %s! Skipping" % v_str)
                 af = None
+            elif len(this_df) == 1:
+                if np.isnan(this_df[exac_key[md_type]].values[0]):
+                    af = None
+                    self.log.info("nan entry found for %s" % v_str)
+                else:
+                    af = this_df[exac_key[md_type]].values[0]
+                    self.log.info("entry found for %s" % v_str)
             
             mutation.metadata[md_type].append(metadata_classes[md_type](self, af))
 
@@ -1331,8 +1414,7 @@ class MobiDB(DynamicSource):
         self._data_cache = {}
         self._supported_properties = { 'mobidb_disorder_propensity' : self._get_mobidb_disorder_predictions }
                                     
-    def add_position_properties(self, sequence, prop=['mobidb_disorder_propensity'], use_alias=None):
-
+    def add_position_properties(self, sequence, prop=['mobidb_disorder_propensity'], use_alias='uniprot_acc'):
         if type(prop) is str:
             props = [prop]
         else:
@@ -1387,7 +1469,7 @@ class MobiDB(DynamicSource):
             self.log.info("full consensus available")
 
             if len(data['mobidb_consensus']['disorder']['full']) > 0:
-                self.log.warning("More than one prediction found; will use the first")
+                self.log.warning("More than one prediction found for MobiDB; will use the first")
 
             regions = data['mobidb_consensus']['disorder']['full'][0]['regions']
 
@@ -1425,7 +1507,7 @@ class MobiDB(DynamicSource):
         
         return assignments
 
-    def _get_mobidb(self, sequence, use_alias=None):
+    def _get_mobidb(self, sequence, use_alias='uniprot_acc'):
         if use_alias is not None:
             gene_id = sequence.aliases[use_alias]
             self.log.info("using alias %s as gene name" % sequence.aliases[use_alias])
@@ -1447,7 +1529,7 @@ class MobiDB(DynamicSource):
                 self.log.error("Couldn't parse data for %s" % gene_id)
                 return None
         else:
-            self.log.warning("Data requests didn't complete correctly for %s" % gene_id)
+            self.log.warning("Data requests for MobiDB didn't complete correctly for %s" % gene_id)
             return None
 
         return data
@@ -1471,6 +1553,9 @@ class ManualAnnotation(StaticSource):
 
         self._datafile = datafile
         self._df = None
+
+        if "sep" not in parsing_options.keys():
+            parsing_options['sep'] = ';'
 
         try:
             self._parse_datafile(**parsing_options)
@@ -1584,7 +1669,6 @@ class ManualAnnotation(StaticSource):
             this_position.add_property(property_obj)
 
             self.log.info("added %s from row %d" % (row['type'], idx+1))
-
 
     def add_sequence_properties(self, sequence, prop=_supported_sequence_properties):
 
