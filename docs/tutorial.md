@@ -155,12 +155,12 @@ as classified by cBioPortal and `cb.cancer_studies` is the full list of
 studies available on cBioPortal. These list are regular pandas dataframes
 and can be manipulated as such, including saved to csv files or similar.
 
-Alternatively, one can visit the (https://www.cbioportal.org/datasets)[cBioPortal datasets page]
+Alternatively, one can visit the [cBioPortal datasets page](https://www.cbioportal.org/datasets)
 which contains a list of all the available studies. While this list doesn't
 contain a column with study IDs, the web links that link the studies in the
 "Name" column do contain the IDs. For instance, the study named 
 "Breast Invasive Carcinoma (Broad, Nature 2012)" links the page
-https://www.cbioportal.org/study?id=brca_broad - meaning the corresponding
+`https://www.cbioportal.org/study?id=brca_broad` - meaning the corresponding
 study ID is `brca_broad`.
 {% endhint %}
 
@@ -264,7 +264,7 @@ adenocarcinoma. It should be noted that COSMIC supports up to four
 cancer histology types and four cancer histology subtypes and Cancermuts
 allows to filter by any of this. In particular, only the mutations that 
 correspond to *all* the selected criteria are retained. Please see the
-(https://cancer.sanger.ac.uk/cosmic/classification)[COSMIC phenotype classification]
+[COSMIC phenotype classification](https://cancer.sanger.ac.uk/cosmic/classification)
 for the classification that COSMIC uses.
 
 Furthermore, similarly to cBioPortal, we retain some metadata:
@@ -310,7 +310,7 @@ frequency for each specific variant.
 #### REVEL score from MyVariant
 
 We will download scores for the REVEL predictor of pathogenicity from the
-(https://myvariant.info)[MyVariant.info] database. REVEL is associated to
+[MyVariant.info](https://myvariant.info) database. REVEL is associated to
 genomic mutations and not to amino-acid mutations, therefore our amino acid
 mutations need to be annotated with the genomic mutations metadata in order
 for this to be possible. This is performed as detailed above. In order to
@@ -339,7 +339,7 @@ the two scores we are able to gather have the same value.
 #### gnomAD allele frequencies
 
 Similarly, we annotate mutations with their exome or genome allele frequencies
-as found in the (https://www.gnomad.org)[gnomAD database]. This works as you 
+as found in the [gnomAD database](https://www.gnomad.org). This works as you 
 would expect by now:
 
 ```py
