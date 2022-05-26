@@ -74,6 +74,28 @@ the gathered information.
 
 5. Create a visualization from the data frame
 
+## Tutorial script
+
+The steps performed in the following tutorial are also written in a pre-built
+Python script available in the `docs` folder, called `tutorial.py`. In order
+to run it, you should have installed the Cancermuts package and activated the
+virtual environment in which it is installed (see Installation).
+
+
+{% hint style='tip' %}
+Depending on the location of the files required by Cancermuts on your system,
+you will need to edit the hardcoded paths in the script to match what is
+available to you
+{% endint %}
+
+Once that is done, from the `cancermuts/docs` directory, you can just run:
+
+```
+$ python tutorial.py
+```
+
+The result should be a `metatable.csv` output file.
+
 ## Tutorial steps
 
 ### The Sequence object
@@ -240,12 +262,33 @@ In this cases, Cancermuts tries its best to infer it from the study name.
 As before, we first create a COSMIC data source object:
 
 ```py
-cosmic = COSMIC(database_files=['/data/databases/cosmic-v95/CosmicMutantExport.tsv'])
+cosmic = COSMIC(database_files=['/data/databases/cosmic-v95/CosmicMutantExport.tsv'],
+	            database_encoding=['latin1'])
 ```
 
 here the `database_files` argument is a list of strings, each of them is a
-database file to be considered. Usually, the argument for this file would be
-the COSMIC database file that was downloaded as detailed in the Install section.
+database file to be considered. Usually, the argument for this file would
+be the COSMIC database file  that was downloaded as detailed in the Install
+section.
+
+Similarly, `database_encoding` defines the
+text file encoding for every file (it is `latin1` for COSMIC version 95).
+
+{% hint style='danger' %}
+As the default database file is rather large, we recommend running this step on
+a computer with at least 32 GB of free memory. Otherwise, it is possible to
+filter the database file first, for instnace keeping only the rows that
+contain the gene name of interest. In bash this can be done by running:
+
+```
+$ head -n 1 CosmicMutantExport.tsv > header.txt
+$ grep MAP1LC3B CosmicMutantExport.tsv > content.txt
+$ cat header.txt content.txt > COSMIC_map1lc3b.csv
+$ rm header.txt content.txt
+```
+
+and then using the resulting file as the database file
+{% endhint %}
 
 We can then add mutations from the COSMIC data source:
 
