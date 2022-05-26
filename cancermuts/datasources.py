@@ -333,19 +333,25 @@ class cBioPortal(DynamicSource, object):
 
         responses = []
         mutations = []
-        do_cancer_type = False
 
+        if 'genomic_mutations' in metadata and not 'genomic_coordinates' in metadata:
+            metadata.append('genomic_coordinates')
+
+        do_cancer_type = False
         if 'cancer_type' in metadata:
             out_metadata['cancer_type'] = []
             do_cancer_type = True
+
         do_cancer_study = False
         if 'cancer_study' in metadata:
             out_metadata['cancer_study'] = []
             do_cancer_study = True
+
         do_genomic_coordinates = False
         if 'genomic_coordinates' in metadata:
             out_metadata['genomic_coordinates'] = []
             do_genomic_coordinates = True
+
         do_genomic_mutations = False
         if 'genomic_mutations' in metadata:
             out_metadata['genomic_mutations'] = []
