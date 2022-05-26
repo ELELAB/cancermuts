@@ -1474,7 +1474,7 @@ class MobiDB(DynamicSource):
         
         return assignments
 
-    def _get_mobidb(self, sequence, use_alias='uniprot'):
+    def _get_mobidb(self, sequence, use_alias='uniprot_acc'):
         if use_alias is not None:
             gene_id = sequence.aliases[use_alias]
             self.log.info("using alias %s as gene name" % sequence.aliases[use_alias])
