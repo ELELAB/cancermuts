@@ -616,3 +616,29 @@ We can then verify:
 [<SequenceProperty Structure from Manual annotations from test.csv, positions 30,31,32,33,34,35,36,37,38,39,40>]
 ```
 
+## Generating the final table
+
+Once the Sequence object has been annotated with the desired data and metadata
+we can generate a summary table containing all the information. This is done using
+the Table module:
+
+```py
+from cancermuts.table import Table
+
+tbl = Table()
+
+# generate pandas data frame
+df = tbl.to_dataframe(seq)
+```
+
+We can then manipulate the dataframe as we see fit, e.g. by saving it
+as a csv file:
+
+```py
+# save pandas dataframe as CSV
+mt = Table()
+df = mt.to_dataframe(seq)
+df.to_csv("metatable.csv")
+```
+
+
