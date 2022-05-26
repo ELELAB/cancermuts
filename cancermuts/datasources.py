@@ -180,6 +180,14 @@ class cBioPortal(DynamicSource, object):
         self._mut_regexp = '[A-Z][0-9]+[A-Z]$'
         self._mut_prog = re.compile(self._mut_regexp)
 
+    @property
+    def cancer_types(self):
+        return self._cancer_types
+
+    @property
+    def cancer_studies(self):
+        return self._cache_cancer_studies
+
     def add_mutations(self, sequence, metadata=[], mainisoform=1, mapisoform=None):
         mutations, out_metadata = self._get_profile_data(sequence.aliases['entrez'], metadata=metadata, mainisoform=mainisoform, mapisoform=mapisoform)
         unique_mutations = list(set(mutations))
@@ -222,13 +230,13 @@ class cBioPortal(DynamicSource, object):
 
     def _get_cancer_types(self):
         self.log.info("fetching cancer types")
-        if True:
+        try:
             result = self._client.Cancer_Types.getAllCancerTypesUsingGET().result()
-        else:
+        except:
             self.log.error("failed retrieving cancer types")
             self._cancer_types = None
 
-        return pd.DataFrame(dict(
+        self._cancer_types = pd.DataFrame(dict(
             [ (attr, [ getattr(entry, attr) for entry in result ]) for attr in dir(result[0]) ]))
  
     def _get_cancer_studies(self, cancer_studies=None):
@@ -366,15 +374,19 @@ class cBioPortal(DynamicSource, object):
         cancer_study_isoform = 1
 
         if do_cancer_type:
-            if cancer_type is not None:
+            if cancer_type_id is None:
+                 self.log.warning("cancer type ID not found - cancer type ID will be inferred from study ID")
+                 cancer_type_id = cancer_study_id.split('_')[0]
+
+            if cancer_type is None:
                 try:
                     cancer_type = self._cancer_types[ self._cancer_types['cancerTypeId'] == cancer_type_id ]
                     if len(cancer_type) != 1:
                         raise KeyError
-                    cancer_type = cancer_type.values[0, 'name']
+                    cancer_type = cancer_type.values[0][2]
                 except KeyError:
-                    #self.log.warning("cancer type for %s not found - cancer type ID will be used instead" % cancer_type_id)
                     cancer_type = cancer_type_id
+                    self.log.warning("cancer type for %s not found - cancer type ID will be used instead" % cancer_type_id)
 
         this_profiles = self._cache_genetic_profiles[ self._cache_genetic_profiles['studyId'] == cancer_study_id ]
         cancer_study_mutation_ids     = this_profiles[ this_profiles['molecularAlterationType'] == 'MUTATION' ]
