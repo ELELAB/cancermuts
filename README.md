@@ -14,7 +14,5 @@ mutations. At the moment it supports:
     * Phosphosite - post-translational modifications
     * Manually curated annotations from csv files
 
-The gathered data also includes some meta-data and more details.
-
-The results of this process can be written in a meta-table csv file.
+Please see the [Cancermuts documentation on GitLab](https://matteo-tiberti.gitbook.io/cancermuts/) for further details
 
