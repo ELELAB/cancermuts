@@ -476,7 +476,7 @@ class cBioPortal(DynamicSource, object):
 
 class COSMIC(DynamicSource, object):
     @logger_init
-    def __init__(self, database_files=None, database_encoding=None, cancer_type=None):
+    def __init__(self, database_files=None, database_encoding=None):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
 
@@ -486,8 +486,16 @@ class COSMIC(DynamicSource, object):
         self._mut_snv_prog = re.compile(self._mut_snv_regexp)
         self._site_kwd = ['Primary site', 'Site subtype 1', 'Site subtype 2', 'Site subtype 3']
         self._histology_kwd = ['Primary histology', 'Histology subtype 1', 'Histology subtype 2', 'Histology subtype 3']
+        self._use_cols_snp = [  'Gene name',
+                                 'Mutation AA',
+                                 'GRCh',
+                                 'Mutation genome position',
+                                 'Mutation CDS',
+                                 'Mutation strand',
+                                 'SNP',
+                                 'HGVSG' ] + self._site_kwd + self._histology_kwd
+
         self._use_cols = [  'Gene name',
-                            'SNP',
                             'Mutation AA',
                             'GRCh',
                             'Mutation genome position',
@@ -513,17 +521,28 @@ class COSMIC(DynamicSource, object):
             encodings = database_encoding
 
         for fi, f in enumerate(self._database_files):
+            self.log.info("Parsing database file %s ..." % f)
             try:
-                self.log.info("Parsing database file %s ..." % f)
-                dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols, encoding=encodings[fi]) )
-            except:
-                self.log.error("Couldn't parse database file {}".format(fi))
-                self._df = None
-                return
+                dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_snp, encoding=encodings[fi]) )
+            except ValueError:
+                try:
+                    dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols, encoding=encodings[fi]) )
+                except ValueError:
+                    self.log.error("Couldn't parse database file {}".format(fi))
+                    self._df = None
+                    return
 
         self._df = pd.concat(dataframes, ignore_index=True, sort=False)
 
-    def _parse_db_file(self, gene_id, cancer_types=None, metadata=[], filter_snps=True):
+    def _parse_db_file(self, gene_id, cancer_types=None,
+                       cancer_histology_subtype_1=None,
+                       cancer_histology_subtype_2=None,
+                       cancer_histology_subtype_3=None,
+                       cancer_sites=None,
+                       cancer_site_subtype_1=None,
+                       cancer_site_subtype_2=None,
+                       cancer_site_subtype_3=None,
+                       metadata=[], filter_snps=True):
 
         mutations = []
 
@@ -550,10 +569,28 @@ class COSMIC(DynamicSource, object):
         df = self._df[ self._df['Gene name'] == gene_id ]
 
         if filter_snps:
-            df = df[ df['SNP'] != 'y' ]
+            if 'SNP' in df.columns:
+                df = df[ df['SNP'] != 'y' ]
+            else:
+                self.log.warning("Could not filter COSMIC for SNP as SNP column is not present")
 
         if cancer_types is not None:
-            df = df[ df['Primary histology'].isin(cancer_types) ]
+            df = df[ df['Primary histology'  ].isin(cancer_types) ]
+        if cancer_histology_subtype_1 is not None:
+            df = df[ df['Histology subtype 1'].isin(cancer_histology_subtype_1) ]
+        if cancer_histology_subtype_2 is not None:
+            df = df[ df['Histology subtype 2'].isin(cancer_histology_subtype_2) ]
+        if cancer_histology_subtype_3 is not None:
+            df = df[ df['Histology subtype 3'].isin(cancer_histology_subtype_3) ]
+
+        if cancer_sites is not None:
+            df = df[ df['Primary site'  ].isin(cancer_sites) ]
+        if cancer_site_subtype_1 is not None:
+            df = df[ df['Site subtype 1'].isin(cancer_site_subtype_1) ]
+        if cancer_site_subtype_2 is not None:
+            df = df[ df['Site subtype 2'].isin(cancer_site_subtype_2) ]
+        if cancer_site_subtype_3 is not None:
+            df = df[ df['Site subtype 3'].isin(cancer_site_subtype_3) ]
 
         df = df[ df['Mutation AA'].notna() ]
 
@@ -602,7 +639,15 @@ class COSMIC(DynamicSource, object):
 
         return mutations, out_metadata
 
-    def add_mutations(self, sequence, cancer_types=None, use_alias=None, filter_snps=True, metadata=[]):
+    def add_mutations(self, sequence, cancer_types=None,
+                    cancer_histology_subtype_1=None,
+                    cancer_histology_subtype_2=None,
+                    cancer_histology_subtype_3=None,
+                    cancer_sites=None,
+                    cancer_site_subtype_1=None,
+                    cancer_site_subtype_2=None,
+                    cancer_site_subtype_3=None,
+                    use_alias=None, filter_snps=True, metadata=[]):
 
         if cancer_types is None:
             self.log.info("no cancer type specified; will use all of them")
@@ -612,7 +657,16 @@ class COSMIC(DynamicSource, object):
         else:
             gene_id = sequence.gene_id
 
-        raw_mutations, out_metadata = self._parse_db_file(gene_id, cancer_types=cancer_types, metadata=metadata)
+        raw_mutations, out_metadata = self._parse_db_file(gene_id, cancer_types=cancer_types,
+                                                            cancer_histology_subtype_1=cancer_histology_subtype_1,
+                                                            cancer_histology_subtype_2=cancer_histology_subtype_2,
+                                                            cancer_histology_subtype_3=cancer_histology_subtype_3,
+                                                            cancer_sites=cancer_sites,
+                                                            cancer_site_subtype_1=cancer_site_subtype_1,
+                                                            cancer_site_subtype_2=cancer_site_subtype_2,
+                                                            cancer_site_subtype_3=cancer_site_subtype_3,
+                                                            metadata=metadata)
+
         mutations = [x[2:] for x in raw_mutations]
         unique_mutations = list(set(mutations))
         self.log.info("unique mutations found in %s: %s" % (self.name, ", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1])))))
