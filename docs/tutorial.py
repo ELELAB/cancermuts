@@ -103,7 +103,7 @@ elm = ELMPredictions()
 elm.add_sequence_properties(seq,
 			    exclude_elm_classes="MOD_.")
 
-print(seq.properties[0:5])
+print(seq.properties)
 print(seq.properties['linear_motif'][0].type)
 
 # save table
