@@ -65,7 +65,7 @@ and links together all the available annotations
 2. Download mutations and add them to the sequence object. This is done by
 appropriately using other data sources
 
-3. Download annotations for either mutations (these are called metadata) or 
+3. Download annotations for either mutations (these are called metadata) or
 position or sequence properties (these are called properties). This is once
 again done by using appropriate data sources for the task.
 
@@ -85,7 +85,7 @@ the analysis and links together all the information we are going to collect. In 
 create it we use a data source class for UniProt from which we can downlaod protein sequences.
 This is only source for sequences available at the moment, more can be added in the future.
 
-To download the main UniProt sequence, you will need the corresponding HGCN symbol only. 
+To download the main UniProt sequence, you will need the corresponding HGCN symbol only.
 The UniProt object automatically identifies the most likely UniProt ID corresponding to the
 gene name. Alternatively, it is possible to provide the UniProt ID manually as an option.
 
@@ -94,7 +94,7 @@ This is done as follows:
 
 ```py
 # import the UniProt data source class
-from cancermuts.datasources import UniProt 
+from cancermuts.datasources import UniProt
 
 # create the corresponding uniprot object
 up = UniProt()
@@ -128,7 +128,9 @@ from cancermuts.datasources import cBioPortal, COSMIC
 
 For cBioPortal, we first create the respective source object:
 
+```py
 cb = cBioPortal()
+```
 
 In this case, cBioPortal will gather mutations from all cancer studies available
 in cBioPortal.
@@ -171,8 +173,8 @@ cb.add_mutations(seq)
 
 It is possible to downloaded metadata about the downloaded aminoacid mutations
 as well by using the `metadata` argument of `add_mutations`, which supports
-a list of strings, one for each metadata type. By default no metadata are added.
-Supported metadata for cBioPortal are:
+a list of strings, one for each metadata type. This is usually recommended.
+By default no metadata are added. Supported metadata for cBioPortal are:
 
 * `cancer_type`: type of cancer the mutation was found in, depending on the study
 * `cancer_study`: cBioPortal study the mutation was found in
@@ -238,7 +240,7 @@ In this cases, Cancermuts tries its best to infer it from the study name.
 As before, we first create a COSMIC data source object:
 
 ```py
-cosmic = COSMIC(database_files=['/data/user/teo/test_cancermuts/cancermuts/lc3b.csv'])
+cosmic = COSMIC(database_files=['/data/databases/cosmic-v95/CosmicMutantExport.tsv'])
 ```
 
 here the `database_files` argument is a list of strings, each of them is a
@@ -383,7 +385,7 @@ order/disorder propensity from MobiDB.
 We import the relative data source class, similarly as what done previously:
 
 ```py
-from cancermuts.datasources import Phosphosite, MobiDB
+from cancermuts.datasources import PhosphoSite, MobiDB
 ```
 
 #### Post-translational modifications with phosphosite
@@ -421,11 +423,11 @@ that we want to be annotated, as follows:
 | Keyword | Description |
 | ------- | ----------- |
 | `acetylation` | Acetylation | 
-| `methylation` | Methylation
+| `methylation` | Methylation |
 | `O-GalNAc` | O-linked β-N-acetylglucosamine |
 | `O-GlcNAc` | O-linked α-N-acetylgalactosamine |
 | `phosphorylation` | Phosphorylation |
-| `sumoylation` | Sumoylation
+| `sumoylation` | Sumoylation |
 | `ubiquitination` | Ubiquitination |
 
 So, for instance:
@@ -527,15 +529,90 @@ We can further add annotations manually to our dataset. This is for data that
 is not available in the databases as of yet, but is useful to have annotated
 in the pipeline to have a complete picture. This can be done by using a custom
 CSV file as data source. The CSV can contain different types and levels of
-information. The file should have the following columns:
+information. The file should have the following columns, separated by `;`:
 
 | Column | Description |
 | ------ | ----------- |
-| `name` | name that is given to this feature () | 
+| `name` | name that is given to this feature. It can be any string. | 
 | `site` | position of this feature; see below | 
 | `type` | type of this feature; see below |
-| `function` | O-linked α-N-acetylgalactosamine |
-| `reference` | Phosphorylation |
+| `function` | function description of this feature or functional annotation; see below |
+| `reference` | reference to the literature for this feature (if any) |
 
+The column format changes depending on the `type`:
 
+* If we want to annotate a new aminoacid substitution, then
+	* type has to be `mutation`
+    * `name` can be any string
+    * `site` needs to be a HGVS-format protein variant specification, e.g.
+     `p.Ala398Tyr`
+    * `function` should be either empty or a HGVS-format single-nucleotide
+    substitution in HGVS format, preposed by 19 or 38 depending on the
+    reference genome assembly (hg19/38). For instance, `38,17:g.7673776G>A`
+
+* If we want to annotate a post-translational modification, then 
+    * `type` should be one of `ptm_phosphorylation`,
+`ptm_ubiquitination`, `ptm_acetylation`, `ptm_sumoylation`, `ptm_nitrosylation`,
+`ptm_methylation`
+    * `name` can be any string
+    * `site` needs to be a single number, e.g. `34`. This is the residue number
+    in the sequence (1-based) on which the PTM is found
+    * `function` can be any string
+    * `reference` can be any string
+
+* If we want to annotate a novel short linear motif, then 
+	* `type` should be `linear_motif`
+	* `site` should be a dash-separated residue range, i.e. `10-25` to signify
+	from residue 10 to 25 in the aminoacid sequence, 1-based, including extremities
+    * `function` can be any string
+    * `reference` can be any string
+
+* If we want to annotate a structured region, then
+	* `type` should be `structure`
+	* `site` should be a dash-separated residue range, i.e. `10-25` to signify
+	from residue 10 to 25 in the aminoacid sequence, 1-based, including extremities
+    * `function` can be any string
+    * `reference` can be any string
+
+For instance, this is a working example of the csv file (named `test.csv`):
+
+```
+name;site;type;function;reference
+asd;p.Met1Ala;mutation;38,17:g.7673776G>A;qwe
+qwe;3;ptm_phosphorylation;asd;qwe
+zxc;10-25;linear_motif;zzz;qqq
+ert;30-40;structure;xxx;ppp
+```
+
+using the CSV file works as you would expect:
+
+```py
+ma = ManualAnnotation('test.csv')
+
+# adds mutations to the seq object
+ma.add_mutations(seq )
+
+# adds PTM annotations to the sequence object
+ma.add_position_properties(seq )
+
+# adds structure or linear motif annotation to the sequence object
+ma.add_sequence_properties(seq )
+```
+
+We can then verify:
+
+```py
+
+>>> seq.positions[0].mutations
+[<Mutation M1A from Manual annotations from test.csv>]
+
+>>> seq.positions[2].properties['ptm_phosphorylation']
+<PositionProperty Phosphorylation Site from Manual annotations from test.csv>
+
+>>> seq.properties['linear_motif']
+[<SequenceProperty Linear motif from Manual annotations from test.csv, positions 10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25>]
+
+>>> seq.properties['structure']
+[<SequenceProperty Structure from Manual annotations from test.csv, positions 30,31,32,33,34,35,36,37,38,39,40>]
+```
 
