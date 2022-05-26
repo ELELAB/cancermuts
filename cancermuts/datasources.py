@@ -27,6 +27,7 @@ import time
 import requests as rq
 from bioservices.uniprot import UniProt as bsUniProt
 from Bio.PDB.Polypeptide import three_to_one
+import numpy as np
 import pandas as pd
 from .core import Sequence, Mutation
 from .properties import *
@@ -1281,12 +1282,16 @@ class gnomAD(DynamicSource, object):
             if len(this_df) == 0:
                 af = None
                 self.log.info("no entry found for %s" % v_str)
-            elif len(this_df) == 1:
-                af = this_df[exac_key[md_type]].values[0]
-                self.log.info("entry found for %s" % v_str)
             elif len(this_df) > 1:
                 self.log.warning("more than one entry for %s! Skipping" % v_str)
                 af = None
+            elif len(this_df) == 1:
+                if np.isnan(this_df[exac_key[md_type]].values[0]):
+                    af = None
+                    self.log.info("nan entry found for %s" % v_str)
+                else:
+                    af = this_df[exac_key[md_type]].values[0]
+                    self.log.info("entry found for %s" % v_str)
             
             mutation.metadata[md_type].append(metadata_classes[md_type](self, af))
 
