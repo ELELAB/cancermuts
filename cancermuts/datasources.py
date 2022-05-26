@@ -1325,8 +1325,8 @@ class gnomAD(DynamicSource, object):
                 else:
                     af = this_df[exac_key[md_type]].values[0]
                     self.log.info("entry found for %s" % v_str)
-            
-            mutation.metadata[md_type].append(metadata_classes[md_type](self, af))
+            if af is not None:
+                mutation.metadata[md_type].append(metadata_classes[md_type](self, af))
 
     def _get_gnomad_data(self, gene_id, reference_genome, dataset):
         headers = { "content-type": "application/json" }
