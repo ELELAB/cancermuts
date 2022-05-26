@@ -74,6 +74,28 @@ the gathered information.
 
 5. Create a visualization from the data frame
 
+## Tutorial script
+
+The steps performed in the following tutorial are also written in a pre-built
+Python script available in the `docs` folder, called `tutorial.py`. In order
+to run it, you should have installed the Cancermuts package and activated the
+virtual environment in which it is installed (see Installation).
+
+
+{% hint style='tip' %}
+Depending on the location of the files required by Cancermuts on your system,
+you will need to edit the hardcoded paths in the script to match what is
+available to you
+{% endint %}
+
+Once that is done, from the `cancermuts/docs` directory, you can just run:
+
+```
+$ python tutorial.py
+```
+
+The result should be a `metatable.csv` output file.
+
 ## Tutorial steps
 
 ### The Sequence object
@@ -94,22 +116,24 @@ This is done as follows:
 
 ```py
 # import the UniProt data source class
-from cancermuts.datasources import UniProt
+>>> from cancermuts.datasources import UniProt
 
 # create the corresponding uniprot object
-up = UniProt()
+>>> up = UniProt()
 
 # get the sequence for the protein
-seq = up.get_sequence('MAP1LC3B')
+>>> seq = up.get_sequence('MAP1LC3B')
 
 # alternatively, we can specifically ask for a Uniprot ID
-seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
+>>> seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
 
 # this prints the downloaded protein sequence
-print(seq.sequence)
+>>> print(seq.sequence)
+MPSEKTFKQRRTFEQRVEDVRLIREQHPTKIPVIIERYKGEKQLPVLDKTKFLVPDHVNMSELIKIIRRRLQLNANQAFFLLVNGHSMVSVSTPISEVYESEKDEDGFLYMVYASQETFGMKLSV
 
 # the seq.positions attribute is an ordered list of the protein positions:
-seq.positions[0:3]
+>>> seq.positions[0:3]
+
 ```
 
 ### Collecting cancer mutations
@@ -121,7 +145,7 @@ We first import the required datasource classes for them:
 
 ```py
 # import data sources classes
-from cancermuts.datasources import cBioPortal, COSMIC
+>>> from cancermuts.datasources import cBioPortal, COSMIC
 ```
 
 #### cBioPortal
@@ -129,7 +153,7 @@ from cancermuts.datasources import cBioPortal, COSMIC
 For cBioPortal, we first create the respective source object:
 
 ```py
-cb = cBioPortal()
+>>> cb = cBioPortal()
 ```
 
 In this case, cBioPortal will gather mutations from all cancer studies available
@@ -140,7 +164,7 @@ if we are interested in e.g. a certain cancer type or some other specific studie
 using the cBioPortal study identifier:
 
 ```py
-cb = cBioPortal(cancer_studies=['coadread_dfci_2016', 
+>>> cb = cBioPortal(cancer_studies=['coadread_dfci_2016', 
 	                            'coadread_genentech',
 	                            'coadread_tcga_pan_can_atlas_2018'])
 ```
@@ -168,7 +192,7 @@ Finally, we use this object to gather the mutations from the selected cancer
 studies and add them to our Sequence object we created earlier:
 
 ```py
-cb.add_mutations(seq)
+>>> cb.add_mutations(seq)
 ```
 
 It is possible to downloaded metadata about the downloaded aminoacid mutations
@@ -185,7 +209,7 @@ By default no metadata are added. Supported metadata for cBioPortal are:
 So for instance:
 
 ```py
-cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
+>>> cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
 ```
 
 {% hint style='info' %}
@@ -201,29 +225,29 @@ respective residues. In this case, Cancermuts identified only three
 mutations for cBioPortal:
 
 ```py
-In [27]: print(seq.positions[38].mutations)
+>>> print(seq.positions[38].mutations)
 [<Mutation K39R from cBioPortal>]
 
-In [28]: print(seq.positions[64].mutations)
+>>> print(seq.positions[64].mutations)
 [<Mutation K65E from cBioPortal>]
 
-In [29]: print(seq.positions[122].mutations)
+>>> print(seq.positions[122].mutations)
 [<Mutation L123S from cBioPortal>]
 ```
 
 Each mutation is recorded in a Mutation object that can be further explored:
 
 ```py
-In [31]: seq.positions[64].mutations
+>>> seq.positions[64].mutations
 [<Mutation K65E from cBioPortal>]
 
-In [9]: seq.positions[64].mutations[0].sources
+>>> seq.positions[64].mutations[0].sources
 [<cancermuts.datasources.cBioPortal at 0x1510a0455c50>]
 
-In [32]: seq.positions[64].mutations[0].mutated_residue_type
+>>> seq.positions[64].mutations[0].mutated_residue_type
 'E'
 
-In [12]: seq.positions[38].mutations[0].metadata
+>>> seq.positions[38].mutations[0].metadata
 {'cancer_type': [<CancerType Colorectal Adenocarcinoma from cBioPortal>],
  'cancer_study': [<CancerStudy coadread_genentech from cBioPortal>],
  'genomic_mutations': [<GenomicMutation hg19,16:g.87435877A>G from cBioPortal>],
@@ -240,12 +264,33 @@ In this cases, Cancermuts tries its best to infer it from the study name.
 As before, we first create a COSMIC data source object:
 
 ```py
-cosmic = COSMIC(database_files=['/data/databases/cosmic-v95/CosmicMutantExport.tsv'])
+cosmic = COSMIC(database_files=['/data/databases/cosmic-v95/CosmicMutantExport.tsv'],
+	            database_encoding=['latin1'])
 ```
 
 here the `database_files` argument is a list of strings, each of them is a
-database file to be considered. Usually, the argument for this file would be
-the COSMIC database file that was downloaded as detailed in the Install section.
+database file to be considered. Usually, the argument for this file would
+be the COSMIC database file  that was downloaded as detailed in the Install
+section.
+
+Similarly, `database_encoding` defines the
+text file encoding for every file (it is `latin1` for COSMIC version 95).
+
+{% hint style='danger' %}
+As the default database file is rather large, we recommend running this step on
+a computer with at least 32 GB of free memory. Otherwise, it is possible to
+filter the database file first, for instnace keeping only the rows that
+contain the gene name of interest. In bash this can be done by running:
+
+```
+$ head -n 1 CosmicMutantExport.tsv > header.txt
+$ grep MAP1LC3B CosmicMutantExport.tsv > content.txt
+$ cat header.txt content.txt > COSMIC_map1lc3b.csv
+$ rm header.txt content.txt
+```
+
+and then using the resulting file as the database file
+{% endhint %}
 
 We can then add mutations from the COSMIC data source:
 
@@ -283,14 +328,14 @@ this newfound mutation. We see now that the details obtained by both cBioPortal
 and COSMIC are present:
 
 ```py
-In [13]: seq.positions[64].mutations[0]
+>>> seq.positions[64].mutations[0]
 <Mutation K65E from cBioPortal,COSMIC>
 
-In [14]: seq.positions[64].mutations[0].sources
+>>> seq.positions[64].mutations[0].sources
 [<cancermuts.datasources.cBioPortal at 0x1510a0455c50>,
  <cancermuts.datasources.COSMIC at 0x15109ff10050>]
 
-In [15]: seq.positions[64].mutations[0].metadata
+>>> seq.positions[64].mutations[0].metadata
 {'cancer_type': [<CancerType Colorectal Adenocarcinoma from cBioPortal>],
  'cancer_study': [<CancerStudy coadread_genentech from cBioPortal>],
  'genomic_mutations': [<GenomicMutation hg19,16:g.87435877A>G from cBioPortal>,
@@ -318,17 +363,17 @@ download the associated REVEL score, we can use the appropriate data source
 class:
 
 ```py
-from cancermuts.datasources import MyVariant
+>>> from cancermuts.datasources import MyVariant
 
-mv = MyVariant()
-mv.add_metadata(seq)
+>>> mv = MyVariant()
+>>> mv.add_metadata(seq)
 ```
 
 we can check that the mutations have been annotated with the REVEL score:
 
 ```py
-seq.positions[64].mutations[0].metadata['revel_score']
-Out[23]: [<DbnsfpRevel, 0.314>, <DbnsfpRevel, 0.314>]
+>>> seq.positions[64].mutations[0].metadata['revel_score']
+[<DbnsfpRevel, 0.314>, <DbnsfpRevel, 0.314>]
 ```
 
 In this case we see the same score twice, as the mutation was previously
@@ -343,10 +388,10 @@ as found in the [gnomAD database](https://www.gnomad.org). This works as you
 would expect by now:
 
 ```py
-from cancermuts.datasources import gnomAD
+>>> from cancermuts.datasources import gnomAD
 
-gnomad = gnomAD(version='2.1')
-gnomad.add_metadata(seq, md_type=['gnomad_exome_allele_frequency',
+>>> gnomad = gnomAD(version='2.1')
+>>> gnomad.add_metadata(seq, md_type=['gnomad_exome_allele_frequency',
 	                              'gnomad_genome_allele_frequency'])
 ```
 
@@ -363,11 +408,11 @@ is available.
 Finally we can check the downloaded metadata:
 
 ```py
-In [31]: seq.positions[64].mutations[0].metadata['gnomad_exome_allele_frequency']
+>>> seq.positions[64].mutations[0].metadata['gnomad_exome_allele_frequency']
 [<gnomADExomeAlleleFrequency, 0.000028>,
  <gnomADExomeAlleleFrequency, 0.000028>]
 
-In [32]: seq.positions[64].mutations[0].metadata['gnomad_genome_allele_frequency']
+>>> seq.positions[64].mutations[0].metadata['gnomad_genome_allele_frequency']
 [<gnomADGenomeAlleleFrequency, nan>,
  <gnomADGenomeAlleleFrequency, nan>]
 ```
@@ -398,7 +443,7 @@ We first create the Phosphosite data source object. We will need to supply the
 location of the database files:
 
 ```py
-ps = PhosphoSite('/data/databases/phosphosite/')
+>>> ps = PhosphoSite('/data/databases/phosphosite/')
 ```
 
 by default, Cancermuts expect the file names in the database to be the default
@@ -407,9 +452,9 @@ modifications by supplying the `database_files` argument, which should be a
 dictionary associating each PTM to a file name:
 
 ```py
-my_databse_files = {  'acetylation'     : 'my_Acetylation_site_dataset',
-                      'methylation'     : 'my_Methylation_site_dataset',
-                      ... }
+>>> my_databse_files = {  'acetylation'     : 'my_Acetylation_site_dataset',
+                          'methylation'     : 'my_Methylation_site_dataset',
+                           ... }
 ```
 
 the keys of the dictionaries should be the options supported in the `properties`
@@ -433,14 +478,14 @@ that we want to be annotated, as follows:
 So, for instance:
 
 ```py
-ps.add_position_properties(seq, 
-	                       properties=['phosphorylation', 'ubiquitination'])
+>>> ps.add_position_properties(seq, 
+	                           properties=['phosphorylation', 'ubiquitination'])
 ```
 
 However, in this case we will consider all of them:
 
 ```py
-ps.add_position_properties(seq)
+>>> ps.add_position_properties(seq)
 ```
 
 Once again, we can check the result:
@@ -459,8 +504,8 @@ We use the MobiDB website to predict structured or unstructured regions in our
 protein of interest. This works similarly as before:
 
 ```py
-mdb = MobiDB()
-mdb.add_position_properties(seq)
+>>> mdb = MobiDB()
+>>> mdb.add_position_properties(seq)
 ```
 
 we can then check the annotation as done previously:
@@ -482,7 +527,7 @@ We further annotate properties to the sequence, i.e. properties that cover
 multiple residues. We first import the respective classes:
 
 ```py
-from cancermuts.datasources import ELMPredictions
+>>> from cancermuts.datasources import ELMPredictions
 ```
 
 #### Predictions of short linear motifs from ELM
@@ -491,9 +536,9 @@ We annotate the sequence using predictions for short linear motifs from the
 [Eukaryotic Linear Motif](http://elm.eu.org) database:
 
 ```py
-elm = ELMPredictions()
-elm.add_sequence_properties(seq,
-							exclude_elm_classes="MOD_.")
+>>> elm = ELMPredictions()
+>>> elm.add_sequence_properties(seq,
+	                            exclude_elm_classes="MOD_.")
 ```
 
 here `exclude_elm_classes` is a single regular expression that allows to remove
@@ -587,16 +632,16 @@ ert;30-40;structure;xxx;ppp
 using the CSV file works as you would expect:
 
 ```py
-ma = ManualAnnotation('test.csv')
+>>> ma = ManualAnnotation('test.csv')
 
 # adds mutations to the seq object
-ma.add_mutations(seq )
+>>> ma.add_mutations(seq)
 
 # adds PTM annotations to the sequence object
-ma.add_position_properties(seq )
+>>> ma.add_position_properties(seq)
 
 # adds structure or linear motif annotation to the sequence object
-ma.add_sequence_properties(seq )
+>>> ma.add_sequence_properties(seq)
 ```
 
 We can then verify:
@@ -623,12 +668,12 @@ we can generate a summary table containing all the information. This is done usi
 the Table module:
 
 ```py
-from cancermuts.table import Table
+>>> from cancermuts.table import Table
 
-tbl = Table()
+>>> tbl = Table()
 
 # generate pandas data frame
-df = tbl.to_dataframe(seq)
+>>> df = tbl.to_dataframe(seq)
 ```
 
 We can then manipulate the dataframe as we see fit, e.g. by saving it
@@ -636,9 +681,9 @@ as a csv file:
 
 ```py
 # save pandas dataframe as CSV
-mt = Table()
-df = mt.to_dataframe(seq)
-df.to_csv("metatable.csv")
+>>> mt = Table()
+>>> df = mt.to_dataframe(seq)
+>>> df.to_csv("metatable.csv")
 ```
 
 
