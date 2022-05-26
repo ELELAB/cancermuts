@@ -1381,7 +1381,8 @@ class MobiDB(DynamicSource):
         self._data_cache = {}
         self._supported_properties = { 'mobidb_disorder_propensity' : self._get_mobidb_disorder_predictions }
                                     
-    def add_position_properties(self, sequence, prop=['mobidb_disorder_propensity'], use_alias='uniprot_acc'):
+    def add_position_properties(self, sequence, prop=['mobidb_disorder_propensity'], use_alias=None):
+
         if type(prop) is str:
             props = [prop]
         else:
@@ -1436,7 +1437,7 @@ class MobiDB(DynamicSource):
             self.log.info("full consensus available")
 
             if len(data['mobidb_consensus']['disorder']['full']) > 0:
-                self.log.warning("More than one prediction found for MobiDB; will use the first")
+                self.log.warning("More than one prediction found; will use the first")
 
             regions = data['mobidb_consensus']['disorder']['full'][0]['regions']
 
@@ -1474,7 +1475,7 @@ class MobiDB(DynamicSource):
         
         return assignments
 
-    def _get_mobidb(self, sequence, use_alias='uniprot'):
+    def _get_mobidb(self, sequence, use_alias=None):
         if use_alias is not None:
             gene_id = sequence.aliases[use_alias]
             self.log.info("using alias %s as gene name" % sequence.aliases[use_alias])
@@ -1496,7 +1497,7 @@ class MobiDB(DynamicSource):
                 self.log.error("Couldn't parse data for %s" % gene_id)
                 return None
         else:
-            self.log.warning("Data requests for MobiDB didn't complete correctly for %s" % gene_id)
+            self.log.warning("Data requests didn't complete correctly for %s" % gene_id)
             return None
 
         return data
