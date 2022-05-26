@@ -708,7 +708,7 @@ class COSMIC(DynamicSource, object):
 
 class PhosphoSite(DynamicSource, object):
     @logger_init
-    def __init__(self, database_files=None):
+    def __init__(self, database_dir, database_files=None):
         description = "PhosphoSite Database"
         super(PhosphoSite, self).__init__(name='PhosphoSite', version='1.0', description=description)
 
@@ -723,8 +723,9 @@ class PhosphoSite(DynamicSource, object):
         self._ptm_suffixes = ['ac', 'm[0-9]', 'ga', 'gl', 'p', 'sm', 'ub']
         self._ptm_suffix_offsets = [-3, -3, -3, -3, -2, -3, -3]
 
+        self._database_dir = database_dir
+
         if database_files is None:
-            self._database_dir = "/data/databases/phosphosite/"
             self._database_files = dict([(i, "%s/%s_site_dataset"%(self._database_dir,i)) for i in self._ptm_types])
 
         else:
@@ -758,9 +759,13 @@ class PhosphoSite(DynamicSource, object):
 
         return sites
 
-    def add_position_properties(self, sequence):
+    def add_position_properties(self, sequence, properties=None):
+
+        if properties is None:
+            properties = self._ptm_types
+
         sites = self._parse_db_file(sequence.gene_id)
-        for ptm_idx,ptm in enumerate(self._ptm_types):
+        for ptm_idx,ptm in enumerate(properties):
 
             p_sites = sites[ptm]
             unique_p_sites = list(set(p_sites))
