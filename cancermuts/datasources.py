@@ -1521,6 +1521,9 @@ class ManualAnnotation(StaticSource):
         self._datafile = datafile
         self._df = None
 
+        if "sep" not in parsing_options.keys():
+            parsing_options['sep'] = ';'
+
         try:
             self._parse_datafile(**parsing_options)
         except pd.errors.ParserError:
@@ -1633,7 +1636,6 @@ class ManualAnnotation(StaticSource):
             this_position.add_property(property_obj)
 
             self.log.info("added %s from row %d" % (row['type'], idx+1))
-
 
     def add_sequence_properties(self, sequence, prop=_supported_sequence_properties):
 
