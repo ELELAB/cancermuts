@@ -89,6 +89,7 @@ class Table:
             'PP4 EVH1-binding docking motifs':'PP4 EVH1',
             'PTB ligand':'PTB',
             'PDZ ligands':'PDZ',
+            'PDZ domain ligands':'PDZ',
             'Pex14 ligand motif':'Pex14',
             'RIR motif':'RIR',
             'SCF ubiquitin ligase binding Phosphodegrons':'SCF',
@@ -113,13 +114,14 @@ class Table:
             'GTPase-binding domain (GBD) ligand':'GTPase'}
 
     ptm_colors = defaultdict(lambda: 'black',
-                {   'ptm_phosphorylation' : 'red',
+                {   'ptm_acetylation'     : 'grey',
                     'ptm_methylation'     : 'darkgreen',
+                    'ptm_ogalnac'         : 'orange',
+                    'ptm_glcnac'          : 'darkorange',
+                    'ptm_phosphorylation' : 'red',
                     'ptm_ubiquitination'  : 'blue',
-                    'ptm_cleavage'        : 'purple',
-                    'ptm_nitrosylation'   : 'orange',
-                    'ptm_acetylation'     : 'grey',
-                    'ptm_sumoylation'     : 'lightblue'    })
+                    'ptm_sumoylation'     : 'lightblue',
+                        })
 
     y_ptm = 1.02
 
@@ -455,6 +457,34 @@ class Table:
                 pos[1] = df_i_range[-1]
             ax.add_patch(patches.Rectangle((pos[0],0), pos[1]-pos[0], 1.0, alpha=0.3, color="black", hatch='...', fill=False))
 
+    def _plot_structures_mobidb(self, ax, df, df_i):
+        all_structs = []
+
+        df_e = df [ df[ self.headers['mobidb_disorder_propensity'] ].notnull() ][ self.headers['mobidb_disorder_propensity']]
+        df_e = filter(lambda x: x != 'S', df_e)
+
+        df_i_pos = sorted(list(set(df_i[self.headers['position']])))
+        df_i_range = (df_i_pos[0], df_i_pos[-1])
+
+        from itertools import groupby
+        from operator import itemgetter
+
+        ranges =[]
+
+        for k,g in groupby(enumerate(df_i_pos),lambda x:x[0]-x[1]):
+            group = (map(itemgetter(1),g))
+            group = list(map(int,group))
+            ranges.append((group[0],group[-1]))
+
+        all_structs = [(r[0], r[-1]) for r in ranges]
+
+        for pos in all_structs:
+            if pos[0] < df_i_range[0]:
+                pos[0] = df_i_range[0]
+            if pos[1] > df_i_range[-1]:
+                pos[1] = df_i_range[-1]
+            ax.add_patch(patches.Rectangle((pos[0],0), pos[1]-pos[0], 1.0, alpha=0.3, color="black", hatch='...', fill=False))
+
     def plot_metatable( self,
                         df,
                         fname=None,
@@ -464,6 +494,7 @@ class Table:
                         elm=True,
                         ptms=True,
                         structure=True,
+                        structure_mobidb=True,
                         ptm_types=None,
                         mutations_revel=True,
                         revel_not_annotated=0.0,
@@ -538,6 +569,9 @@ class Table:
 
             if structure:
                 self._plot_structures(ax, df, df_i)
+
+            if structure_mobidb:
+                self._plot_structures_mobidb(ax, df, df_i)
 
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.6)
