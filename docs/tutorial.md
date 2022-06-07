@@ -686,4 +686,29 @@ as a csv file:
 >>> df.to_csv("metatable.csv")
 ```
 
+## Plotting the content of the final table
 
+Finally, we can use Cancermuts to obtain a graphical representation of the
+final data frame:
+
+```py
+>>> fig, ax = mt.plot_metatable(df, fname='my_table.pdf', section_size=50)
+```
+
+the function returns the figure and axes `Matplotlib` objects relative
+to the figure that is being created. It also saves the final output as the file
+indicated by the `fname` argument in pdf format. The plot is similar to the one
+shown and described in our publication. Different aspects of the plot can
+be customized specifying different arguments, the major ones being:
+
+* the `section_size` arguments control how many protein sequence position are
+described by each section of the plot, meaning it controls how many sections
+are generated. The argument is the number of desired positions
+(e.g. `section_size=50`)
+* several data types can be hidden or shown by changing options to `False`
+(do not show) or `True` (show; default for most cases). These are `mutations`,
+`elm`, `ptms`, `structure`, `structure_mobidb`, `mutations_revel`
+* by default, only ELMs overlapping mutation sites are plotted - this can be
+changed by using argument `mutation_elms_only=False`
+* option `figsize` accepts a tuple of number (width and height) and allows to
+change size and proportion of the output figure (e.g. `figsize=(4,5)`)
