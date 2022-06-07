@@ -494,7 +494,7 @@ class Table:
                         elm=True,
                         ptms=True,
                         structure=True,
-                        structure_mobidb=True,
+                        structure_mobidb=False,
                         ptm_types=None,
                         mutations_revel=True,
                         revel_not_annotated=0.0,
