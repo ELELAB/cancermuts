@@ -117,10 +117,12 @@ class Table:
                 {   'ptm_acetylation'     : 'grey',
                     'ptm_methylation'     : 'darkgreen',
                     'ptm_ogalnac'         : 'orange',
-                    'ptm_glcnac'          : 'darkorange',
+                    'ptm_oglcnac'          : 'darkorange',
                     'ptm_phosphorylation' : 'red',
                     'ptm_ubiquitination'  : 'blue',
                     'ptm_sumoylation'     : 'lightblue',
+                    'ptm_nitrosylation'   : 'cyan',
+                    'ptm_cleavage'        : 'magenta'
                         })
 
     y_ptm = 1.02
