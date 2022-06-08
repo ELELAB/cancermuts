@@ -79,8 +79,9 @@ the gathered information.
 The steps performed in the following tutorial are also written in a pre-built
 Python script available in the `docs` folder, called `tutorial.py`. In order
 to run it, you should have installed the Cancermuts package and activated the
-virtual environment in which it is installed (see Installation).
-
+virtual environment in which it is installed (see Installation). This tutorial
+script follows the tutorial steps and has been written using a single cancer
+type as reference (colorectal cancer).
 
 {% hint style='tip' %}
 Depending on the location of the files required by Cancermuts on your system,
@@ -94,7 +95,19 @@ Once that is done, from the `cancermuts/docs` directory, you can just run:
 $ python tutorial.py
 ```
 
-The result should be a `metatable.csv` output file.
+The result should be a `metatable.csv` output file together with a `my_table.pdf`
+figure.
+
+We also provide a similar example which considers all available cancer types,
+in the `tutorial_pancancer.py` file. It's run in the same way as with the
+other tutorial script:
+
+```
+$ python tutorial_pancancer.py
+```
+
+Similarly as before, the result should be a `metatable_pancancer.csv` output file
+together with a `my_table_pancancer.pdf` figure.
 
 ## Tutorial steps
 
@@ -300,16 +313,24 @@ cosmic.add_mutations(seq,
 					 cancer_site_subtype_1=['colon'],
 					 cancer_types=['carcinoma'],
 					 cancer_histology_subtype_1=['adenocarcinoma'], 
-					 metadata=['genomic_coordinates', 'genomic_mutations', 
-					 			'cancer_site', 'cancer_histology'])
+					 metadata=['genomic_coordinates', 'genomic_mutations',
+					 		   'cancer_site', 'cancer_histology'])
 ```
 
 Here we restrict the search to those mutations that are involved in colon
-adenocarcinoma. It should be noted that COSMIC supports up to four 
-cancer histology types and four cancer histology subtypes and Cancermuts
-allows to filter by any of this. In particular, only the mutations that 
-correspond to *all* the selected criteria are retained. Please see the
-[COSMIC phenotype classification](https://cancer.sanger.ac.uk/cosmic/classification)
+adenocarcinoma. It should be noted that it is possible to search in any
+available cancer types or sites as well, without specifying cancer types
+sites in the `add_mutations` call, for instance:
+
+```py
+cosmic.add_mutations(seq, metadata=['genomic_coordinates', 'genomic_mutations', 
+                                       'cancer_site', 'cancer_histology'])
+```
+
+It should be noted that COSMIC supports up to four cancer histology types
+and four cancer histology subtypes and Cancermuts allows to filter by any of this.
+In particular, only the mutations that  correspond to *all* the selected criteria
+are retained. Please see the [COSMIC phenotype classification](https://cancer.sanger.ac.uk/cosmic/classification)
 for the classification that COSMIC uses.
 
 Furthermore, similarly to cBioPortal, we retain some metadata:
