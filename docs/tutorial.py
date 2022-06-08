@@ -114,3 +114,6 @@ tbl = Table()
 df = tbl.to_dataframe(seq)
 
 df.to_csv("metatable.csv")
+
+tbl.plot_metatable(df, fname='my_table.pdf', section_size=50)
+
