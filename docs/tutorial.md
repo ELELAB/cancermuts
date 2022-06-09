@@ -166,21 +166,16 @@ We first import the required datasource classes for them:
 For cBioPortal, we first create the respective source object:
 
 ```py
->>> cb = cBioPortal()
-```
-
-In this case, cBioPortal will gather mutations from all cancer studies available
-in cBioPortal.
-
-It is possible to specify a set of cancer studies Cancermuts should use instead,
-if we are interested in e.g. a certain cancer type or some other specific studies, 
-using the cBioPortal study identifier:
-
-```py
 >>> cb = cBioPortal(cancer_studies=['coadread_dfci_2016', 
 	                            'coadread_genentech',
 	                            'coadread_tcga_pan_can_atlas_2018'])
 ```
+
+For this tutorial, we specify a list of cancer studies Cancermuts should 
+use, which correspond to a few colorectal cancer studies. This is especially
+useful if we are interested in e.g. a certain cancer type or some other
+specific studies. Studies can be referred to using their cBioPortal 
+study identifier.
 
 {% hint style='info' %}
 Finding the correct set of identifier for the studies of interest can
@@ -199,6 +194,20 @@ contain a column with study IDs, the web links that link the studies in the
 "Breast Invasive Carcinoma (Broad, Nature 2012)" links the page
 `https://www.cbioportal.org/study?id=brca_broad` - meaning the corresponding
 study ID is `brca_broad`.
+{% endhint %}
+
+It should be noted that, alternatively, we can create the cancer study
+
+{% hint style='info' %}
+It is also possible to initialize the cBioPortal data source object without
+specifying cancer studies:
+
+```py
+>>> cb = cBioPortal()
+```
+
+In this case, cBioPortal will gather mutations from all cancer studies available
+in cBioPortal.
 {% endhint %}
 
 Finally, we use this object to gather the mutations from the selected cancer
@@ -318,7 +327,10 @@ cosmic.add_mutations(seq,
 ```
 
 Here we restrict the search to those mutations that are involved in colon
-adenocarcinoma. It should be noted that it is possible to search in any
+adenocarcinoma. 
+
+{% hint style='info' %}
+It should be noted that it is possible to search in any
 available cancer types or sites as well, without specifying cancer types
 sites in the `add_mutations` call, for instance:
 
@@ -326,6 +338,7 @@ sites in the `add_mutations` call, for instance:
 cosmic.add_mutations(seq, metadata=['genomic_coordinates', 'genomic_mutations', 
                                        'cancer_site', 'cancer_histology'])
 ```
+{% endhint %}
 
 It should be noted that COSMIC supports up to four cancer histology types
 and four cancer histology subtypes and Cancermuts allows to filter by any of this.
