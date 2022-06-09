@@ -46,6 +46,7 @@ class Table:
             '14-3-3 binding phosphopeptide motif':'14-3-3',
             'APCC activator-binding ABBA motif':'ABBA',
             'Actin-binding motifs':'Actin',
+            'Adaptin binding Endosome-Lysosome-Basolateral sorting signals':'Adaptin',
             'APCC-binding Destruction motifs':'APCC',
             'AP-2 beta2 appendage CCV component motifs':'AP2',
             'Atg8 protein family ligands':'Atg8',
@@ -312,6 +313,7 @@ class Table:
 
         if revel is True:
             df_m = df_m.fillna(revel_not_annotated)
+            df_m['Revel score'] = pd.to_numeric(df_m['Revel score'])
             ax.set_ylabel("REVEL score")
             ax.set_ylim((0.0, 1.0))
 
