@@ -196,8 +196,6 @@ contain a column with study IDs, the web links that link the studies in the
 study ID is `brca_broad`.
 {% endhint %}
 
-It should be noted that, alternatively, we can create the cancer study
-
 {% hint style='info' %}
 It is also possible to initialize the cBioPortal data source object without
 specifying cancer studies:
@@ -206,7 +204,7 @@ specifying cancer studies:
 >>> cb = cBioPortal()
 ```
 
-In this case, cBioPortal will gather mutations from all cancer studies available
+In this case, Cancermuts will gather mutations from all cancer studies available
 in cBioPortal.
 {% endhint %}
 
@@ -326,13 +324,12 @@ cosmic.add_mutations(seq,
 					 		   'cancer_site', 'cancer_histology'])
 ```
 
-Here we restrict the search to those mutations that are involved in colon
+Here we restrict the search to those mutations that are involved in colorectal
 adenocarcinoma. 
 
 {% hint style='info' %}
-It should be noted that it is possible to search in any
-available cancer types or sites as well, without specifying cancer types
-sites in the `add_mutations` call, for instance:
+It is also possible to search in any available cancer type or site as well (i.e. pancancer),
+by not specifying cancer types or sites in the `add_mutations` call, for instance:
 
 ```py
 cosmic.add_mutations(seq, metadata=['genomic_coordinates', 'genomic_mutations', 
