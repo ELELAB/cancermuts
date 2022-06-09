@@ -21,9 +21,7 @@ from cancermuts.datasources import cBioPortal, COSMIC
 
 # add mutations from cBioPortal
 
-cb = cBioPortal(cancer_studies=['coadread_dfci_2016', 
-	                            'coadread_genentech',
-	                            'coadread_tcga_pan_can_atlas_2018'])
+cb = cBioPortal()
 
 cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
 
@@ -44,10 +42,6 @@ cosmic = COSMIC(database_files=['/data/databases/cosmic-v95/CosmicMutantExport.t
                 database_encoding=['latin1'])
 
 cosmic.add_mutations(seq, 
-					 cancer_sites=['large_intestine'],
-					 cancer_site_subtype_1=['colon'],
-					 cancer_types=['carcinoma'],
-					 cancer_histology_subtype_1=['adenocarcinoma'], 
 					 metadata=['genomic_coordinates', 'genomic_mutations', 
 					 			'cancer_site', 'cancer_histology'])
 
@@ -113,7 +107,6 @@ tbl = Table()
 
 df = tbl.to_dataframe(seq)
 
-df.to_csv("metatable.csv")
+df.to_csv("metatable_pancancer.csv")
 
-tbl.plot_metatable(df, fname='my_table.pdf', section_size=50)
-
+tbl.plot_metatable(df, fname='my_table_pancancer.pdf', section_size=50)

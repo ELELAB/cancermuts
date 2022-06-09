@@ -79,8 +79,9 @@ the gathered information.
 The steps performed in the following tutorial are also written in a pre-built
 Python script available in the `docs` folder, called `tutorial.py`. In order
 to run it, you should have installed the Cancermuts package and activated the
-virtual environment in which it is installed (see Installation).
-
+virtual environment in which it is installed (see Installation). This tutorial
+script follows the tutorial steps and has been written using a single cancer
+type as reference (colorectal cancer).
 
 {% hint style='tip' %}
 Depending on the location of the files required by Cancermuts on your system,
@@ -94,7 +95,19 @@ Once that is done, from the `cancermuts/docs` directory, you can just run:
 $ python tutorial.py
 ```
 
-The result should be a `metatable.csv` output file.
+The result should be a `metatable.csv` output file together with a `my_table.pdf`
+figure.
+
+We also provide a similar example which considers all available cancer types,
+in the `tutorial_pancancer.py` file. It's run in the same way as with the
+other tutorial script:
+
+```
+$ python tutorial_pancancer.py
+```
+
+Similarly as before, the result should be a `metatable_pancancer.csv` output file
+together with a `my_table_pancancer.pdf` figure.
 
 ## Tutorial steps
 
@@ -153,21 +166,16 @@ We first import the required datasource classes for them:
 For cBioPortal, we first create the respective source object:
 
 ```py
->>> cb = cBioPortal()
-```
-
-In this case, cBioPortal will gather mutations from all cancer studies available
-in cBioPortal.
-
-It is possible to specify a set of cancer studies Cancermuts should use instead,
-if we are interested in e.g. a certain cancer type or some other specific studies, 
-using the cBioPortal study identifier:
-
-```py
 >>> cb = cBioPortal(cancer_studies=['coadread_dfci_2016', 
 	                            'coadread_genentech',
 	                            'coadread_tcga_pan_can_atlas_2018'])
 ```
+
+For this tutorial, we specify a list of cancer studies Cancermuts should 
+use, which correspond to a few colorectal cancer studies. This is especially
+useful if we are interested in e.g. a certain cancer type or some other
+specific studies. Studies can be referred to using their cBioPortal 
+study identifier.
 
 {% hint style='info' %}
 Finding the correct set of identifier for the studies of interest can
@@ -186,6 +194,18 @@ contain a column with study IDs, the web links that link the studies in the
 "Breast Invasive Carcinoma (Broad, Nature 2012)" links the page
 `https://www.cbioportal.org/study?id=brca_broad` - meaning the corresponding
 study ID is `brca_broad`.
+{% endhint %}
+
+{% hint style='info' %}
+It is also possible to initialize the cBioPortal data source object without
+specifying cancer studies:
+
+```py
+>>> cb = cBioPortal()
+```
+
+In this case, Cancermuts will gather mutations from all cancer studies available
+in cBioPortal.
 {% endhint %}
 
 Finally, we use this object to gather the mutations from the selected cancer
@@ -300,16 +320,27 @@ cosmic.add_mutations(seq,
 					 cancer_site_subtype_1=['colon'],
 					 cancer_types=['carcinoma'],
 					 cancer_histology_subtype_1=['adenocarcinoma'], 
-					 metadata=['genomic_coordinates', 'genomic_mutations', 
-					 			'cancer_site', 'cancer_histology'])
+					 metadata=['genomic_coordinates', 'genomic_mutations',
+					 		   'cancer_site', 'cancer_histology'])
 ```
 
-Here we restrict the search to those mutations that are involved in colon
-adenocarcinoma. It should be noted that COSMIC supports up to four 
-cancer histology types and four cancer histology subtypes and Cancermuts
-allows to filter by any of this. In particular, only the mutations that 
-correspond to *all* the selected criteria are retained. Please see the
-[COSMIC phenotype classification](https://cancer.sanger.ac.uk/cosmic/classification)
+Here we restrict the search to those mutations that are involved in colorectal
+adenocarcinoma. 
+
+{% hint style='info' %}
+It is also possible to search in any available cancer type or site as well (i.e. pancancer),
+by not specifying cancer types or sites in the `add_mutations` call, for instance:
+
+```py
+cosmic.add_mutations(seq, metadata=['genomic_coordinates', 'genomic_mutations', 
+                                       'cancer_site', 'cancer_histology'])
+```
+{% endhint %}
+
+It should be noted that COSMIC supports up to four cancer histology types
+and four cancer histology subtypes and Cancermuts allows to filter by any of this.
+In particular, only the mutations that  correspond to *all* the selected criteria
+are retained. Please see the [COSMIC phenotype classification](https://cancer.sanger.ac.uk/cosmic/classification)
 for the classification that COSMIC uses.
 
 Furthermore, similarly to cBioPortal, we retain some metadata:
