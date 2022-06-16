@@ -1,0 +1,6 @@
+name;site;type;function;reference
+Ubiquitination;45;ptm_ubiquitination;;PMID: 24980959;
+Phosphorylation;1043;ptm_phosphorylation;;PMID: 30217973
+Phosphorylation;1252;ptm_phosphorylation;Submission PNAS 2020 (Fiorella paper);30217973
+structured;41-203;structure;First half of predicted beta propeller;
+structured;857-1040;structure;Second half of predicted beta-propeller;
