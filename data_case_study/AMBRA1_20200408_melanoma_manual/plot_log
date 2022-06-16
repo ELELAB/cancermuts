@@ -1,0 +1,317 @@
+15/04/2020,13:36 WARNING [cancermuts.Table]> not enough colors specified for ptms to plot
+15/04/2020,13:36 DEBUG [cancermuts.Table]> default stem color will be used
+/data/user/teo/cancermuts/AMBRA1_20200408/cancermuts/table.py:332: UserWarning: In Matplotlib 3.3 individual lines on a stem plot will be added as a LineCollection instead of individual lines. This significantly improves the performance of a stem plot. To remove this warning and switch to the new behaviour, set the "use_line_collection" keyword argument to True.
+  (markerline, stemlines, baseline) = ax.stem(df_m_c[self.headers['position']], scores)
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Acetylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for S-Nitrosylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for OGalNAc site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for OGlcNAc site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Sumoylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Caspase cleavage site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Acetylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for S-Nitrosylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for OGalNAc site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for OGlcNAc site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Sumoylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Ubiquitination site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Caspase cleavage site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Acetylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for S-Nitrosylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for OGalNAc site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for OGlcNAc site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Sumoylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Ubiquitination site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Caspase cleavage site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Methylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Acetylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for S-Nitrosylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for OGalNAc site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for OGlcNAc site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Sumoylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Ubiquitination site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Caspase cleavage site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Methylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Acetylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for S-Nitrosylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for OGalNAc site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for OGlcNAc site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Sumoylation site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Ubiquitination site
+15/04/2020,13:36 INFO [cancermuts.Table]> No information found for Caspase cleavage site
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: Matching :family=sans-serif:style=normal:variant=normal:weight=normal:stretch=normal:size=8.0.
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXGeneral' (STIXGeneralBol.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans Mono' (DejaVuSansMono-Oblique.ttf) oblique normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Serif' (DejaVuSerif-BoldItalic.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXSizeThreeSym' (STIXSizThreeSymBol.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXSizeOneSym' (STIXSizOneSymBol.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Serif' (DejaVuSerif-Bold.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXSizeFourSym' (STIXSizFourSymBol.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans' (DejaVuSans-BoldOblique.ttf) oblique normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Serif' (DejaVuSerif.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXGeneral' (STIXGeneral.ttf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXNonUnicode' (STIXNonUni.ttf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans' (DejaVuSans-Bold.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXNonUnicode' (STIXNonUniIta.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans Display' (DejaVuSansDisplay.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans' (DejaVuSans.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXNonUnicode' (STIXNonUniBolIta.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'cmmi10' (cmmi10.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXSizeFourSym' (STIXSizFourSymReg.ttf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'cmtt10' (cmtt10.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Serif Display' (DejaVuSerifDisplay.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'cmr10' (cmr10.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXSizeTwoSym' (STIXSizTwoSymReg.ttf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'cmss10' (cmss10.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'cmb10' (cmb10.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXSizeFiveSym' (STIXSizFiveSymReg.ttf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Serif' (DejaVuSerif-Italic.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'cmsy10' (cmsy10.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans' (DejaVuSans-Oblique.ttf) oblique normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans Mono' (DejaVuSansMono-BoldOblique.ttf) oblique normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXGeneral' (STIXGeneralItalic.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXSizeThreeSym' (STIXSizThreeSymReg.ttf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXSizeTwoSym' (STIXSizTwoSymBol.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXSizeOneSym' (STIXSizOneSymReg.ttf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans Mono' (DejaVuSansMono-Bold.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXNonUnicode' (STIXNonUniBol.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'STIXGeneral' (STIXGeneralBolIta.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans Mono' (DejaVuSansMono.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'cmex10' (cmex10.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans' (lmsans10-boldoblique.otf) oblique normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman10-italic.otf) italic normal roman normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans' (DejaVuSansCondensed-BoldOblique.ttf) oblique normal bold condensed>) = 11.535
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman Slanted' (lmromanslant9-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Adventor' (texgyreadventor-regular.otf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans' (lmsans10-bold.otf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans' (lmsans10-oblique.otf) oblique normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Sans' (LiberationSans-BoldItalic.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-Hairline.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Prop' (lmmonoprop10-oblique.otf) oblique normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Heros' (texgyreheros-bold.otf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans' (DejaVuSansCondensed-Oblique.ttf) oblique normal 400 condensed>) = 11.25
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans Quotation' (lmsansquot8-oblique.otf) oblique normal 700 normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Bitstream Vera Sans' (VeraBI.ttf) oblique normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Times New Roman' (Times_New_Roman_Bold_Italic.ttf) italic normal roman normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Verdana' (verdanai.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Mono' (LiberationMono-Bold.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Pagella' (texgyrepagella-bold.otf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Termes' (texgyretermes-bolditalic.otf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Bitstream Vera Sans' (VeraBd.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Georgia' (Georgia_Bold_Italic.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Georgia' (georgiaz.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans' (lmsans12-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Verdana' (verdanab.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Adventor' (texgyreadventor-italic.otf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-Medium.ttf) normal normal medium normal>) = 10.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Mono' (LiberationMono-Regular.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Prop Light' (lmmonoproplt10-regular.otf) normal normal light normal>) = 10.24
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Schola' (texgyreschola-regular.otf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Courier New' (Courier_New_Bold.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans Quotation' (lmsansquot8-bold.otf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Pagella Math' (texgyrepagella-math.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans' (lmsans9-oblique.otf) oblique normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Schola' (texgyreschola-bolditalic.otf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans Quotation' (lmsansquot8-boldoblique.otf) oblique normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Verdana' (Verdana.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Verdana' (Verdana_Bold_Italic.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Bonum' (texgyrebonum-bold.otf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Serif' (LiberationSerif-BoldItalic.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Sans' (LiberationSans-Italic.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman9-italic.otf) italic normal roman normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman8-bold.otf) normal normal roman normal>) = 10.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Georgia' (Georgia.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman Slanted' (lmromanslant17-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Sans Narrow' (LiberationSansNarrow-Regular.ttf) normal normal 400 condensed>) = 10.25
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans' (lmsans12-oblique.otf) oblique normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Courier New' (courbd.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Termes' (texgyretermes-bold.otf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman7-bold.otf) normal normal roman normal>) = 10.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Times New Roman' (timesbd.ttf) normal normal roman normal>) = 10.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman9-bold.otf) normal normal roman normal>) = 10.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'wasy10' (wasy10.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Arial Black' (Arial_Black.ttf) normal normal black normal>) = 10.525
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Times New Roman' (times.ttf) normal normal roman normal>) = 10.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman Caps' (lmromancaps10-oblique.otf) oblique normal roman normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Prop Light' (lmmonoproplt10-bold.otf) normal normal light normal>) = 10.24
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Times New Roman' (Times_New_Roman.ttf) normal normal roman normal>) = 10.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono' (lmmono12-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Serif' (DejaVuSerifCondensed-Italic.ttf) italic normal 400 condensed>) = 11.25
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Trebuchet MS' (Trebuchet_MS_Bold_Italic.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Schola Math' (texgyreschola-math.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans' (DejaVuSansCondensed-Bold.ttf) normal normal bold condensed>) = 10.535
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Comic Sans MS' (Comic_Sans_MS.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Bonum' (texgyrebonum-bolditalic.otf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'rsfs10' (rsfs10.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-Thin.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Bitstream Vera Sans Mono' (VeraMoBI.ttf) oblique normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans' (lmsans17-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman7-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Webdings' (webdings.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-BlackItalic.ttf) italic normal black normal>) = 11.525
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Light Cond' (lmmonoltcond10-regular.otf) normal normal light condensed>) = 10.44
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Bitstream Vera Sans Mono' (VeraMono.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Arial' (Arial_Bold_Italic.ttf) italic normal bold normal>) = 1.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Impact' (Impact.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman17-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Arial' (Arial_Italic.ttf) italic normal 400 normal>) = 1.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Bonum' (texgyrebonum-regular.otf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Termes' (texgyretermes-italic.otf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman8-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-Light.ttf) normal normal light normal>) = 10.24
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-SemiboldItalic.ttf) italic normal semibold normal>) = 11.24
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Trebuchet MS' (Trebuchet_MS_Italic.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Cursor' (texgyrecursor-italic.otf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman10-bolditalic.otf) italic normal roman normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Math TeX Gyre' (DejaVuMathTeXGyre.ttf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono' (lmmono10-italic.otf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono' (lmmono8-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans' (lmsans10-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Caps' (lmmonocaps10-oblique.otf) oblique normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Trebuchet MS' (Trebuchet_MS_Bold.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Heros Cn' (texgyreheroscn-regular.otf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Courier New' (Courier_New.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Serif' (DejaVuSerifCondensed.ttf) normal normal 400 condensed>) = 10.25
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Sans Narrow' (LiberationSansNarrow-Italic.ttf) italic normal 400 condensed>) = 11.25
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Light Cond' (lmmonoltcond10-oblique.otf) oblique normal light condensed>) = 11.44
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Prop Light' (lmmonoproplt10-boldoblique.otf) oblique normal light normal>) = 11.24
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Light' (lmmonolt10-regular.otf) normal normal light normal>) = 10.24
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Courier New' (Courier_New_Bold_Italic.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman Dunhill' (lmromandunh10-oblique.otf) oblique normal roman normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman6-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Comic Sans MS' (comic.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Georgia' (georgia.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Times New Roman' (Times_New_Roman_Italic.ttf) italic normal roman normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Trebuchet MS' (Trebuchet_MS.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Heros Cn' (texgyreheroscn-italic.otf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-BoldItalic.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Sans' (LiberationSans-Bold.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Slanted' (lmmonoslant10-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Serif' (LiberationSerif-Bold.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Noto Mono' (NotoMono-Regular.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Arial' (Arial.ttf) normal normal 400 normal>) = 0.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman Demi' (lmromandemi10-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Mono' (LiberationMono-Italic.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman5-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-HairlineItalic.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Pagella' (texgyrepagella-regular.otf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Arial' (arialbi.ttf) italic normal bold normal>) = 1.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Caps' (lmmonocaps10-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Chorus' (texgyrechorus-mediumitalic.otf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Verdana' (Verdana_Italic.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Light' (lmmonolt10-boldoblique.otf) oblique normal light normal>) = 11.24
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Serif' (LiberationSerif-Italic.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Andale Mono' (Andale_Mono.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans Demi Cond' (lmsansdemicond10-regular.otf) normal normal regular condensed>) = 10.25
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman Unslanted' (lmromanunsl10-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Verdana' (Verdana_Bold.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Georgia' (Georgia_Italic.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Heros Cn' (texgyreheroscn-bolditalic.otf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Verdana' (verdana.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Georgia' (georgiab.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Serif' (LiberationSerif-Regular.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Trebuchet MS' (trebucbi.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman8-italic.otf) italic normal roman normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Bitstream Vera Serif' (VeraSeBd.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Bitstream Vera Sans Mono' (VeraMoBd.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman Slanted' (lmromanslant12-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'esint10' (esint10.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Comic Sans MS' (Comic_Sans_MS_Bold.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Termes Math' (texgyretermes-math.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Bonum Math' (texgyrebonum-math.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Schola' (texgyreschola-italic.otf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman12-bold.otf) normal normal roman normal>) = 10.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Times New Roman' (timesi.ttf) italic normal roman normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans' (lmsans17-oblique.otf) oblique normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Heros' (texgyreheros-bolditalic.otf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman Dunhill' (lmromandunh10-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans' (DejaVuSansCondensed.ttf) normal normal 400 condensed>) = 10.25
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Arial' (arial.ttf) normal normal 400 normal>) = 0.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Georgia' (Georgia_Bold.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Impact' (impact.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans Quotation' (lmsansquot8-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman Demi' (lmromandemi10-oblique.otf) oblique normal roman normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman9-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Arial' (ariali.ttf) italic normal 400 normal>) = 1.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Bitstream Vera Sans' (VeraIt.ttf) oblique normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Sans Narrow' (LiberationSansNarrow-Bold.ttf) normal normal bold condensed>) = 10.535
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-Italic.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Trebuchet MS' (trebuc.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Comic Sans MS' (comicbd.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Arial Black' (ariblk.ttf) normal normal black normal>) = 10.525
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Cursor' (texgyrecursor-bold.otf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-ThinItalic.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman Caps' (lmromancaps10-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre DejaVu Math' (texgyredejavu-math.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Adventor' (texgyreadventor-bold.otf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman6-bold.otf) normal normal roman normal>) = 10.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-Bold.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Trebuchet MS' (trebucit.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman Slanted' (lmromanslant10-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman12-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono' (lmmono10-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Sans' (LiberationSans-Regular.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman Slanted' (lmromanslant10-bold.otf) normal normal roman normal>) = 10.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-Regular.ttf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman12-italic.otf) italic normal roman normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Arial' (Arial_Bold.ttf) normal normal bold normal>) = 0.33499999999999996
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans' (lmsans8-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Light' (lmmonolt10-bold.otf) normal normal light normal>) = 10.24
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Bitstream Vera Sans' (Vera.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Trebuchet MS' (trebucbd.ttf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Sans Narrow' (LiberationSansNarrow-BoldItalic.ttf) italic normal bold condensed>) = 11.535
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman7-italic.otf) italic normal roman normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Prop' (lmmonoprop10-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Courier New' (Courier_New_Italic.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'stmary10' (stmary10.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-MediumItalic.ttf) italic normal medium normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-HeavyItalic.ttf) italic normal heavy normal>) = 11.43
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Courier New' (courbi.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Times New Roman' (timesbi.ttf) italic normal roman normal>) = 11.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Arial' (arialbd.ttf) normal normal bold normal>) = 0.33499999999999996
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Bitstream Vera Serif' (VeraSe.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Georgia' (georgiai.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-Black.ttf) normal normal black normal>) = 10.525
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'msam10' (msam10.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman5-bold.otf) normal normal roman normal>) = 10.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman10-bold.otf) normal normal roman normal>) = 10.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Schola' (texgyreschola-bold.otf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-LightItalic.ttf) italic normal light normal>) = 11.24
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Courier New' (cour.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-Heavy.ttf) normal normal heavy normal>) = 10.43
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Bitstream Vera Sans Mono' (VeraMoIt.ttf) oblique normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman Slanted' (lmromanslant8-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Pagella' (texgyrepagella-italic.otf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Prop Light' (lmmonoproplt10-oblique.otf) oblique normal light normal>) = 11.24
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans' (lmsans8-oblique.otf) oblique normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Webdings' (Webdings.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Heros' (texgyreheros-regular.otf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Heros Cn' (texgyreheroscn-bold.otf) normal normal bold normal>) = 10.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Courier New' (couri.ttf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'eufm10' (eufm10.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Math' (latinmodern-math.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Cursor' (texgyrecursor-regular.otf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Pagella' (texgyrepagella-bolditalic.otf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Adventor' (texgyreadventor-bolditalic.otf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Droid Sans Fallback' (DroidSansFallbackFull.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Liberation Mono' (LiberationMono-BoldItalic.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Cursor' (texgyrecursor-bolditalic.otf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Heros' (texgyreheros-italic.otf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Serif' (DejaVuSerifCondensed-BoldItalic.ttf) italic normal bold condensed>) = 11.535
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Verdana' (verdanaz.ttf) italic normal bold normal>) = 11.335
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans' (lmsans9-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Sans Demi Cond' (lmsansdemicond10-oblique.otf) oblique normal demi condensed>) = 11.44
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Lato' (Lato-Semibold.ttf) normal normal semibold normal>) = 10.24
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Times New Roman' (Times_New_Roman_Bold.ttf) normal normal roman normal>) = 10.145
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono' (lmmono9-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Mono Light' (lmmonolt10-oblique.otf) oblique normal light normal>) = 11.24
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Bonum' (texgyrebonum-italic.otf) italic normal 400 normal>) = 11.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Serif' (DejaVuSerifCondensed-Bold.ttf) normal normal bold condensed>) = 10.535
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Latin Modern Roman' (lmroman10-regular.otf) normal normal regular normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'DejaVu Sans' (DejaVuSans-ExtraLight.ttf) normal normal light normal>) = 10.24
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'msbm10' (msbm10.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'TeX Gyre Termes' (texgyretermes-regular.otf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: score(<Font 'Andale Mono' (andalemo.ttf) normal normal 400 normal>) = 10.05
+15/04/2020,13:36 DEBUG [matplotlib.font_manager]> findfont: Matching :family=sans-serif:style=normal:variant=normal:weight=normal:stretch=normal:size=8.0 to Arial ('/usr/share/fonts/truetype/msttcorefonts/Arial.ttf') with score of 0.050000.
+15/04/2020,13:36 DEBUG [matplotlib.backends.backend_pdf]> Assigning font /b'F1' = '/usr/share/fonts/truetype/msttcorefonts/Arial.ttf'
+15/04/2020,13:36 DEBUG [matplotlib.backends.backend_pdf]> Embedding font /usr/share/fonts/truetype/msttcorefonts/Arial.ttf.
+15/04/2020,13:36 DEBUG [matplotlib.backends.backend_pdf]> Writing TrueType font.
