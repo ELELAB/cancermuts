@@ -23,22 +23,23 @@ Classes to interrogate data sources and annotate various data
 
 """
 
+from ast import If
 import time
 import requests as rq
 from bioservices.uniprot import UniProt as bsUniProt
 from Bio.PDB.Polypeptide import three_to_one
+from Bio import SeqIO
 import numpy as np
 import pandas as pd
 from .core import Sequence, Mutation
 from .properties import *
 from .metadata import *
 from .log import *
-import io
+from io import StringIO
 import json
 import re
 import sys
 import os
-import csv
 import myvariant
 import pyliftover
 import itertools
@@ -121,10 +122,12 @@ class UniProt(DynamicSource, object):
         if upid is None:
             self.log.info("retrieving UniProt ID for human gene %s" % gene_id)
             try:
-                upids = self._uniprot_service.search("gene:%s AND organism:human" % gene_id, columns="entry name").split()[2:]
+                uniprot_table = pd.read_csv(StringIO(self._uniprot_service.search(f"(gene:{gene_id}) AND (organism_id:9606)")), sep='\t')
+                upids = uniprot_table['Entry Name'].to_list()
             except:
                 self.log.error("Failed to retrieve list of Uniprot IDs")
                 return None
+
             upid = upids[0]
             if len(upids) > 1:
                 self.log.warning("the following UniProt entries were found for gene %s: %s; will use %s" %(gene_id, ', '.join(upids), upid))
@@ -132,43 +135,85 @@ class UniProt(DynamicSource, object):
                 self.log.info("will use Uniprot ID %s" % upid)
         else:
             self.log.info("The user-provided Uniprot ID (%s) will be used" % upid)
-
         aliases = {'uniprot' : upid,
-                   'entrez' :       self._get_aliases(upid, ['P_ENTREZGENEID'])['P_ENTREZGENEID'],
-                   'uniprot_acc' : self._get_aliases(upid, ['ACC+ID'])['ACC+ID']}
+                   'entrez' :       self._get_aliases(upid, ['GeneID'])['GeneID'],
+                   'uniprot_acc' : self._get_aliases(upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']}
 
         self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s, gene %s" % (upid, gene_id))
 
-        try:
-            sequence = self._uniprot_service.get_fasta_sequence(str(upid))
-        except:
+        if True:
+            sequence = self._get_fasta_sequence(str(upid))
+        else:
             self.log.error("failed retrieving sequence for Uniprot ID %s" % upid)
             return None
 
         return Sequence(gene_id, sequence, self, aliases=aliases)
 
-    def _get_aliases(self, gene_id, to, fr='ACC+ID'):
+    def _get_fasta_sequence(self, upid):
+        """This function downloads the sequence of the specified UniProt entry
+        by means of the UniProt API. The downloaded sequence corresponds to the
+        sequence of the main isoform.
+
+        Parameters
+        ----------
+        upid : :obj:`str`
+            a valid UniProt identifier
+
+        Returns
+        -------
+        sequence : :obj:`str`
+            a protein sequence as a string
+        """
+
+        try:
+            fasta_text = self._uniprot_service.get_fasta(upid)
+        except:
+            self.log.error(f"could not retrieve FASTA sequence for {upid}")
+            return None
+
+        try:
+            sequences = list(SeqIO.parse(StringIO(fasta_text), 'fasta'))
+        except:
+            self.log.error(f"could not parse obtained FASTA file for {upid}")
+            return None
+
+        if len(sequences) > 1:
+            self.log.warning(f"Multiple FASTA sequences for {upid} found; the first one will be used")
+
+        return str(sequences[0].seq)
+
+    def _get_aliases(self, gene_id, to, fr='UniProtKB_AC-ID'):
 
         out = {}
 
         for t in to:
+
+            if re.match('UniProtKB_\S+', t):
+                t_keyword = "_".join(t.split("_")[1:])
+                t_query = 'UniProtKB'
+            else:
+                t_keyword = None
+                t_query = t
+
             responses = self._uniprot_service.mapping( fr = fr,
-                                                       to = t,
-                                                       query = gene_id )#[gene_id]
+                                                       to = t_query,
+                                                       query = gene_id )['results']
 
             if len(responses) == 0:
-                log.warning(f"No {t} found for {gene_id}")
+                self.log.warning(f"No {t} found for {gene_id}")
                 return None
             if len(responses) > 1:
                 raise TypeError
+            if len(responses) > 1:
+                self.log.warning(f"More than one {t} found: {' '.join(responses)}")
+                self.log.warning("The first one will be used")
 
-            ids = responses[gene_id]
+            results = responses[0]
 
-            if len(ids) > 1:
-                log.warning("More than one Entrez ID found: {}".format(' '.join(responses)))
-                log.warning("The first one will be used")
-
-            out[t] = ids[0]
+            if t_keyword is not None:
+                out[t] = results['to'][t_keyword]
+            else:
+                out[t] = results['to']
         return out
 
 
