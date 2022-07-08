@@ -23,7 +23,6 @@ Classes to interrogate data sources and annotate various data
 
 """
 
-from ast import If
 import time
 import requests as rq
 from bioservices.uniprot import UniProt as bsUniProt
