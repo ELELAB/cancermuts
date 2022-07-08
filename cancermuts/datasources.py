@@ -1146,16 +1146,31 @@ class ELMPredictions(DynamicSource, object):
                 tmp2 = [ unicode.strip(t, '"') for t in tmp2 ]
                 self._elm_classes[tmp2[1]] = tmp2[2:]
 
-    def _get_prediction(self, gene_name):
+    def _get_prediction(self, gene_name, elm_wait):
+        
+        if elm_wait > 0:
+            self.log.info(f"waiting {elm_wait} seconds before querying ELM as requested")
         self.log.info("retrieving prediction for %s" % gene_name )
+        time.sleep(elm_wait)
+        
         try:
             req_url = os.path.join(self._requests_url, gene_name) + ".tsv"
+            response = rq.get(req_url)
+
+            if response.status_code == 429:
+                self.log.error("connection to ELM server was refused as not enough time has passed since the last attempt; please wait at least 3 minutes before retrying")
+                return None
+            elif response.status_code != 200:
+                self.log.error(f"ELM server responded with {response.status_code}; couldn't fetch prediction")
+                return None
+            else:
+                response = response.text
         except:
             self.log.error("couldn't fetch ELM predictions")
             return None
 
         out = []
-        response = rq.get(req_url).text
+        
         tmp = response.split("\n")
 
         for line in tmp:
@@ -1172,13 +1187,13 @@ class ELMPredictions(DynamicSource, object):
             out.append(tmp2)
         return out
 
-    def add_sequence_properties(self, sequence, exclude_elm_classes='{100}', use_alias='uniprot'):
+    def add_sequence_properties(self, sequence, exclude_elm_classes='{100}', use_alias='uniprot', elm_wait=180):
         self.log.info("adding ELM predictions to sequence ...")
         if use_alias is None:
-            data = self._get_prediction(sequence.gene_id)
+            data = self._get_prediction(sequence.gene_id, elm_wait=elm_wait)
         else:
             self.log.info("will use alias %s as gene name" % sequence.aliases[use_alias])
-            data = self._get_prediction(sequence.aliases[use_alias])
+            data = self._get_prediction(sequence.aliases[use_alias], elm_wait=elm_wait)
 
         for d in data:
             if d[5]:
