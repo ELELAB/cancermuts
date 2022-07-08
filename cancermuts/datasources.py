@@ -1146,8 +1146,11 @@ class ELMPredictions(DynamicSource, object):
                 tmp2 = [ unicode.strip(t, '"') for t in tmp2 ]
                 self._elm_classes[tmp2[1]] = tmp2[2:]
 
-    def _get_prediction(self, gene_name):
+    def _get_prediction(self, gene_name, elm_wait):
+
         self.log.info("retrieving prediction for %s" % gene_name )
+        self.log.info(f"waiting {elm_wait} seconds as requested")
+        time.sleep(elm_wait)
         try:
             req_url = os.path.join(self._requests_url, gene_name) + ".tsv"
         except:
@@ -1172,13 +1175,13 @@ class ELMPredictions(DynamicSource, object):
             out.append(tmp2)
         return out
 
-    def add_sequence_properties(self, sequence, exclude_elm_classes='{100}', use_alias='uniprot'):
+    def add_sequence_properties(self, sequence, exclude_elm_classes='{100}', use_alias='uniprot', elm_wait=180):
         self.log.info("adding ELM predictions to sequence ...")
         if use_alias is None:
-            data = self._get_prediction(sequence.gene_id)
+            data = self._get_prediction(sequence.gene_id, elm_wait=elm_wait)
         else:
             self.log.info("will use alias %s as gene name" % sequence.aliases[use_alias])
-            data = self._get_prediction(sequence.aliases[use_alias])
+            data = self._get_prediction(sequence.aliases[use_alias], elm_wait=elm_wait)
 
         for d in data:
             if d[5]:
