@@ -1418,7 +1418,7 @@ class gnomAD(DynamicSource, object):
         try:
             response_json = response.json()
         except:
-            log.error("downloaded data couldn't be understood")
+            self.log.error("downloaded data couldn't be understood")
             return None
 
         if 'errors' in response_json.keys():
@@ -1727,7 +1727,7 @@ class ManualAnnotation(StaticSource):
                     assert(len(tmp) == 2)
                     assert(int(tmp[0]) <= int(tmp[1]))
                 except AssertionError:
-                    log.error("line %d range in site column must be specified as 'from-to' (ex 10-15)" % (idx+1))
+                    self.log.error("line %d range in site column must be specified as 'from-to' (ex 10-15)" % (idx+1))
                 positions = tuple(range(tmp[0], tmp[1]+1))
             else:
                 positions = ( int(row['site']) )
