@@ -1147,18 +1147,29 @@ class ELMPredictions(DynamicSource, object):
                 self._elm_classes[tmp2[1]] = tmp2[2:]
 
     def _get_prediction(self, gene_name, elm_wait):
-
+        
+        if elm_wait > 0:
+            self.log.info(f"waiting {elm_wait} seconds before querying ELM as requested")
         self.log.info("retrieving prediction for %s" % gene_name )
-        self.log.info(f"waiting {elm_wait} seconds as requested")
         time.sleep(elm_wait)
+        
         try:
             req_url = os.path.join(self._requests_url, gene_name) + ".tsv"
+            response = rq.get(req_url)
+
+            if response.status_code == 429:
+                self.log.error("connection to ELM server was refused as not enough time has passed since the last attempt; please wait at least 3 minutes before retrying")
+                return None
+            elif response.status_code != 200:
+                self.log.error(f"ELM server responded with {response.status_code}; couldn't fetch prediction")
+            else:
+                response = response.text
         except:
             self.log.error("couldn't fetch ELM predictions")
             return None
 
         out = []
-        response = rq.get(req_url).text
+        
         tmp = response.split("\n")
 
         for line in tmp:
