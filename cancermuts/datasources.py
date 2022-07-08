@@ -140,9 +140,9 @@ class UniProt(DynamicSource, object):
 
         self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s, gene %s" % (upid, gene_id))
 
-        if True:
+        try:
             sequence = self._get_fasta_sequence(str(upid))
-        else:
+        except:
             self.log.error("failed retrieving sequence for Uniprot ID %s" % upid)
             return None
 
