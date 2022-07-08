@@ -1162,6 +1162,7 @@ class ELMPredictions(DynamicSource, object):
                 return None
             elif response.status_code != 200:
                 self.log.error(f"ELM server responded with {response.status_code}; couldn't fetch prediction")
+                return None
             else:
                 response = response.text
         except:
