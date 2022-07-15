@@ -60,6 +60,7 @@ class Table:
             'Clathrin box':'Clathrin',
             'CtBP ligand motif':'CtBP',
             'Cyclin docking motif':'Cyclin',
+            'Cyclin N-terminal Domain Docking Motifs':'Cyclin'
             'Cyclin recognition site':'Cyclin',
             'Di-Tryptophan targeting motif to the Delta-COP MHD domain':'MHD',
             'DDB1-Cullin4 binding site':'DDB1-Cullin4',
@@ -67,10 +68,12 @@ class Table:
             'Endosome-Lysosome-Basolateral sorting signals':'ELB ss',
             'Extracellular side LRP5 and -6 binding motif':'LRP5,6',
             'EVH1  ligands':'EVH1',
+            'FFAT motif':'FFAT',
             'FHA phosphopeptide ligands':'FHA',
             'Helical calmodulin binding motifs': 'Calm.',
             'IAP-binding motif (IBM)':'IBM',
             'Immunoreceptor tyrosine-based motif':'ImmY',
+            'Integrin RGD-type binding sites':'Integrin',
             'IRF-3 interaction and dimerisation motif':'IRF-3',
             'IRF-3 binding site':'IRF-3',
             'KEAP1 binding degron':'KEAP1',
@@ -87,6 +90,7 @@ class Table:
             'PCSK cleavage site':'PCSK cl.',
             'Phosphotyrosine ligands bound by SH2 domains':'pY',
             'PP1-docking motif RVXF':'PP1',
+            'PP1-docking motif SILK':'PP1'
             'PP2A holoenzyme B56-docking site':'PP2A',
             'PP2AC binding site':'PP2AC',
             'PP4 EVH1-binding docking motifs':'PP4 EVH1',
