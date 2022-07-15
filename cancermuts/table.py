@@ -321,6 +321,8 @@ class Table:
 
         if revel is True:
             def process_revel(x):
+                if x == '':
+                    return np.nan
                 if pd.isna(x) or type(x) is float:
                     return x
                 vals = x.split(',')
