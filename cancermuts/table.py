@@ -316,8 +316,20 @@ class Table:
             return
 
         if revel is True:
+            def process_revel(x):
+                if pd.isna(x) or type(x) is float:
+                    return x
+                vals = x.split(',')
+                return max(map(float, vals))
+
+            pd.options.mode.chained_assignment = None
+
+            numeric_revel = df_m['Revel score'].apply(process_revel)
+            df_m['Revel score'] = numeric_revel
             df_m = df_m.fillna(revel_not_annotated)
-            df_m['Revel score'] = pd.to_numeric(df_m['Revel score'])
+
+            pd.options.mode.chained_assignment = 'warn'
+
             ax.set_ylabel("REVEL score")
             ax.set_ylim((0.0, 1.0))
 
