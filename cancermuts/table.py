@@ -60,6 +60,7 @@ class Table:
             'Clathrin box':'Clathrin',
             'CtBP ligand motif':'CtBP',
             'Cyclin docking motif':'Cyclin',
+            'Cyclin N-terminal Domain Docking Motifs':'Cyclin',
             'Cyclin recognition site':'Cyclin',
             'Di-Tryptophan targeting motif to the Delta-COP MHD domain':'MHD',
             'DDB1-Cullin4 binding site':'DDB1-Cullin4',
@@ -67,10 +68,13 @@ class Table:
             'Endosome-Lysosome-Basolateral sorting signals':'ELB ss',
             'Extracellular side LRP5 and -6 binding motif':'LRP5,6',
             'EVH1  ligands':'EVH1',
+            'FFAT motif':'FFAT',
             'FHA phosphopeptide ligands':'FHA',
             'Helical calmodulin binding motifs': 'Calm.',
             'IAP-binding motif (IBM)':'IBM',
             'Immunoreceptor tyrosine-based motif':'ImmY',
+            'Integrin RGD-type binding sites':'Integrin',
+            'IRF-3 interaction and dimerisation motif':'IRF-3',
             'IRF-3 binding site':'IRF-3',
             'KEAP1 binding degron':'KEAP1',
             'LC3 binding site':'LC3',
@@ -82,9 +86,11 @@ class Table:
             'NLS classical Nuclear Localization Signals':'NLS',
             'NRD cleavage site':'NRD cl.',
             'Nuclear receptor box':'NRB',
+            'PCNA binding PIP Box':'PCNA',
             'PCSK cleavage site':'PCSK cl.',
             'Phosphotyrosine ligands bound by SH2 domains':'pY',
             'PP1-docking motif RVXF':'PP1',
+            'PP1-docking motif SILK':'PP1',
             'PP2A holoenzyme B56-docking site':'PP2A',
             'PP2AC binding site':'PP2AC',
             'PP4 EVH1-binding docking motifs':'PP4 EVH1',
@@ -92,6 +98,7 @@ class Table:
             'PDZ ligands':'PDZ',
             'PDZ domain ligands':'PDZ',
             'Pex14 ligand motif':'Pex14',
+            'Raptor interacting motif':'Raptor',
             'RIR motif':'RIR',
             'SCF ubiquitin ligase binding Phosphodegrons':'SCF',
             'Separase cleavage motif':'Separase cl.',
@@ -105,6 +112,7 @@ class Table:
             'Tankyrase-binding motif':'Tankyrase',
             'UEV Domain binding PTAP motif':'UEV',
             'USP7 binding motif':'USP7',
+            'WAVE regulatory complex (WRC) binding site motif':'WRC',
             'WW domain ligands':'WW',
             'WDR5 WD40 repeat (blade 5,6)-binding ligand':'WDR5',
             'WxxL LIR motif':'WxxL',
@@ -312,8 +320,22 @@ class Table:
             return
 
         if revel is True:
+            def process_revel(x):
+                if x == '':
+                    return np.nan
+                if pd.isna(x) or type(x) is float:
+                    return x
+                vals = x.split(',')
+                return max(map(float, vals))
+
+            pd.options.mode.chained_assignment = None
+
+            numeric_revel = df_m['Revel score'].apply(process_revel)
+            df_m['Revel score'] = numeric_revel
             df_m = df_m.fillna(revel_not_annotated)
-            df_m['Revel score'] = pd.to_numeric(df_m['Revel score'])
+
+            pd.options.mode.chained_assignment = 'warn'
+
             ax.set_ylabel("REVEL score")
             ax.set_ylim((0.0, 1.0))
 
