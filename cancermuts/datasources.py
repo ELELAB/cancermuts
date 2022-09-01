@@ -226,7 +226,7 @@ class cBioPortal(DynamicSource, object):
 
         super(cBioPortal, self).__init__(name='cBioPortal', version='1.0', description=description)
 
-        self._api_endpoint = 'https://www.cbioportal.org/api/api-docs'
+        self._api_endpoint = 'https://www.cbioportal.org/api/v2/api-docs'
         self._max_connections = max_connections
         self._max_threads = max_threads
 
