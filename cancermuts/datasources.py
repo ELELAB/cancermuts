@@ -1499,8 +1499,12 @@ class MobiDB(DynamicSource):
 
         assignments = self._get_mobidb_disorder_predictions_assignments(sequence, *args, **kwargs)
 
+        if assignments is None:
+            self.log.error("Couldn't retrieve prediction from MobiDB")
+            return False
+
         if len(assignments) != len(sequence.positions): 
-            self.log.error("Error in the assignment of predictions")
+            self.log.error("Error in the assignment of predictions: length of MobiDB structure assignment and sequence don't match")
             return False
 
         for i,a in enumerate(assignments):
