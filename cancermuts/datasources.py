@@ -1504,7 +1504,7 @@ class MobiDB(DynamicSource):
             return False
 
         if len(assignments) != len(sequence.positions): 
-            self.log.error("Error in the assignment of predictions: length of assignment and sequence don't match")
+            self.log.error("Error in the assignment of predictions: length of MobiDB structure assignment and sequence don't match")
             return False
 
         for i,a in enumerate(assignments):
