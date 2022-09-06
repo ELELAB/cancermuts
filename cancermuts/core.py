@@ -168,6 +168,7 @@ class SequencePosition(object):
         :obj:`str` as key and `cancermuts.properties.PositionProperty` as value.
     """
     description = 'Position'
+    header = "aa_position"
     @logger_init
     def __init__(self, wt_residue_type, sequence_position, mutations=None, properties=None):
         """Constructor for the SequencePosition class.
