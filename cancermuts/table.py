@@ -151,21 +151,21 @@ class Table:
         ptm_codes = {}
 
         for k,v in iteritems(position_properties_classes):
-            headers[k] = v.description
+            headers[k] = v.header
             if 'ptm' in v.category:
-                ptms[k] = v.description
+                ptms[k] = v.header
                 ptm_codes[k] = v.code
 
         for k,v in iteritems(sequence_properties_classes):
-            headers[k] = v.description
+            headers[k] = v.header
 
         for k,v in iteritems(metadata_classes):
-            headers[k] = v.description
+            headers[k] = v.header
 
-        headers['position']    = SequencePosition.description
-        headers['wt']          = 'WT residue'
-        headers['mutated']     = 'Mutated residue'
-        headers['mut_sources'] = 'Mutation sources'
+        headers['position']    = SequencePosition.header
+        headers['wt']          = 'ref_aa'
+        headers['mutated']     = 'alt_aa'
+        headers['mut_sources'] = 'sources'
 
         self.headers = headers
         self.ptms = ptms
@@ -188,7 +188,7 @@ class Table:
 
         header += [ self.headers[p] for p in sequence_properties ]
         sequence_properties_col = list(range(sequence_properties_cols_start, len(header)))
-        header += ['WT residue', 'Mutated residue', 'Sources']
+        header += [self.headers['wt'], self.headers['mutated'], self.headers['mut_sources']]
         for md in mutation_metadata:
             header.append(self.headers[md])
 
@@ -330,8 +330,8 @@ class Table:
 
             pd.options.mode.chained_assignment = None
 
-            numeric_revel = df_m['Revel score'].apply(process_revel)
-            df_m['Revel score'] = numeric_revel
+            numeric_revel = df_m[self.headers['revel_score']].apply(process_revel)
+            df_m[self.headers['revel_score']] = numeric_revel
             df_m = df_m.fillna(revel_not_annotated)
 
             pd.options.mode.chained_assignment = 'warn'
@@ -340,7 +340,7 @@ class Table:
             ax.set_ylim((0.0, 1.0))
 
         else:
-            df_m['Revel score'] = revel_not_annotated
+            df_m[self.headers['revel_score']] = revel_not_annotated
 
         for col in list(set(df_m['stem_colors'])):
 

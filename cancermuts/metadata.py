@@ -38,6 +38,7 @@ class Metadata(object):
 class CancerType(Metadata):
 
     description = "Cancer type"
+    header = "cancer_type"
 
     def __init__(self, source, cancer_type):
         super(CancerType, self).__init__(source)
@@ -65,6 +66,7 @@ class CancerType(Metadata):
 class CancerStudy(Metadata):
 
     description = "Cancer study"
+    header = "cancer_study"
 
     def __init__(self, source, study_id):
         super(CancerStudy, self).__init__(source)
@@ -91,6 +93,7 @@ class CancerStudy(Metadata):
 class GenomicCoordinates(Metadata):
 
     description = "Genomic coordinates"
+    header = "genomic_coordinates"
 
     def __init__(self, source, genome_build, chromosome, coord_start, coord_end, ref):
         super(GenomicCoordinates, self).__init__(source)
@@ -129,6 +132,7 @@ class GenomicCoordinates(Metadata):
 class GenomicMutation(Metadata):
 
     description = "Genomic mutation"
+    header = "genomic_mutation"
 
     allowed_bases = set(['A', 'C', 'G', 'T'])
 
@@ -256,6 +260,7 @@ class GenomicMutation(Metadata):
 class DbnsfpRevel(Metadata):
 
     description = "Revel score"
+    header = "REVEL_score"
 
     def __init__(self, source, score):
         super(DbnsfpRevel, self).__init__(source)
@@ -314,6 +319,7 @@ class gnomADExomeAlleleFrequency(gnomADAlleleFrequency):
     freq_type = "Exome"
     basic_description = "%s allele frequency" % freq_type
     description = basic_description
+    header = "gnomad_exome_af"
 
     @classmethod
     def set_version_in_desc(cls, version_string):
@@ -330,6 +336,7 @@ class gnomADGenomeAlleleFrequency(gnomADAlleleFrequency):
     freq_type = "Genome"
     basic_description = "%s allele frequency" % freq_type
     description = basic_description
+    header = "gnomad_genome_af"
 
     @classmethod
     def set_version_in_desc(cls, version_string):
@@ -344,6 +351,7 @@ class gnomADGenomeAlleleFrequency(gnomADAlleleFrequency):
 class CancerSite(Metadata):
 
     description = "Cancer site"
+    header = "cancer_site"
     not_specified = 'NS'
 
     def __init__(self, source, *sites):
@@ -375,6 +383,7 @@ class CancerSite(Metadata):
 class CancerHistology(Metadata):
 
     description = "Cancer histology"
+    header = "cancer_histology"
     not_specified = 'NS'
 
     def __init__(self, source, *histology):
