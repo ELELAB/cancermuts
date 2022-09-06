@@ -243,6 +243,12 @@ class Table:
 
         df = pd.DataFrame(rows, columns=header)
 
+        this_col = df.pop(self.headers['wt'])
+        df.insert(1, self.headers['wt'], this_col)
+
+        this_col = df.pop(self.headers['mutated'])
+        df.insert(2, self.headers['mutated'], this_col)
+
         positions = df[ self.headers['position'] ]
 
         property_cols = dict()
