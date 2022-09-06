@@ -72,7 +72,8 @@ class PositionProperty(object):
 
 class LinearMotif(SequenceProperty):
     description = "Residue part of a linear motif"
-    category='linear_motif'
+    header = "linear_motif"
+    category = 'linear_motif'
 
     def __init__(self, positions, sources, name=""):
         super(LinearMotif, self).__init__(  name="Linear motif",
@@ -90,7 +91,8 @@ class LinearMotif(SequenceProperty):
 
 class Structure(SequenceProperty):
     description = "Structure"
-    category='structure'
+    header = "structure"
+    category = 'structure'
 
     def __init__(self, positions, sources, name=""):
         super(Structure, self).__init__(  name="Structure",
@@ -110,6 +112,7 @@ class Structure(SequenceProperty):
 
 class PhosphorylationSite(PositionProperty):
     description = "Phosphorylation site"
+    header = "phosphorylation_site"
     category="ptm_phosphorylation"
     code = "P"
 
@@ -125,6 +128,7 @@ class PhosphorylationSite(PositionProperty):
 
 class MethylationSite(PositionProperty):
     description = "Methylation site"
+    header = "methylation_site"
     category="ptm_methylation"
     code = "Me"
 
@@ -140,6 +144,7 @@ class MethylationSite(PositionProperty):
 
 class AcetylationSite(PositionProperty):
     description = "Acetylation site"
+    header = "acetylation_site"
     category='ptm_acetylation'
     code = 'Ac'
 
@@ -155,6 +160,7 @@ class AcetylationSite(PositionProperty):
 
 class SNitrosylationSite(PositionProperty):
     description = "S-Nitrosylation site"
+    header = "s-nitrosylation_site"
     category='ptm_nitrosylation'
     code = "SN"
 
@@ -170,6 +176,7 @@ class SNitrosylationSite(PositionProperty):
 
 class OGalNAcSite(PositionProperty):
     description = "OGalNAc site"
+    header = "ogalnac_site"
     category='ptm_ogalnac'
     code = "O-GalNAc"
 
@@ -185,6 +192,7 @@ class OGalNAcSite(PositionProperty):
 
 class OGlcNAcSite(PositionProperty):
     description = "OGlcNAc site"
+    header = "oglcnac_site"
     category='ptm_oglcnac'
     code = "O-GlcNAc"
 
@@ -201,6 +209,7 @@ class OGlcNAcSite(PositionProperty):
 
 class SumoylationSite(PositionProperty):
     description = "Sumoylation site"
+    header = "sumoyylation_site"
     category='ptm_sumoylation'
     code = "Sumo"
 
@@ -216,6 +225,7 @@ class SumoylationSite(PositionProperty):
 
 class UbiquitinationSite(PositionProperty):
     description = "Ubiquitination site"
+    header = "ubiquitination_site"
     category='ptm_ubiquitination'
     code = 'Ubq'
 
@@ -230,6 +240,7 @@ class UbiquitinationSite(PositionProperty):
 
 class CleavageSite(PositionProperty):
     description = "Caspase cleavage site"
+    header = "cleavage_site"
     category='ptm_cleavage'
     code = 'C'
 
@@ -246,6 +257,7 @@ class CleavageSite(PositionProperty):
 
 class DisorderPropensity(PositionProperty):
     description = "Structural disorder"
+    header = "disorder_propensity"
     category = 'disorder_propensity'
 
 #   def __init__(self, name, category, position, sources=None, values=None, metadata=None):
