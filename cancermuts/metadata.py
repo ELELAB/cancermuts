@@ -98,6 +98,12 @@ class GenomicCoordinates(Metadata):
     def __init__(self, source, genome_build, chromosome, coord_start, coord_end, ref):
         super(GenomicCoordinates, self).__init__(source)
         self.genome_build = genome_build
+
+        if chromosome == '23':
+            chromosome = 'X'
+        if chromosome == '24':
+            chromosome = 'Y'
+
         self.chr = chromosome
         self.coord_start = coord_start
         self.coord_end = coord_end
@@ -140,8 +146,8 @@ class GenomicMutation(Metadata):
     _mut_insdel_regexp = '^[0-9XY]+:g\.[0-9]+_[0-9]+delins[ACTG]+'
     _mut_snv_prog = re.compile(_mut_snv_regexp)
     _mut_insdel_prog = re.compile(_mut_insdel_regexp)
-    _mut_snv_parse = '{chr:d}:g.{coord:d}{ref:l}>{alt:l}'
-    _mut_insdel_parse = '{chr:d}:g.{coord_start:d}_{coord_end:d}delins{substitution}'
+    _mut_snv_parse = '{chr}:g.{coord:d}{ref:l}>{alt:l}'
+    _mut_insdel_parse = '{chr}:g.{coord_start:d}_{coord_end:d}delins{substitution}'
 
     @logger_init
     def __init__(self, source, genome_build, definition):
@@ -157,12 +163,20 @@ class GenomicMutation(Metadata):
                 self.log.error(f'this mutation does not specify allowed nucleotides: {definition}')
                 return None
 
-            self.chr = tokens['chr']
+            if tokens['chr'] == '23':
+                self.chr = 'X'
+            elif tokens['chr'] == '24':
+                self.chr = 'Y'
+            else:
+                self.chr = tokens['chr']
+
             self.coord = tokens['coord']
             self.ref = tokens['ref']
             self.alt = tokens['alt']
             self.is_snv = True
             self.is_insdel = False
+
+            self.definition=f"{self.chr}:g.{self.coord}{self.ref}>{self.alt}"
 
         elif self._mut_insdel_prog.match(definition):
             tokens = parse(self._mut_insdel_parse, definition)
@@ -170,12 +184,20 @@ class GenomicMutation(Metadata):
                 self.log.error(f'this mutation does not specify allowed nucleotides: {definition}')
                 return None
 
-            self.chr = tokens['chr']
+            if tokens['chr'] == '23':
+                self.chr = 'X'
+            elif tokens['chr'] == '24':
+                self.chr = 'Y'
+            else:
+                self.chr = tokens['chr']
+
             self.coord_start = tokens['coord_start']
             self.coord_end = tokens['coord_end']
             self.substitution = tokens['substitution']
             self.is_snv = False
             self.is_insdel = True
+
+            self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}delins{self.substitution}"
 
         else:
             self.chr = None
@@ -183,7 +205,7 @@ class GenomicMutation(Metadata):
             self.ref = None
             self.alt = None
             self.is_snv = False
-            self.is_insdel=False
+            self.is_insdel = False
 
     def get_value_str(self, fmt='csv'):
         if fmt == 'csv':
