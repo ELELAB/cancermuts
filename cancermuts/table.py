@@ -355,9 +355,9 @@ class Table:
             scores = []
             for s, row in df_m_c.iterrows():
                 try:
-                    this_score = np.float(row[self.headers['revel_score']])
+                    this_score = float(row[self.headers['revel_score']])
                 except ValueError:
-                    this_score = np.max(np.array(row[self.headers['revel_score']].split(", "), dtype=np.float))
+                    this_score = np.max(np.array(row[self.headers['revel_score']].split(", "), dtype=float))
                     self.log.warning("The revel score for {0}{1}{2} had more than one value ({3}). The largest will be used".format(
                         row[self.headers['wt']],
                         row[self.headers['position']],
