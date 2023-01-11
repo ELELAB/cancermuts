@@ -471,7 +471,8 @@ class cBioPortal(DynamicSource, object):
                                     'startPosition',
                                     'endPosition',
                                     'referenceAllele']].values)
-                        gd = ['hg19', str(int(gd[0])), str(int(gd[1])), str(int(gd[2])), str(gd[3])]
+
+                        gd = ['hg19', str(gd[0]), str(int(gd[1])), str(int(gd[2])), str(gd[3])]
                         out_metadata['genomic_coordinates'].append(gd)
                     if do_genomic_mutations:
                         if row['startPosition'] == row['endPosition']:
@@ -632,7 +633,7 @@ class COSMIC(DynamicSource, object):
 
                 if gd is not None:
                     tmp2 = r['Mutation genome position'].split(":")
-                    gd.append(str(int(tmp2[0]))) # chr
+                    gd.append(tmp2[0]) # chr
                     gd.extend(tmp2[1].split("-")) # [start, end]
                     gd.append(r['Mutation CDS'][-3]) # ref
 
