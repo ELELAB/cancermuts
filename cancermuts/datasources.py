@@ -1267,12 +1267,15 @@ class gnomAD(DynamicSource, object):
 
         ref_assembly = self._assembly[self.version]
 
+        mutation.metadata[md_type] = list()
+
         if gene_id not in self._cache.keys():
 
             data = self._get_gnomad_data(gene_id, self._assembly[self.version], self._versions[self.version])
 
             if data is None:
-                return
+                self._cache[gene_id] = None
+                return None
             
             assemblies = set(data['reference_genome'])
             
@@ -1287,12 +1290,13 @@ class gnomAD(DynamicSource, object):
             self._cache[gene_id] = data
         
         else:
-            self.log.info("data for gene %s already in cache" % gene_id)
             data = self._cache[gene_id]
 
-        mutation.metadata[md_type] = list()
+            if data is None:
+                self.log.warning(f"cached data for gene {gene_id} was available, but didn't contain any information")
+                return None
 
-        allele_frequencies = []
+            self.log.info(f"data for gene {gene_id} already in cache")
 
         for variant in mutation.metadata['genomic_mutations']:
             if type(variant) is GenomicMutation and (variant.is_snv or variant.is_insdel):
@@ -1387,6 +1391,10 @@ class gnomAD(DynamicSource, object):
                                             'genome.ac':'genome_ac',
                                             'genome.an':'genome_an'
                                             })
+        if variants.empty:
+            self.log.warning('No variants were available for the specified gene')
+            return None
+
         variants['edited_variant_id'] = variants.apply(self._edit_variant_id, axis=1)
 
         variants['total_ac'] = variants['exome_ac'] + variants['genome_ac']
