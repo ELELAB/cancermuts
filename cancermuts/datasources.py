@@ -48,6 +48,7 @@ from future.utils import iteritems
 from bravado.client import SwaggerClient
 from bravado.requests_client import RequestsClient
 from requests.adapters import HTTPAdapter
+from collections import defaultdict
 
 
 import sys
@@ -475,12 +476,22 @@ class cBioPortal(DynamicSource, object):
                         gd = ['hg19', str(gd[0]), str(int(gd[1])), str(int(gd[2])), str(gd[3])]
                         out_metadata['genomic_coordinates'].append(gd)
                     if do_genomic_mutations:
+
+                        if row['chr'] == 'MT':
+                            mut_type = 'm'
+                        else:
+                            mut_type = 'g'
+
                         if row['startPosition'] == row['endPosition']:
-                            gm_fmt = f"{row['chr']}:g.{row['startPosition']}{row['referenceAllele']}>{row['variantAllele']}"
+                            if row['chr'] == 'MT':
+                                mut_type = 'm'
+                            else:
+                                mut_type = 'g'
+                            gm_fmt = f"{row['chr']}:{mut_type}.{row['startPosition']}{row['referenceAllele']}>{row['variantAllele']}"
                             gm = ['hg19', gm_fmt]
                         elif (len(row['referenceAllele']) == len(row['variantAllele'])) and \
                                 ((row['endPosition'] - row['startPosition'] + 1) == len(row['variantAllele'])):
-                            gm_fmt = f"{row['chr']}:g.{row['startPosition']}_{row['endPosition']}delins{row['variantAllele']}"
+                            gm_fmt = f"{row['chr']}:{mut_type}.{row['startPosition']}_{row['endPosition']}delins{row['variantAllele']}"
                             gm = ['hg19', gm_fmt]
                             #self.log.info("Added delins! " + gm_fmt)
                         else:
@@ -1185,7 +1196,15 @@ class gnomAD(DynamicSource, object):
                        '2.1_non-topmed' :  'gnomAD v2.1 (non-topmed)',
                        'exac' :            'EXaC',
                     }
-
+    # whether the version includes mitochondrial DNA variants
+    _version_mt = {   '2.1' :              False,
+                       '3' :               True,
+                       '2.1_controls' :    False,
+                       '2.1_non-neuro' :   False,
+                       '2.1_non-cancer' :  False,
+                       '2.1_non-topmed' :  False,
+                       'exac' :            False
+                    }
 
     @logger_init
     def __init__(self, version='2.1'):
@@ -1200,7 +1219,9 @@ class gnomAD(DynamicSource, object):
         self._gnomad_endpoint = 'https://gnomad.broadinstitute.org/api/'
         self._cache = {}
         self._supported_metadata = {'gnomad_exome_allele_frequency' : self._get_exome_allele_freq,
-                                    'gnomad_genome_allele_frequency' : self._get_genome_allele_freq}
+                                    'gnomad_genome_allele_frequency' : self._get_genome_allele_freq,
+                                    'gnomad_mt_hom_allele_frequency' : self._get_mt_hom_allele_freq}
+        self._cache = defaultdict(dict)
 
         gnomADExomeAlleleFrequency.set_version_in_desc(self._version_str[version])
         gnomADGenomeAlleleFrequency.set_version_in_desc(self._version_str[version])
@@ -1254,6 +1275,10 @@ class gnomAD(DynamicSource, object):
         self.log.info("getting genome allele frequency")
         self._get_metadata(mutation, gene_id, 'gnomad_genome_allele_frequency')
 
+    def _get_mt_hom_allele_freq(self, mutation, gene_id):
+        self.log.info("getting mitochondrial allele frequency")
+        self._get_metadata(mutation, gene_id, 'gnomad_mt_hom_allele_frequency')
+
     def _edit_variant_id(self, row):
         split_id = row['variant_id'].split('-')
         if len(split_id[2]) > 1 or len(split_id[3]) > 1:
@@ -1263,34 +1288,43 @@ class gnomAD(DynamicSource, object):
     def _get_metadata(self, mutation, gene_id, md_type):
 
         exac_key = {    'gnomad_exome_allele_frequency'  : 'exome_af', 
-                        'gnomad_genome_allele_frequency' : 'genome_af'       }
-
+                        'gnomad_genome_allele_frequency' : 'genome_af',
+                        'gnomad_mt_hom_allele_frequency' : 'mt_hom_af' }
         ref_assembly = self._assembly[self.version]
 
         mutation.metadata[md_type] = list()
 
-        if gene_id not in self._cache.keys():
+        if (md_type == 'gnomad_exome_allele_frequency' or md_type == 'gnomad_genome_allele_frequency'):
+            data_type = 'variants'
+            data_fct = self._get_gnomad_data
+        elif md_type == 'gnomad_mt_hom_allele_frequency':
+            data_type = 'mt_variants'
+            data_fct = self._get_gnomad_mt_data
 
-            data = self._get_gnomad_data(gene_id, self._assembly[self.version], self._versions[self.version])
+        if gene_id not in self._cache[data_type].keys():
+
+            data = data_fct(gene_id, self._assembly[self.version], self._versions[self.version])
 
             if data is None:
-                self._cache[gene_id] = None
+                self._cache[data_type][gene_id] = None
                 return None
-            
+
             assemblies = set(data['reference_genome'])
             
             if len(assemblies) != 1:
                 self.log.error("the downloaded data refers to more than one assembly!")
+                self._cache[data_type][gene_id] = None
                 return None
 
             if list(assemblies)[0] != ref_assembly:
                 self.log.error("the downloaded data refers to an unexpected assembly!")
+                self._cache[data_type][gene_id] = None
                 return None
 
-            self._cache[gene_id] = data
+            self._cache[data_type][gene_id] = data
         
         else:
-            data = self._cache[gene_id]
+            data = self._cache[data_type][gene_id]
 
             if data is None:
                 self.log.warning(f"cached data for gene {gene_id} was available, but didn't contain any information")
@@ -1326,11 +1360,16 @@ class gnomAD(DynamicSource, object):
                 else:
                     af = this_df[exac_key[md_type]].values[0]
                     self.log.info("entry found for %s" % v_str)
+                    print('---')
+                    print(mutation)
+                    print('matching ID', af)
+                    print('matching_id', v_str)
+                    print('original def', variant.definition, variant.genome_build)
+                    print('lifted', variant.as_assembly(ref_assembly).definition, variant.as_assembly(ref_assembly).genome_build)
             if af is not None:
                 mutation.metadata[md_type].append(metadata_classes[md_type](self, af))
 
     def _get_gnomad_data(self, gene_id, reference_genome, dataset):
-        headers = { "content-type": "application/json" }
         request="""query getGene($geneSymbol : String!,
                               $refBuild : ReferenceGenomeId!,
                               $dataset : DatasetId!) {
@@ -1405,6 +1444,71 @@ class gnomAD(DynamicSource, object):
         variants['total_af'] = variants['total_ac'] / variants['total_an']
 
         return variants
+
+    def _get_gnomad_mt_data(self, gene_id, reference_genome, dataset):
+        request="""query getGene($geneSymbol : String!,
+                              $refBuild : ReferenceGenomeId!,
+                              $dataset : DatasetId!) {
+                gene(gene_symbol : $geneSymbol, reference_genome: $refBuild) {
+                    gene_id
+                    symbol
+                    hgnc_id
+                    mitochondrial_variants(dataset : $dataset) {
+                        variant_id
+                        reference_genome
+                        pos
+                        rsids
+                        ac_hom
+                        ac_het
+                        an
+                    }
+                }
+            }"""
+
+        self.log.info("retrieving mitochondrial variant data for gene %s" % gene_id)
+
+        try:
+            response = rq.post(self._gnomad_endpoint,
+                data=json.dumps({
+                                "query": request,
+                                "variables": { "geneSymbol": gene_id,
+                                               "refBuild"  : reference_genome,
+                                               "dataset"   : dataset }
+                                }),
+                headers={"Content-Type": "application/json"})
+        except:
+            self.log.error("Couldn't perform request for gnomAD")
+            return None
+
+        try:
+            response_json = response.json()
+        except:
+            self.log.error("downloaded data couldn't be understood")
+            return None
+
+        if 'errors' in response_json.keys():
+            self.log.error('The following errors were reported when querying gnomAD:')
+            for e in response_json['errors']:
+                self.log.error('\t%s' % e['message'])
+            return None
+
+        variants = pd.json_normalize(response_json['data']['gene']['mitochondrial_variants'])
+        variants = variants.rename(columns={'exome.ac':'exome_ac',
+                                            'exome.an':'exome_an',
+                                            'genome.ac':'genome_ac',
+                                            'genome.an':'genome_an'
+                                            })
+        if variants.empty:
+            self.log.warning('No mitochondrial variants were available for the specified gene')
+            return None
+
+        variants['edited_variant_id'] = variants.apply(self._edit_variant_id, axis=1)
+
+        variants['mt_hom_af']  =  variants['ac_hom'] / variants['an']
+        variants['mt_het_af']  =  variants['ac_het'] / variants['an']
+
+        return variants
+
 
 class MobiDB(DynamicSource):
 

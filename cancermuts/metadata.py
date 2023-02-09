@@ -142,12 +142,12 @@ class GenomicMutation(Metadata):
 
     allowed_bases = set(['A', 'C', 'G', 'T'])
 
-    _mut_snv_regexp = '^[0-9XY]+:g\.[0-9]+[ACTG]>[ACTG]'
-    _mut_insdel_regexp = '^[0-9XY]+:g\.[0-9]+_[0-9]+delins[ACTG]+'
+    _mut_snv_regexp = '^([0-9]+|X|Y|MT)+:[gm]\.[0-9]+[ACTG]>[ACTG]'
+    _mut_insdel_regexp = '^([0-9]+|X|Y|MT):[gm]\.[0-9]+_[0-9]+delins[ACTG]+'
     _mut_snv_prog = re.compile(_mut_snv_regexp)
     _mut_insdel_prog = re.compile(_mut_insdel_regexp)
-    _mut_snv_parse = '{chr}:g.{coord:d}{ref:l}>{alt:l}'
-    _mut_insdel_parse = '{chr}:g.{coord_start:d}_{coord_end:d}delins{substitution}'
+    _mut_snv_parse = '{chr}:{type:l}.{coord:d}{ref:l}>{alt:l}'
+    _mut_insdel_parse = '{chr}:{type:l}.{coord_start:d}_{coord_end:d}delins{substitution}'
 
     @logger_init
     def __init__(self, source, genome_build, definition):
@@ -167,16 +167,20 @@ class GenomicMutation(Metadata):
                 self.chr = 'X'
             elif tokens['chr'] == '24':
                 self.chr = 'Y'
+            elif tokens['chr'] == '25':
+                self.chr = 'MT'
             else:
                 self.chr = tokens['chr']
 
+            self.type = tokens['type']
             self.coord = tokens['coord']
             self.ref = tokens['ref']
             self.alt = tokens['alt']
             self.is_snv = True
             self.is_insdel = False
 
-            self.definition=f"{self.chr}:g.{self.coord}{self.ref}>{self.alt}"
+            self.definition=f"{self.chr}:{self.type}.{self.coord}{self.ref}>{self.alt}"
+            print(f"parsing mut {definition} to {self.definition}")
 
         elif self._mut_insdel_prog.match(definition):
             tokens = parse(self._mut_insdel_parse, definition)
@@ -188,6 +192,8 @@ class GenomicMutation(Metadata):
                 self.chr = 'X'
             elif tokens['chr'] == '24':
                 self.chr = 'Y'
+            elif tokens['chr'] == '25':
+                self.chr = 'MT'
             else:
                 self.chr = tokens['chr']
 
@@ -197,7 +203,8 @@ class GenomicMutation(Metadata):
             self.is_snv = False
             self.is_insdel = True
 
-            self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}delins{self.substitution}"
+            self.definition = f"{self.chr}:{self.type}.{self.coord_start}_{self.coord_end}delins{self.substitution}"
+            print(f"parsing mut {definition} to {self.definition}")
 
         else:
             self.chr = None
@@ -211,10 +218,16 @@ class GenomicMutation(Metadata):
         if fmt == 'csv':
             return f"{self.genome_build},{self.definition}"
         if fmt == 'gnomad':
+
+            if self.chr == 'MT':
+                chr = 'M'
+            else:
+                chr = self.chr
+
             if self.is_snv:
-                return f"{self.chr}-{self.coord}-{self.ref}-{self.alt}"
+                return f"{chr}-{self.coord}-{self.ref}-{self.alt}"
             elif self.is_insdel:
-                return f"{self.chr}-{self.coord_start}-?-{self.substitution}"
+                return f"{chr}-{self.coord_start}-?-{self.substitution}"
             else:
                 return None
         else:
@@ -224,19 +237,28 @@ class GenomicMutation(Metadata):
         return self.coord
 
     def as_hg19(self):
+        if self.genome_build == 'hg38':
+            return self
+        elif self.genome_build == 'hg19':
+
+            if self.chr == 'MT':
+                chr = 'M'
+            else:
+                chr = self.chr
+
         if self.genome_build == 'hg19':
             return self
         elif self.genome_build == 'hg38':
             if self.is_snv:
-                converted_coords = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.coord))
+                converted_coords = lo_hg38_hg19.convert_coordinate(f'chr{chr}', int(self.coord))
                 assert len(converted_coords) == 1
-                return GenomicMutation(self.source, 'hg19', f"{self.chr}:g.{converted_coords[0][1]}{self.ref}>{self.alt}")
+                return GenomicMutation(self.source, 'hg19', f"{self.chr}:{self.type}.{converted_coords[0][1]}{self.ref}>{self.alt}")
             elif self.is_insdel:
-                converted_coords_start = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.coord_start))
-                converted_coords_end   = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.coord_end))
+                converted_coords_start = lo_hg38_hg19.convert_coordinate(f'chr{chr}', int(self.coord_start))
+                converted_coords_end   = lo_hg38_hg19.convert_coordinate(f'chr{chr}', int(self.coord_end))
                 assert len(converted_coords_start) == 1
                 assert len(converted_coords_end)   == 1
-                return GenomicMutation(self.source, 'hg19', f"{self.chr}:g.{converted_coords_start[0][1]}_{converted_coords_end[0][1]}delins{self.substitution}")
+                return GenomicMutation(self.source, 'hg19', f"{self.chr}:{self.type}.{converted_coords_start[0][1]}_{converted_coords_end[0][1]}delins{self.substitution}")
             else:
                 raise TypeError
 
@@ -244,16 +266,22 @@ class GenomicMutation(Metadata):
         if self.genome_build == 'hg38':
             return self
         elif self.genome_build == 'hg19':
+
+            if self.chr == 'MT':
+                chr = 'M'
+            else:
+                chr = self.chr
+
             if self.is_snv:
-                converted_coords = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.coord))
+                converted_coords = lo_hg19_hg38.convert_coordinate(f'chr{chr}', int(self.coord))
                 assert len(converted_coords) == 1
-                return GenomicMutation(self.source, 'hg38', f"{self.chr}:g.{converted_coords[0][1]}{self.ref}>{self.alt}")
+                return GenomicMutation(self.source, 'hg38', f"{self.chr}:{self.type}.{converted_coords[0][1]}{self.ref}>{self.alt}")
             elif self.is_insdel:
-                converted_coords_start = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.coord_start))
-                converted_coords_end   = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.coord_end))
+                converted_coords_start = lo_hg19_hg38.convert_coordinate(f'chr{chr}', int(self.coord_start))
+                converted_coords_end   = lo_hg19_hg38.convert_coordinate(f'chr{chr}', int(self.coord_end))
                 assert len(converted_coords_start) == 1
                 assert len(converted_coords_end)   == 1
-                return GenomicMutation(self.source, 'hg38', f"{self.chr}:g.{converted_coords_start[0][1]}{converted_coords_end[0][1]}delins{self.substitution}")
+                return GenomicMutation(self.source, 'hg38', f"{self.chr}:{self.type}.{converted_coords_start[0][1]}{converted_coords_end[0][1]}delins{self.substitution}")
             else:
                 raise TypeError
 
@@ -370,6 +398,19 @@ class gnomADGenomeAlleleFrequency(gnomADAlleleFrequency):
     def __repr__(self):
         return "<gnomADGenomeAlleleFrequency, %f>" % self.frequency
 
+class gnomADHomMitochondrialAlleleFrequency(gnomADAlleleFrequency):
+
+    freq_type = "Mitochondrial"
+    basic_description = "%s homoplasmic allele frequency" % freq_type
+    description = basic_description
+    header = "gnomad_mitochondrial_hom_af"
+
+    def __init__(self, source, frequency):
+        super(gnomADHomMitochondrialAlleleFrequency, self).__init__(source, frequency)
+
+    def __repr__(self):
+        return "<gnomADHomMitochondrialAlleleFrequency, %f>" % self.frequency
+
 class CancerSite(Metadata):
 
     description = "Cancer site"
@@ -435,13 +476,14 @@ class CancerHistology(Metadata):
         return hash((self.source, self.histology))
 
 metadata_classes = { 
-                     'cancer_type'                 : CancerType,
-                     'cancer_study'                : CancerStudy,
-                     'genomic_coordinates'         : GenomicCoordinates,
-                     'genomic_mutations'           : GenomicMutation,
-                     'revel_score'                 : DbnsfpRevel,
+                     'cancer_type'                    : CancerType,
+                     'cancer_study'                   : CancerStudy,
+                     'genomic_coordinates'            : GenomicCoordinates,
+                     'genomic_mutations'              : GenomicMutation,
+                     'revel_score'                    : DbnsfpRevel,
                      'gnomad_genome_allele_frequency' : gnomADGenomeAlleleFrequency,
-                     'gnomad_exome_allele_frequency' : gnomADExomeAlleleFrequency,
-                     'cancer_site'                 : CancerSite,
-                     'cancer_histology'            : CancerHistology,
+                     'gnomad_exome_allele_frequency'  : gnomADExomeAlleleFrequency,
+                     'gnomad_mt_hom_allele_frequency' : gnomADHomMitochondrialAlleleFrequency,
+                     'cancer_site'                    : CancerSite,
+                     'cancer_histology'               : CancerHistology,
                    }
