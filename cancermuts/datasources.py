@@ -1603,20 +1603,19 @@ class ManualAnnotation(StaticSource):
             return
 
         #Prepares metadata for mutations
-        metadata.append('genomic_mutations')
-        gm_df = self._df['genomic_mutations'][self._df['type'] == 'mutation']
-        gm = list()
-        for row in gm_df:
-            if len(row.split(' ')) > 1:
-                md=str()
-                for el in row.split(' '):
-                    md+=el+','
-                gm.append(md[:-1].split(','))
-            elif row is not '':
-                gm.append(row.split(','))
-            else:
-                gm.append(None)
-        out_metadata = {'genomic_mutations':gm}
+        do_genomic_mutations=False
+        if 'genomic_mutations' in metadata:
+            do_genomic_mutations=True
+
+        if do_genomic_mutations:
+            gm_df = self._df['genomic_mutations'][self._df['type'] == 'mutation']
+            gm = list()
+            for row in gm_df:
+                if row is not '':
+                    gm.append(re.split('[,\s]+',row))
+                else:
+                    gm.append(None)
+            out_metadata = {'genomic_mutations':gm}
 
         #mutation dataframe
         tmp_df = self._df[ self._df['type'] == 'mutation' ]
@@ -1659,18 +1658,19 @@ class ManualAnnotation(StaticSource):
 
             mutation_indices = [i for i, x in enumerate(mutations) if x == m]
 
-            #If there are multiple genomic mutation metadata for one mutation, move the 
-            #additional entries to the end of out_metadata['genomic_mutations'] and
-            #and add the index number for this entry to mutation_indices
-            new_mut_ind = list()
-            for mi in mutation_indices:     
-                if out_metadata['genomic_mutations'][mi] != None and len(out_metadata['genomic_mutations'][mi]) > 2:
-                    num_md = len(out_metadata['genomic_mutations'][mi])
-                    for i in range(2,num_md,2):
-                        out_metadata['genomic_mutations'].append(out_metadata['genomic_mutations'][mi][i:i+2])
-                        new_mut_ind.append(len(out_metadata['genomic_mutations'])-1)
-                    out_metadata['genomic_mutations'][mi] = out_metadata['genomic_mutations'][mi][0:2]        
-            mutation_indices.extend(new_mut_ind)
+            if do_genomic_mutations:
+                #If there are multiple genomic mutation metadata for one mutation, move the 
+                #additional entries to the end of out_metadata['genomic_mutations'] and
+                #and add the index number for this entry to mutation_indices
+                new_mut_ind = list()
+                for mi in mutation_indices:  
+                    if out_metadata['genomic_mutations'][mi] is not None and len(out_metadata['genomic_mutations'][mi]) > 2:
+                        num_md = len(out_metadata['genomic_mutations'][mi])
+                        for i in range(2,num_md,2):
+                            out_metadata['genomic_mutations'].append(out_metadata['genomic_mutations'][mi][i:i+2])
+                            new_mut_ind.append(len(out_metadata['genomic_mutations'])-1)
+                        out_metadata['genomic_mutations'][mi] = out_metadata['genomic_mutations'][mi][0:2]        
+                mutation_indices.extend(new_mut_ind)
 
             mutation_obj = Mutation(sequence.positions[site_seq_idx],
                                     mut,
