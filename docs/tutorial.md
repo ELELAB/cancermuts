@@ -614,6 +614,7 @@ information. The file should have the following columns, separated by `;`:
 | `type` | type of this feature; see below |
 | `function` | function description of this feature or functional annotation; see below |
 | `reference` | reference to the literature for this feature (if any) |
+| `genomic_mutations` | metadata for mutations; see below |
 
 The column format changes depending on the `type`:
 
@@ -622,9 +623,11 @@ The column format changes depending on the `type`:
     * `name` can be any string
     * `site` needs to be a HGVS-format protein variant specification, e.g.
      `p.Ala398Tyr`
-    * `function` should be either empty or a HGVS-format single-nucleotide
+    * `genomic_mutations` should be either empty or a HGVS-format single-nucleotide
     substitution in HGVS format, preposed by 19 or 38 depending on the
-    reference genome assembly (hg19/38). For instance, `38,17:g.7673776G>A`
+    reference genome assembly (hg19/38). For instance, `38,17:g.7673776G>A`. If there are 
+    multiple entries for the same mutation, seperate them with a space.
+    	* To parse the column 'genomic_mutations', it has to specified when adding mutations. See the examples below.
 
 * If we want to annotate a post-translational modification, then 
     * `type` should be one of `ptm_phosphorylation`,
@@ -653,8 +656,8 @@ The column format changes depending on the `type`:
 For instance, this is a working example of the csv file (named `test.csv`):
 
 ```
-name;site;type;function;reference
-asd;p.Met1Ala;mutation;38,17:g.7673776G>A;qwe
+name;site;type;function;reference;genomic_mutations
+asd;p.Met1Ala;mutation;;qwe;38,17:g.7673776G>A
 qwe;3;ptm_phosphorylation;asd;qwe
 zxc;10-25;linear_motif;zzz;qqq
 ert;30-40;structure;xxx;ppp
@@ -667,6 +670,9 @@ using the CSV file works as you would expect:
 
 # adds mutations to the seq object
 >>> ma.add_mutations(seq)
+
+# adds mutations and the corresponding metadata to the seq obejct
+>>> ma.add_mutations(seq, metadata=['genomic_mutations'])
 
 # adds PTM annotations to the sequence object
 >>> ma.add_position_properties(seq)
@@ -743,3 +749,4 @@ are generated. The argument is the number of desired positions
 changed by using argument `mutation_elms_only=False`
 * option `figsize` accepts a tuple of number (width and height) and allows to
 change size and proportion of the output figure (e.g. `figsize=(4,5)`)
+
