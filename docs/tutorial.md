@@ -149,6 +149,17 @@ MPSEKTFKQRRTFEQRVEDVRLIREQHPTKIPVIIERYKGEKQLPVLDKTKFLVPDHVNMSELIKIIRRRLQLNANQAFF
 
 ```
 
+{% hint style='info' %}
+Cancermuts is able to handle mitochondrial genes, and will download associated
+cancer mutations from both cBioPortal and COSMIC - however not all our annotation
+sources support them. Currently, we are not able to download annotations for the
+following sources:
+  - REVEL from MyVariant as REVEL scores are not available for mitochondrial genes
+  - gnomAD allele frequencies, because mitochondrial genes are not available on
+  the gnomAD API
+we therefore recommend skipping these annotations altogether for mitochondrial genes.
+{% endhint %}
+
 ### Collecting cancer mutations
 
 Now that we have the Sequence ready, we can start adding annotations to it.
