@@ -1546,7 +1546,8 @@ class MobiDB(DynamicSource):
 
 class ManualAnnotation(StaticSource):
 
-    _expected_cols = ['name', 'site', 'type', 'function', 'reference','genomic_mutations']
+    _expected_cols = ['name', 'site', 'type', 'function', 'reference']
+    _metadata_cols = ['genomic_mutations']
     _ptm_keywords = ['ptm_cleavage', 'ptm_phosphorylation', 'ptm_ubiquitination', 'ptm_acetylation', 'ptm_sumoylation', 'ptm_nitrosylation', 'ptm_methylation']
     _supported_position_properties = _ptm_keywords
     _supported_sequence_properties = ['linear_motif', 'structure']
@@ -1587,6 +1588,10 @@ class ManualAnnotation(StaticSource):
         except:
             self.log.error("required columns not found in csv file (these are: %s). Manual annotation will be skipped" % ", ".join(self._expected_cols))
             raise IndexError
+        try:
+            self._metadata_df = df[ self._metadata_cols ]
+        except:
+            self.log.warning("Metadata columns not found in csv file (these are: %s)." % ", ".join(self._metadata_cols))
 
         self.log.info("Parsed file:")
         self.log.info('\n{0}'.format(str(self._df)))
@@ -1606,12 +1611,17 @@ class ManualAnnotation(StaticSource):
         do_genomic_mutations=False
         if 'genomic_mutations' in metadata:
             do_genomic_mutations=True
+            try:
+                gm_df = self._metadata_df['genomic_mutations'][self._df['type'] == 'mutation']
+            except:
+                self.log.error('genomic_mutations specified in metadata, but no genomic_mutations column found in file. Metadata annotation will be skipped.')
+                metadata.remove('genomic_mutations')
+                do_genomic_mutations=False
 
         if do_genomic_mutations:
-            gm_df = self._df['genomic_mutations'][self._df['type'] == 'mutation']
             gm = list()
             for row in gm_df:
-                if row is not '':
+                if row != '':
                     gm.append(re.split('[,\s]+',row))
                 else:
                     gm.append(None)
