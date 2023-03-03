@@ -269,6 +269,7 @@ class cBioPortal(DynamicSource, object):
                 self.log.info("synonymous mutation %s discarded" % m)
                 continue
 
+            #Finds the mutation's indices in the complete list of mutations. Used for adding metadata
             mutation_indices = [i for i,x in enumerate(mutations) if x == m]
 
             try:
@@ -1546,6 +1547,7 @@ class MobiDB(DynamicSource):
 class ManualAnnotation(StaticSource):
 
     _expected_cols = ['name', 'site', 'type', 'function', 'reference']
+    _metadata_cols = ['genomic_mutations']
     _ptm_keywords = ['ptm_cleavage', 'ptm_phosphorylation', 'ptm_ubiquitination', 'ptm_acetylation', 'ptm_sumoylation', 'ptm_nitrosylation', 'ptm_methylation']
     _supported_position_properties = _ptm_keywords
     _supported_sequence_properties = ['linear_motif', 'structure']
@@ -1586,6 +1588,10 @@ class ManualAnnotation(StaticSource):
         except:
             self.log.error("required columns not found in csv file (these are: %s). Manual annotation will be skipped" % ", ".join(self._expected_cols))
             raise IndexError
+        try:
+            self._metadata_df = df[ self._metadata_cols ]
+        except:
+            self.log.warning("Metadata columns not found in csv file (these are: %s)." % ", ".join(self._metadata_cols))
 
         self.log.info("Parsed file:")
         self.log.info('\n{0}'.format(str(self._df)))
@@ -1601,10 +1607,29 @@ class ManualAnnotation(StaticSource):
         if self._df is None:
             return
 
+        #Prepares metadata for mutations
+        do_genomic_mutations=False
+        if 'genomic_mutations' in metadata:
+            do_genomic_mutations=True
+            try:
+                gm_df = self._metadata_df['genomic_mutations'][self._df['type'] == 'mutation']
+            except:
+                self.log.error('genomic_mutations specified in metadata, but no genomic_mutations column found in file. Metadata annotation will be skipped.')
+                metadata.remove('genomic_mutations')
+                do_genomic_mutations=False
+
+        if do_genomic_mutations:
+            gm = list()
+            for row in gm_df:
+                if row != '':
+                    gm.append(re.split('[,\s]+',row))
+                else:
+                    gm.append(None)
+            out_metadata = {'genomic_mutations':gm}
+
+        #mutation dataframe
         tmp_df = self._df[ self._df['type'] == 'mutation' ]
 
-        if 'genomic_mutations' in metadata:
-            out_metadata = { 'genomic_mutations' : tmp_df['function'].str.split(',').tolist() }
 
         mutations = tmp_df['site'].tolist()
 
@@ -1613,11 +1638,13 @@ class ManualAnnotation(StaticSource):
         self.log.info("unique mutations found in datafile: %s" % (", ".join(sorted(unique_mutations))))
 
         for m in unique_mutations:
+            #collects the position, wild type aa and mutated aa
             tokens = parse(self._mut_prot_parse, m)
             if tokens is None:
                 self.log.error(f"Failed to parse mutation {m}; check that the format is correct (i.e. HGVS protein single amino acid substitution)")
                 continue
 
+            #checks if it is a synonymous mutation
             num = int(tokens['position'])
             wt  = three_to_one(str.upper(tokens['wt']))
             mut = three_to_one(str.upper(tokens['mut']))
@@ -1626,6 +1653,7 @@ class ManualAnnotation(StaticSource):
                 self.log.info("synonymous mutation %s discarded" % m)
                 continue
 
+            #Checks if mutation is outside protein sequence
             try:
                 site_seq_idx = sequence.seq2index(num)
             except:
@@ -1640,10 +1668,25 @@ class ManualAnnotation(StaticSource):
 
             mutation_indices = [i for i, x in enumerate(mutations) if x == m]
 
+            if do_genomic_mutations:
+                #If there are multiple genomic mutation metadata for one mutation, move the 
+                #additional entries to the end of out_metadata['genomic_mutations'] and
+                #and add the index number for this entry to mutation_indices
+                new_mut_ind = list()
+                for mi in mutation_indices:  
+                    if out_metadata['genomic_mutations'][mi] is not None and len(out_metadata['genomic_mutations'][mi]) > 2:
+                        num_md = len(out_metadata['genomic_mutations'][mi])
+                        for i in range(2,num_md,2):
+                            out_metadata['genomic_mutations'].append(out_metadata['genomic_mutations'][mi][i:i+2])
+                            new_mut_ind.append(len(out_metadata['genomic_mutations'])-1)
+                        out_metadata['genomic_mutations'][mi] = out_metadata['genomic_mutations'][mi][0:2]        
+                mutation_indices.extend(new_mut_ind)
+
             mutation_obj = Mutation(sequence.positions[site_seq_idx],
                                     mut,
                                     [self])
 
+            #Adding mutation to mutation object
             for md in metadata:
                 mutation_obj.metadata[md] = []
                 for mi in mutation_indices:
@@ -1651,7 +1694,6 @@ class ManualAnnotation(StaticSource):
                         tmp_md = [self] + out_metadata[md][mi]
                         this_md = metadata_classes[md](*tmp_md)
                         mutation_obj.metadata[md].append(this_md)
-
             position.add_mutation(mutation_obj)
 
 
