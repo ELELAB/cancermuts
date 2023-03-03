@@ -623,11 +623,14 @@ The column format changes depending on the `type`:
     * `name` can be any string
     * `site` needs to be a HGVS-format protein variant specification, e.g.
      `p.Ala398Tyr`
-    * `genomic_mutations` HGVS-format single-nucleotide
-    substitution, preposed by hg19 or hg38 depending on the
-    reference genome assembly (hg19/hg38). For instance, `hg38,17:g.7673776G>A`. If there are 
-    multiple entries for the same mutation, seperate them with a space.
-    	* To add the information from 'genomic_mutations', it has to specified when adding mutations. See the examples below.
+    * a new column, `genomic_mutations`, can optionally be added to annotate genomic
+    mutations metadata corresponding to the protein mutation. For each
+    mutation, we can specify one mor more space-separated single-nucleotide
+    substitutions in the HGVS format, preposed by hg19 or hg38 depending on the
+    reference genome assembly (hg19/hg38). For instance, `hg38,17:g.7673776G>A`.
+    To actually use the information from the 'genomic_mutations' column, the
+    `genomic_mutations` metadata should also be specified when calling `ManualAnnotation.add_mutations`
+    See the examples below.
 
 * If we want to annotate a post-translational modification, then 
     * `type` should be one of `ptm_phosphorylation`,
@@ -680,11 +683,13 @@ using the CSV file works as you would expect:
 
 # adds mutations to the seq object
 >>> ma.add_mutations(seq)
-# adds mutations and the corresponding metadata to the seq obejct
-# >>> ma.add_mutations(seq, metadata=['genomic_mutations'])
-
 # adds PTM annotations to the sequence object
 >>> ma.add_position_properties(seq)
+
+# alternatively, if we want to add genomic mutations metadata, we need to
+# explicitly add it in the metadata argument instead. The following commented
+# line adds mutations with the corresponding metadata to the seq obejct
+# >>> ma.add_mutations(seq, metadata=['genomic_mutations'])
 
 # adds structure or linear motif annotation to the sequence object
 >>> ma.add_sequence_properties(seq)
