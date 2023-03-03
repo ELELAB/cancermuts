@@ -75,19 +75,18 @@ class LinearMotif(SequenceProperty):
     header = "linear_motif"
     category = 'linear_motif'
 
-    def __init__(self, positions, sources, name=""):
+    def __init__(self, positions, sources, name="", id=""):
         super(LinearMotif, self).__init__(  name="Linear motif",
                                                     positions=positions,
                                                     sources=sources,
                                                     values=None,
                                                     metadata=None  )
         self.type = name
+        self.id = id
 
     def get_value_str(self):
-        return "%s, %d-%d, %s" % (    self.type,
-                                      self.positions[ 0].sequence_position,
-                                      self.positions[-1].sequence_position,
-                                      ",".join(s.name for s in self.sources))
+        return f'{self.type} ({self.id}),{self.positions[ 0].sequence_position}-{self.positions[-1].sequence_position},{",".join(s.name for s in self.sources)}'
+
 
 class Structure(SequenceProperty):
     description = "Structure"
