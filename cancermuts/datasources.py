@@ -1150,7 +1150,8 @@ class ELMPredictions(DynamicSource, object):
 
             property_obj = sequence_properties_classes['linear_motif']  (sources=[self],
                                                                          positions=this_positions,
-                                                                         name=self._elm_classes[d[0]][0])
+                                                                         name=self._elm_classes[d[0]][0],
+                                                                         id=d[0])
 
             property_obj.metadata['function'] = [self._elm_classes[d[0]][0]]
             property_obj.metadata['ref']      = self.description
