@@ -370,6 +370,40 @@ class gnomADGenomeAlleleFrequency(gnomADAlleleFrequency):
     def __repr__(self):
         return "<gnomADGenomeAlleleFrequency, %f>" % self.frequency
 
+class gnomADPopmaxExomeAlleleFrequency(gnomADAlleleFrequency):
+
+    freq_type = "Popmax exome"
+    basic_description = "%s allele frequency" % freq_type
+    description = basic_description
+    header = "gnomad_popmax_exome_af"
+
+    @classmethod
+    def set_version_in_desc(cls, version_string):
+        cls.description = "%s (%s)" % (cls.basic_description, version_string)
+
+    def __init__(self, source, frequency):
+        super(gnomADPopmaxExomeAlleleFrequency, self).__init__(source, frequency)
+
+    def __repr__(self):
+        return "<gnomADPopmaxExomeAlleleFrequency, %f>" % self.frequency
+
+class gnomADPopmaxGenomeAlleleFrequency(gnomADAlleleFrequency):
+
+    freq_type = "Popmax genome"
+    basic_description = "%s allele frequency" % freq_type
+    description = basic_description
+    header = "gnomad_popmax_genome_af"
+
+    @classmethod
+    def set_version_in_desc(cls, version_string):
+        cls.description = "%s (%s)" % (cls.basic_description, version_string)
+
+    def __init__(self, source, frequency):
+        super(gnomADPopmaxGenomeAlleleFrequency, self).__init__(source, frequency)
+
+    def __repr__(self):
+        return "<gnomADPopmaxGenomeAlleleFrequency, %f>" % self.frequency
+
 class CancerSite(Metadata):
 
     description = "Cancer site"
@@ -442,6 +476,8 @@ metadata_classes = {
                      'revel_score'                 : DbnsfpRevel,
                      'gnomad_genome_allele_frequency' : gnomADGenomeAlleleFrequency,
                      'gnomad_exome_allele_frequency' : gnomADExomeAlleleFrequency,
+                     'gnomad_popmax_genome_allele_frequency' : gnomADPopmaxGenomeAlleleFrequency,
+                     'gnomad_popmax_exome_allele_frequency' : gnomADPopmaxExomeAlleleFrequency,
                      'cancer_site'                 : CancerSite,
                      'cancer_histology'            : CancerHistology,
                    }

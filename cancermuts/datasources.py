@@ -1200,7 +1200,9 @@ class gnomAD(DynamicSource, object):
         self._gnomad_endpoint = 'https://gnomad.broadinstitute.org/api/'
         self._cache = {}
         self._supported_metadata = {'gnomad_exome_allele_frequency' : self._get_exome_allele_freq,
-                                    'gnomad_genome_allele_frequency' : self._get_genome_allele_freq}
+                                    'gnomad_genome_allele_frequency' : self._get_genome_allele_freq,
+                                    'gnomad_popmax_exome_allele_frequency' : self._get_popmax_exome_allele_freq,
+                                    'gnomad_popmax_genome_allele_frequency' : self._get_popmax_genome_allele_freq}
 
         gnomADExomeAlleleFrequency.set_version_in_desc(self._version_str[version])
         gnomADGenomeAlleleFrequency.set_version_in_desc(self._version_str[version])
@@ -1254,6 +1256,14 @@ class gnomAD(DynamicSource, object):
         self.log.info("getting genome allele frequency")
         self._get_metadata(mutation, gene_id, 'gnomad_genome_allele_frequency')
 
+    def _get_popmax_exome_allele_freq(self, mutation, gene_id):
+        self.log.info("getting popmax genome allele frequency")
+        self._get_metadata(mutation, gene_id, 'gnomad_popmax_exome_allele_frequency')
+
+    def _get_popmax_genome_allele_freq(self, mutation, gene_id):
+        self.log.info("getting popmax genome allele frequency")
+        self._get_metadata(mutation, gene_id, 'gnomad_popmax_genome_allele_frequency')
+
     def _edit_variant_id(self, row):
         split_id = row['variant_id'].split('-')
         if len(split_id[2]) > 1 or len(split_id[3]) > 1:
@@ -1263,7 +1273,9 @@ class gnomAD(DynamicSource, object):
     def _get_metadata(self, mutation, gene_id, md_type):
 
         exac_key = {    'gnomad_exome_allele_frequency'  : 'exome_af', 
-                        'gnomad_genome_allele_frequency' : 'genome_af'       }
+                        'gnomad_genome_allele_frequency' : 'genome_af',
+                        'gnomad_popmax_exome_allele_frequency' : 'popmax_exome_af',
+                        'gnomad_popmax_genome_allele_frequency' : 'popmax_genome_af'       }
 
         ref_assembly = self._assembly[self.version]
 
@@ -1322,6 +1334,7 @@ class gnomAD(DynamicSource, object):
             elif len(this_df) == 1:
                 if np.isnan(this_df[exac_key[md_type]].values[0]):
                     af = None
+                    mutation.metadata[md_type] = np.nan
                     self.log.info("nan entry found for %s" % v_str)
                 else:
                     af = this_df[exac_key[md_type]].values[0]
@@ -1349,17 +1362,27 @@ class gnomAD(DynamicSource, object):
                         exome {
                             ac
                             an
+                            populations {
+                                id
+                                ac
+                                an
+                            }
                         }
                         genome {
                             ac
                             an
+                            populations {
+                                id
+                                ac
+                                an
+                            }
                         }
                     }
                 }
             }"""
         
         self.log.info("retrieving data for gene %s" % gene_id)
-        
+
         try:
             response = rq.post(self._gnomad_endpoint,
                 data=json.dumps({
@@ -1368,7 +1391,7 @@ class gnomAD(DynamicSource, object):
                                                "refBuild"  : reference_genome,
                                                "dataset"   : dataset }
                                 }),
-                headers={"Content-Type": "application/json"})
+                headers={"Content-Type": "application/json"}) 
         except:
             self.log.error("Couldn't perform request for gnomAD")
             return None
@@ -1404,7 +1427,105 @@ class gnomAD(DynamicSource, object):
         variants['genome_af'] = variants['genome_ac'] / variants['genome_an']
         variants['total_af'] = variants['total_ac'] / variants['total_an']
 
+        variants[['popmax_exome_ac',  'popmax_exome_an',  'popmax_exome_af',
+              'popmax_genome_ac', 'popmax_genome_an', 'popmax_genome_af',
+              'popmax_tot_ac',    'popmax_tot_an',    'popmax_tot_af']] = variants.apply(self.get_popmax_af, axis=1)
+
         return variants
+
+    def get_popmax_af(self, variants, pops=['afr', 'eas', 'nfe', 'amr', 'sas']):
+    # from https://gnomad.broadinstitute.org/help/popmax
+
+    # This annotation contains allele frequency information (AC, AN, AF, homozygote
+    # count) for the non-bottlenecked population with the highest frequency.
+
+    # For gnomAD v2, this excludes
+    #   Ashkenazi Jewish (asj),
+    #   European Finnish (fin),
+    #   and "Other" (oth) populations.
+    # 
+    # For gnomAD v3, this excludes
+    #   Amish (ami),
+    #   Ashkenazi Jewish (asj),
+    #   European Finnish (fin),
+    #   Middle Eastern (mid), and
+    #   "Other" (oth) populations.
+
+    # gnomAD version                  2    3
+    ############################################################
+    # afr: african/african american   +    +   
+    # ami: Amish                      NA   -
+    # amr: latino/admixed american    +    +
+    # asj: ashkenazi jews             -    -
+    # eas: east asian                 +    +
+    # fin: european (finnish)         -    -
+    # nfe: european (non-finnish)     +    +
+    # mid: middle eastern             NA   -
+    # oth: other                      -    -
+    # sas: south asian                +    +
+    
+        popmax_allowed_pops = ['afr', 'amr', 'eas', 'nfe', 'sas']
+
+        popmax_exome = pd.NA
+        if 'exome.populations' in variants.keys().tolist():
+            if type(variants['exome.populations']) == list:
+                do_exome = True
+                popmax_exome = pd.DataFrame(variants['exome.populations']).set_index('id').loc[popmax_allowed_pops,:]
+                popmax_exome['af'] = popmax_exome['ac'] / popmax_exome['an']
+                popmax_exome = popmax_exome.loc[popmax_exome['af'].idxmax()]
+
+                popmax_exome_af = popmax_exome.af
+                popmax_exome_ac = popmax_exome.ac
+                popmax_exome_an = popmax_exome.an
+            else:
+                do_exome = False
+        else:
+            do_exome = False
+
+        if do_exome == False:
+            popmax_exome_ac = pd.NA
+            popmax_exome_an = pd.NA
+            popmax_exome_af = pd.NA
+
+        
+        popmax_genome = pd.NA
+        if 'genome.populations' in variants.keys().tolist():
+            if type(variants['genome.populations']) == list:
+                do_genome = True
+                popmax_genome = pd.DataFrame(variants['genome.populations']).set_index('id').loc[['afr', 'eas', 'nfe', 'amr', 'sas'],:]
+                popmax_genome['af'] = popmax_genome['ac'] / popmax_genome['an']
+                popmax_genome = popmax_genome.loc[popmax_genome['af'].idxmax()]
+
+                popmax_genome_af = popmax_genome.af
+                popmax_genome_ac = popmax_genome.ac
+                popmax_genome_an = popmax_genome.an
+    
+            else:
+                do_genome = False
+        else:
+            do_genome = False
+
+        if do_genome == False:
+                popmax_genome_ac = pd.NA
+                popmax_genome_an = pd.NA
+                popmax_genome_af = pd.NA
+
+
+        if do_exome and do_genome:
+            popmax_tot_ac = popmax_exome_ac + popmax_genome_ac
+            popmax_tot_an = popmax_exome_an + popmax_genome_an
+            popmax_tot_af = popmax_tot_ac / popmax_tot_an
+
+        else:
+            popmax_tot_ac = pd.NA
+            popmax_tot_an = pd.NA
+            popmax_tot_af = pd.NA
+
+        return pd.Series([popmax_exome_ac,  popmax_exome_an,  popmax_exome_af,
+                        popmax_genome_ac, popmax_genome_an, popmax_genome_af,
+                        popmax_tot_ac,    popmax_tot_an,    popmax_tot_af]).replace(pd.NA,np.nan)
+
+
 
 class MobiDB(DynamicSource):
 
