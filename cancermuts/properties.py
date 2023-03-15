@@ -85,7 +85,7 @@ class LinearMotif(SequenceProperty):
         self.id = id
 
     def get_value_str(self):
-        return f'{self.type} ({self.id}),{self.positions[ 0].sequence_position}-{self.positions[-1].sequence_position},{",".join(s.name for s in self.sources)}'
+        return f'{self.type} ({self.id}), {self.positions[ 0].sequence_position}-{self.positions[-1].sequence_position}, {",".join(s.name for s in self.sources)}'
 
 
 class Structure(SequenceProperty):
