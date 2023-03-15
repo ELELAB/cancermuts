@@ -1,5 +1,6 @@
     # metadata.py - properties handling for the cancermuts package
 # (c) 2018 Matteo Tiberti <matteo.tiberti@gmail.com>
+# (c) 2023 Katrine Meldgård <katrine@meldgaard.dk>
 # This file is part of cancermuts
 #
 # cancermuts is free software: you can redistribute it and/or modify
