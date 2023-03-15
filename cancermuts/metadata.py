@@ -142,8 +142,8 @@ class GenomicMutation(Metadata):
 
     allowed_bases = set(['A', 'C', 'G', 'T'])
 
-    _mut_snv_regexp = '^[0-9XY]+:g\.[0-9]+[ACTG]>[ACTG]'
-    _mut_insdel_regexp = '^[0-9XY]+:g\.[0-9]+_[0-9]+delins[ACTG]+'
+    _mut_snv_regexp = '^[0-9XY]+:g\.[0-9]+[ACTG]>[ACTG]$'
+    _mut_insdel_regexp = '^[0-9XY]+:g\.[0-9]+_[0-9]+delins[ACTG]+$'
     _mut_snv_prog = re.compile(_mut_snv_regexp)
     _mut_insdel_prog = re.compile(_mut_insdel_regexp)
     _mut_snv_parse = '{chr}:g.{coord:d}{ref:l}>{alt:l}'
@@ -200,6 +200,7 @@ class GenomicMutation(Metadata):
             self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}delins{self.substitution}"
 
         else:
+            self.log.info("doing other")
             self.chr = None
             self.coord = None
             self.ref = None
