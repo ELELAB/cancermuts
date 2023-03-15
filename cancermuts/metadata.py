@@ -158,10 +158,6 @@ class GenomicMutation(Metadata):
 
         if self._mut_snv_prog.match(definition):
             tokens = parse(self._mut_snv_parse, definition)
-            if tokens['ref'] not in self.allowed_bases or \
-               tokens['alt'] not in self.allowed_bases:
-                self.log.error(f'this mutation does not specify allowed nucleotides: {definition}')
-                return None
 
             if tokens['chr'] == '23':
                 self.chr = 'X'
@@ -180,9 +176,6 @@ class GenomicMutation(Metadata):
 
         elif self._mut_insdel_prog.match(definition):
             tokens = parse(self._mut_insdel_parse, definition)
-            if not set(tokens['substitution']).issubset(self.allowed_bases):
-                self.log.error(f'this mutation does not specify allowed nucleotides: {definition}')
-                return None
 
             if tokens['chr'] == '23':
                 self.chr = 'X'
