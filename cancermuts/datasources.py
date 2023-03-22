@@ -1189,6 +1189,12 @@ class gnomAD(DynamicSource, object):
                        'exac' :            'EXaC',
                     }
 
+    _version_metadata_compatability = { '2.1' :         ['gnomad_exome_allele_frequency',
+                                                         'gnomad_genome_allele_frequency',
+                                                         'gnomad_popmax_exome_allele_frequency',
+                                                         'gnomad_popmax_genome_allele_frequency'],
+                                        '3' :           ['gnomad_genome_allele_frequency',
+                                                         'gnomad_popmax_genome_allele_frequency']}
 
     @logger_init
     def __init__(self, version='2.1'):
@@ -1197,6 +1203,7 @@ class gnomAD(DynamicSource, object):
         if version not in self._versions.keys():
             self.log.error("gnomAD version %s not supported by the current implementation" % version)
             raise TypeError
+        self._gnomad_version=version
 
         super(gnomAD, self).__init__(name='gnomAD', version=version, description=self.description)
 
@@ -1209,9 +1216,19 @@ class gnomAD(DynamicSource, object):
 
         gnomADExomeAlleleFrequency.set_version_in_desc(self._version_str[version])
         gnomADGenomeAlleleFrequency.set_version_in_desc(self._version_str[version])
+        gnomADPopmaxExomeAlleleFrequency.set_version_in_desc(self._version_str[version])
+        gnomADPopmaxGenomeAlleleFrequency.set_version_in_desc(self._version_str[version])
 
     def add_metadata(self, sequence, md_type=['gnomad_exome_allele_frequency'], use_alias=None):
-        
+        if '2.1' in self._gnomad_version:
+            for md in md_type:
+                if md not in self._version_metadata_compatability['2.1']:
+                    self.log.error(f"The  metadata type '{md}' is not compatible with the gnomAD version. Compatible metadata are {self._version_metadata_compatability['2.1']}")
+        elif '3' in self._gnomad_version:
+            for md in md_type:
+                if md not in self._version_metadata_compatability['3']:
+                    self.log.error(f"The metadata type '{md}' is not compatible with the gnomAD version. Compatible metadata are {self._version_metadata_compatability['3']}")
+
         if use_alias is not None:
             gene_id = sequence.aliases[use_alias]
             self.log.info("using alias %s as gene name" % sequence.aliases[use_alias])
@@ -1264,9 +1281,9 @@ class gnomAD(DynamicSource, object):
 
         Parameters
         ----------
-        mutation : :obj:'cancermuts.core.Mutation'
+        mutation : :obj:`cancermuts.core.Mutation`
             Object containing mutations and metadata associated with the sequence.
-        gene_id : 'str'
+        gene_id : :obj:`str`
             ID of the gene (gene name) to which the sequence belongs
         """
 
@@ -1278,9 +1295,9 @@ class gnomAD(DynamicSource, object):
 
         Parameters
         ----------
-        mutation : :obj:'cancermuts.core.Mutation'
+        mutation : :obj:`cancermuts.core.Mutation`
             Object containing mutations and metadata associated with the sequence.
-        gene_id : 'str'
+        gene_id : :obj:`str`
             ID of the gene (gene name) to which the sequence belongs
         """
 
@@ -1443,16 +1460,27 @@ class gnomAD(DynamicSource, object):
 
         variants['edited_variant_id'] = variants.apply(self._edit_variant_id, axis=1)
 
-        variants['total_ac'] = variants['exome_ac'] + variants['genome_ac']
-        variants['total_an'] = variants['exome_an'] + variants['genome_an']
+        if self._gnomad_version!='3':
+            variants['total_ac'] = variants['exome_ac'] + variants['genome_ac']
+            variants['total_an'] = variants['exome_an'] + variants['genome_an']
 
-        variants['exome_af']  =  variants['exome_ac'] / variants['exome_an']
-        variants['genome_af'] = variants['genome_ac'] / variants['genome_an']
-        variants['total_af'] = variants['total_ac'] / variants['total_an']
+            variants['exome_af']  =  variants['exome_ac'] / variants['exome_an']
+            variants['genome_af'] = variants['genome_ac'] / variants['genome_an']
+            variants['total_af'] = variants['total_ac'] / variants['total_an']
 
+        #Gnomad version 3 only contains genome information
+        elif self._gnomad_version=='3':
+            variants['total_ac'] = pd.NA
+            variants['total_an'] = pd.NA
+
+            variants['exome_af']  =  pd.NA
+            variants['genome_af'] = variants['genome_ac'] / variants['genome_an']
+            variants['total_af'] = pd.NA
+        
         variants[['popmax_exome_ac',  'popmax_exome_an',  'popmax_exome_af',
-              'popmax_genome_ac', 'popmax_genome_an', 'popmax_genome_af',
-              'popmax_tot_ac',    'popmax_tot_an',    'popmax_tot_af']] = variants.apply(self._get_popmax_af, axis=1)
+                'popmax_genome_ac', 'popmax_genome_an', 'popmax_genome_af',
+                'popmax_tot_ac',    'popmax_tot_an',    'popmax_tot_af']] = variants.apply(self._get_popmax_af, axis=1)
+
 
         return variants
 
@@ -1461,20 +1489,20 @@ class gnomAD(DynamicSource, object):
 
         Parameters
         ----------
-        variants : DataFrame
+        variants : :obj:`DataFrame`
             Dataframe containing at least the following:
                 Index:
                     RangeIndex
                 Columns:
                     'exome.populations' and/or 'genome.populations' : 
                         list of dicts in the format [{'id': , 'ac': , 'an': }]
-        pops : 'list'
+        pops : :obj:`list`
             Optional. List containing any or all of the populations 
             ('afr', 'eas', 'nfe', 'amr', 'sas'). 
 
         Returns
         -------
-        Series
+        `Series`
             Series containing the calculated popmax values
         """
     # from https://gnomad.broadinstitute.org/help/popmax

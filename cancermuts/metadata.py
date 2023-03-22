@@ -371,6 +371,23 @@ class gnomADGenomeAlleleFrequency(gnomADAlleleFrequency):
         return "<gnomADGenomeAlleleFrequency, %f>" % self.frequency
 
 class gnomADPopmaxExomeAlleleFrequency(gnomADAlleleFrequency):
+    """This class represents gnomad popmax exome allele frequency
+
+    Attributes
+    ----------
+    basic_description : :obj:`str`
+        string containing description of the frequency type
+    description : :obj:`str`
+        string containing description of the frequency type including gnomad version
+    freq_type : :obj:`str``
+        string containing the type of allele frequency
+    get_value : :obj:`cancermuts.metadata.gnomADAlleleFrequency.get_value`
+        gets the frequency from self
+    get_value_str : :obj:`cancermuts.metadata.gnomADAlleleFrequency.get_value_str`
+        gets the frequency from self and converts it to string
+    header : :obj:`str``
+        string containing the name of the column header for the metatable
+    """
 
     freq_type = "Popmax exome"
     basic_description = "%s allele frequency" % freq_type
@@ -379,15 +396,54 @@ class gnomADPopmaxExomeAlleleFrequency(gnomADAlleleFrequency):
 
     @classmethod
     def set_version_in_desc(cls, version_string):
+        """Makes it possible to use the class for different versions
+
+        Parameters
+        ----------
+        version_string
+        """
         cls.description = "%s (%s)" % (cls.basic_description, version_string)
 
     def __init__(self, source, frequency):
+        """Constructor for the gnomAD popmax exome allele frequency
+
+        Parameters
+        ----------
+        source: :obj:`cancermuts.datasources.gnomAD`
+            Object containing the source of the frequency
+        version_string: 'str'
+            String containing the gnomAD version
+        """
         super(gnomADPopmaxExomeAlleleFrequency, self).__init__(source, frequency)
 
     def __repr__(self):
+        """Function which creates the string to add to the mutation object
+
+        Returns
+        -------
+        'str'
+            String containing allele frequency type and the corresponding frequency.
+        """
         return "<gnomADPopmaxExomeAlleleFrequency, %f>" % self.frequency
 
 class gnomADPopmaxGenomeAlleleFrequency(gnomADAlleleFrequency):
+    """This class represents gnomad popmax genome allele frequency
+
+    Attributes
+    ----------
+    basic_description : :obj:`str`
+        string containing description of the frequency type
+    description : :obj:`str`
+        string containing description of the frequency type including gnomad version
+    freq_type : :obj:`str``
+        string containing the type of allele frequency
+    get_value : :obj:`cancermuts.metadata.gnomADAlleleFrequency.get_value`
+        gets the frequency from self
+    get_value_str : :obj:`cancermuts.metadata.gnomADAlleleFrequency.get_value_str`
+        gets the frequency from self and converts it to string
+    header : :obj:`str``
+        string containing the name of the column header for the metatable
+    """
 
     freq_type = "Popmax genome"
     basic_description = "%s allele frequency" % freq_type
@@ -396,12 +452,34 @@ class gnomADPopmaxGenomeAlleleFrequency(gnomADAlleleFrequency):
 
     @classmethod
     def set_version_in_desc(cls, version_string):
+        """Makes it possible to use the class for different versions
+
+        Parameters
+        ----------
+        version_string
+        """
         cls.description = "%s (%s)" % (cls.basic_description, version_string)
 
     def __init__(self, source, frequency):
+        """Constructor for the gnomAD popmax exome allele frequency
+
+        Parameters
+        ----------
+        source: :obj:`cancermuts.datasources.gnomAD`
+            Object containing the source of the frequency
+        version_string: 'str'
+            String containing the gnomAD version
+        """
         super(gnomADPopmaxGenomeAlleleFrequency, self).__init__(source, frequency)
 
     def __repr__(self):
+        """Function which creates the string to add to the mutation object
+
+        Returns
+        -------
+        'str'
+            String containing allele frequency type and the corresponding frequency.
+        """
         return "<gnomADPopmaxGenomeAlleleFrequency, %f>" % self.frequency
 
 class CancerSite(Metadata):
