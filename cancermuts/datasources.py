@@ -1415,7 +1415,7 @@ class MobiDB(DynamicSource):
 
         super(MobiDB, self).__init__(name='MobiDB', version='0.1', description=self.description)
 
-        self._requests_url = 'http://mobidb.bio.unipd.it/ws/'
+        self._requests_url = 'https://mobidb.org/api/download?format=json&acc='
         self._data_cache = {}
         self._supported_properties = { 'mobidb_disorder_propensity' : self._get_mobidb_disorder_predictions }
                                     
@@ -1446,10 +1446,6 @@ class MobiDB(DynamicSource):
 
         assignments = self._get_mobidb_disorder_predictions_assignments(sequence, *args, **kwargs)
 
-        if assignments is None:
-            self.log.error("Couldn't retrieve prediction from MobiDB")
-            return False
-
         if len(assignments) != len(sequence.positions): 
             self.log.error("Error in the assignment of predictions: length of MobiDB structure assignment and sequence don't match")
             return False
@@ -1467,53 +1463,50 @@ class MobiDB(DynamicSource):
         data = self._get_mobidb(sequence, use_alias=use_alias)
 
         try:
-            disorder_data = data['mobidb_consensus']['disorder']
+            curated_disorder_data = data['curated-disorder-priority']
         except KeyError:
-            self.log.error("No disorder data was found")
+            self.log.error("No curated disorder data was found.")
+            return None
+        
+        try:
+            predicted_disorder_data = data['prediction-disorder-priority']
+        except KeyError:
+            self.log.error("No predicted disorder data was found.")
             return None
 
         assignments = [None for p in sequence.positions]
 
-        if 'full' in disorder_data:
-            self.log.info("full consensus available")
-
-            if len(data['mobidb_consensus']['disorder']['full']) > 0:
-                self.log.warning("More than one prediction found for MobiDB; will use the first")
-
-            regions = data['mobidb_consensus']['disorder']['full'][0]['regions']
+        if curated_disorder_data is not None:
+            self.log.info("curated disorder data is available")
+            regions = curated_disorder_data['regions']
 
             for r in regions:
                 for i in range(r[0]-1, r[1]):
                     try:
-                        assignments[i] = str(r[2])
+                        assignments[i] = 'C' #C for curated
                     except IndexError:
                         self.log.error("residue index %s not in sequence!" % i)
                         return None
-            if None in assignments:
-                self.log.warning("Some positions were not assigned!")
 
-        elif 'predictors' in disorder_data:
-            self.log.info("full consensus not available - predictions will be used")
+        if predicted_disorder_data is not None:
+            self.log.info("predicted disorder data is available")
+            regions = predicted_disorder_data['regions']
 
-            mobidb_lite = data['mobidb_consensus']['disorder']['predictors'][1]
-            if mobidb_lite['method'] != 'mobidb-lite':
-                self.log.error("ModiDB-lite consensus prediction is not available")
-                return None
-
-            regions = mobidb_lite['regions']
             for r in regions:
                 for i in range(r[0]-1,r[1]): # r[1]: -1 because of the 0-offset, +1 because of the [) of range, total 0
-                    try:
-                        assignments[i] = str(r[2])
-                    except IndexError:
-                        self.log.error("residue %s not in sequence!" % i)
-                        return None
-            assignments = [ 'S' if a is None else a for a in assignments ]
-
-        else:
-            self.log.error("No disorder data or prediction available!")
+                    if assignments[i] is None:
+                        try:
+                            assignments[i] = 'P' #P for predicted
+                        except IndexError:
+                            self.log.error("residue %s not in sequence!" % i)
+                            return None
+        
+        if curated_disorder_data is None and predicted_disorder_data is None:
+            self.log.info("No disorder data or predicted disorder available from MobiDB.")
             return None
         
+        assignments = [ 'S' if a is None else a for a in assignments ]
+
         return assignments
 
     def _get_mobidb(self, sequence, use_alias='uniprot_acc'):
@@ -1524,7 +1517,7 @@ class MobiDB(DynamicSource):
             gene_id = sequence.gene_id
 
         try:
-            url = ('/').join([self._requests_url, gene_id, 'consensus'])
+            url = ('').join([self._requests_url, gene_id])
             self.log.debug("fetching %s" % url)
             req = rq.get(url)
         except:
