@@ -421,12 +421,19 @@ class Table:
 
         for i, elm in enumerate(all_elms):
             all_elms[i][1] = [ int(e) for e in elm[1].split('-') ]
+            elm_string = all_elms[i][0]
+            last_parenthesis_index = elm_string.rfind("(")
+            elm_name = elm_string[:last_parenthesis_index].strip()
+            elm_code = elm_string[last_parenthesis_index+1:-1]
+
+            all_elms[i].append( elm_name )
+            all_elms[i].append( elm_code )
             all_elms[i].append( elm[1][0] + (elm[1][1] - elm[1][0]) / 2.0 )
 
         all_elms = sorted(all_elms, key=lambda x: x[3])
 
         for elm in all_elms:
-            name, pos, source, x = elm
+            _1, pos, source, name, _2, x = elm
 
             if mutation_elms_only:
                 elm_range = set(range(pos[0], pos[1]+1))
