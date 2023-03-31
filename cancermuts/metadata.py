@@ -435,13 +435,13 @@ class gnomADPopmaxGenomeAlleleFrequency(gnomADAlleleFrequency):
         string containing description of the frequency type
     description : :obj:`str`
         string containing description of the frequency type including gnomad version
-    freq_type : :obj:`str``
+    freq_type : :obj:`str`
         string containing the type of allele frequency
     get_value : :obj:`cancermuts.metadata.gnomADAlleleFrequency.get_value`
         gets the frequency from self
     get_value_str : :obj:`cancermuts.metadata.gnomADAlleleFrequency.get_value_str`
         gets the frequency from self and converts it to string
-    header : :obj:`str``
+    header : :obj:`str`
         string containing the name of the column header for the metatable
     """
 
