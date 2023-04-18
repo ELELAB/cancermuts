@@ -258,6 +258,13 @@ class cBioPortal(DynamicSource, object):
         return self._cache_cancer_studies
 
     def add_mutations(self, sequence, metadata=[]):
+        _cBioPortal_supported_metadata = ['cancer_type', 'cancer_study', 'genomic_coordinates', 'genomic_mutations']
+
+        for md in metadata:
+            if md not in _cBioPortal_supported_metadata:
+                self.log.error(f'{md} is not a valid metadata. Supported metadata are: {_cBioPortal_supported_metadata}')
+                raise ValueError
+
         mutations, out_metadata = self._get_available_mutations(sequence.aliases['entrez'], metadata=metadata)
         unique_mutations = list(set(mutations))
         self.log.info("unique mutations found in %s: %s" % (self.name, ", ".join(sorted(unique_mutations, key=lambda x: int(x[1:-1])))))
@@ -666,6 +673,12 @@ class COSMIC(DynamicSource, object):
                     cancer_site_subtype_2=None,
                     cancer_site_subtype_3=None,
                     use_alias=None, filter_snps=True, metadata=[]):
+        _cosmic_supported_metadata = ['cancer_type', 'genomic_coordinates', 'genomic_mutations', 'cancer_site', 'cancer_histology']
+
+        for md in metadata:
+            if md not in _cosmic_supported_metadata:
+                self.log.error(f'{md} is not a valid metadata. Supported metadata are: {_cosmic_supported_metadata}')
+                raise ValueError
 
         if cancer_types is None:
             self.log.info("no cancer type specified; will use all of them")
