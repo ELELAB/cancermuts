@@ -415,26 +415,34 @@ the two scores we are able to gather have the same value.
 #### gnomAD allele frequencies
 
 Similarly, we annotate mutations with their exome or genome allele frequencies
-as found in the [gnomAD database](https://www.gnomad.org). This works as you 
-would expect by now:
+as found in the [gnomAD database](https://www.gnomad.org). It is also possible to
+annotate with the highest allele frequency found in non-bottlenecked 
+populations (referred to as popmax). This works as you would expect by now:
 
 ```py
 >>> from cancermuts.datasources import gnomAD
 
 >>> gnomad = gnomAD(version='2.1')
 >>> gnomad.add_metadata(seq, md_type=['gnomad_exome_allele_frequency',
-	                              'gnomad_genome_allele_frequency'])
+	                              'gnomad_genome_allele_frequency',
+                                  'gnomad_popmax_exome_allele_frequency',
+	                              'gnomad_popmax_genome_allele_frequency'])
 ```
 
 here, we specify the `version` argument to specify the version of gnomAD to be 
 considered. Please refer to the API documentation for all the available versions.
 
 The `md_type` keyword allows to select which metadata type(s) to annotate, i.e.
-choose between exome or allele frequency (or both as in the example).
+choose between exome or genome allele frequency (or both as in the example) and whether 
+to annotate the popmax as well. Note, that they can all be chosen independently 
+of each other.
 
 We calculate the allele frequency as the ratio between the total allele count over
 the allele number as found in gnomAD, if the entry for the corresponding variant 
 is available.
+
+The popmax allele frequency is found by calculating the exome and/or genome allele frequency from 
+all supported non-bottlenecked populations and then finding the maximum frequency of those.
 
 Finally we can check the downloaded metadata:
 
