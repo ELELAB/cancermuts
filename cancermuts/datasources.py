@@ -263,7 +263,7 @@ class cBioPortal(DynamicSource, object):
         for md in metadata:
             if md not in _cBioPortal_supported_metadata:
                 self.log.error(f'{md} is not a valid metadata. Supported metadata are: {_cBioPortal_supported_metadata}')
-                raise ValueError
+                raise ValueError(f'{md} is not a valid metadata. Supported metadata are: {_cBioPortal_supported_metadata}')
 
         mutations, out_metadata = self._get_available_mutations(sequence.aliases['entrez'], metadata=metadata)
         unique_mutations = list(set(mutations))
@@ -678,7 +678,7 @@ class COSMIC(DynamicSource, object):
         for md in metadata:
             if md not in _cosmic_supported_metadata:
                 self.log.error(f'{md} is not a valid metadata. Supported metadata are: {_cosmic_supported_metadata}')
-                raise ValueError
+                raise ValueError(f'{md} is not a valid metadata. Supported metadata are: {_cosmic_supported_metadata}')
 
         if cancer_types is None:
             self.log.info("no cancer type specified; will use all of them")
