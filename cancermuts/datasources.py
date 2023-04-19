@@ -1231,7 +1231,7 @@ class gnomAD(DynamicSource, object):
         for md in md_type:
             if md not in self._version_metadata_compatability[self._gnomad_version]:
                 self.log.error(f"The  metadata type '{md}' is not compatible with the gnomAD version. Compatible metadata are {self._version_metadata_compatability[self._gnomad_version]}")
-                raise ValueError
+                raise ValueError(f"The  metadata type '{md}' is not compatible with the gnomAD version. Compatible metadata are {self._version_metadata_compatability[self._gnomad_version]}")
        
         if use_alias is not None:
             gene_id = sequence.aliases[use_alias]
