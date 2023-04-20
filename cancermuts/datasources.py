@@ -1462,50 +1462,68 @@ class MobiDB(DynamicSource):
 
         data = self._get_mobidb(sequence, use_alias=use_alias)
 
+        # Collect data from MobiDB response
         try:
             curated_disorder_data = data['curated-disorder-priority']
         except KeyError:
             self.log.error("No curated disorder data was found.")
-            return None
+            curated_disorder_data = None
         
         try:
             predicted_disorder_data = data['prediction-disorder-priority']
         except KeyError:
             self.log.error("No predicted disorder data was found.")
-            return None
+            predicted_disorder_data = None
+
+        try:
+            observed_structure_data = data['derived-observed-priority']
+        except KeyError:
+            self.log.error("No observed structure data was found.")
+            observed_structure_data = None
 
         assignments = [None for p in sequence.positions]
 
+        # If specified data is available, annotate sequence accordingly
         if curated_disorder_data is not None:
-            self.log.info("curated disorder data is available")
+            self.log.info("Curated disorder data is available")
             regions = curated_disorder_data['regions']
 
             for r in regions:
-                for i in range(r[0]-1, r[1]):
+                for i in range(r[0]-1, r[1]): # r[1]: -1 because of the 0-offset, +1 because of the [) of range, total 0
                     try:
-                        assignments[i] = 'C' #C for curated
+                        assignments[i] = 'Disordered, curated' # Curated Disorder
                     except IndexError:
                         self.log.error("residue index %s not in sequence!" % i)
                         return None
 
         if predicted_disorder_data is not None:
-            self.log.info("predicted disorder data is available")
+            self.log.info("Predicted disorder data is available")
             regions = predicted_disorder_data['regions']
 
             for r in regions:
                 for i in range(r[0]-1,r[1]): # r[1]: -1 because of the 0-offset, +1 because of the [) of range, total 0
                     if assignments[i] is None:
                         try:
-                            assignments[i] = 'P' #P for predicted
+                            assignments[i] = 'Disordered, predicted' # Predicted Disorder
                         except IndexError:
                             self.log.error("residue %s not in sequence!" % i)
                             return None
         
-        if curated_disorder_data is None and predicted_disorder_data is None:
-            self.log.info("No disorder data or predicted disorder available from MobiDB.")
-            return None
+        if observed_structure_data is not None:
+            self.log.info("Observed structure data is available")
+            regions = observed_structure_data['regions']
+
+            for r in regions:
+                for i in range(r[0]-1,r[1]): # r[1]: -1 because of the 0-offset, +1 because of the [) of range, total 0
+                    if assignments[i] is None:
+                        try:
+                            assignments[i] = 'Structured, observed' # Structured
+                        except IndexError:
+                            self.log.error("residue %s not in sequence!" % i)
+                            return None
         
-        assignments = [ 'S' if a is None else a for a in assignments ]
+        if curated_disorder_data is None and predicted_disorder_data is None and observed_structure_data is None:
+            self.log.info("No data fitting the criteria was available from MobiDB. The sequence is not annotated.")
 
         return assignments
 
@@ -1516,6 +1534,7 @@ class MobiDB(DynamicSource):
         else:
             gene_id = sequence.gene_id
 
+        # Download request from MobiDB
         try:
             url = ('').join([self._requests_url, gene_id])
             self.log.debug("fetching %s" % url)
@@ -1524,6 +1543,7 @@ class MobiDB(DynamicSource):
             self.log.error("Couldn't get data for %s" % gene_id)
             return None
 
+        #Check if MobiDB responded correctly
         if req.status_code == 200:
             try:
                 data = req.json()
