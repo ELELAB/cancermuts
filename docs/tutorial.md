@@ -531,7 +531,7 @@ Once again, we can check the result:
 
 #### structured regions with MobiDB
 
-We use the MobiDB website to predict structured or unstructured regions in our
+We use the MobiDB website to annotate disordered regions in our
 protein of interest using the consensus of the entry. This works similarly as before:
 
 ```py
@@ -549,13 +549,15 @@ We can then check the annotation as done previously:
 <StructuralDisorder, Structured, observed>
 ```
 
-There are three types of annotations. 
+There are four types of annotations, here listed in order of priority.
 * Disordered, curated
-    * The residue is disordered, based on manually curated data
+    * Based on manually curated data
+* Disordered, derived
+    * Based on primary data, e.g. PDB structures
+* Disordered, homology
+    * Based on homology inference
 * Disordered, predicted
-    * The residue is disordered, based on predictions
-* Structured, observed
-    * The residue is structured, derived from primary data, e.g. PDB structures
+    * Based on predictions
 
 If none of these data are available for the consensus, the residue will not be annotated. 
 For more information about the types of evidence, please see the [MobiDB vocabulary](https://mobidb.bio.unipd.it/about/vocabulary)

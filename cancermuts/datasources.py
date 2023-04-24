@@ -1470,60 +1470,48 @@ class MobiDB(DynamicSource):
             curated_disorder_data = None
         
         try:
+            derived_disorder_data = data['derived-disorder-priority']
+        except KeyError:
+            self.log.error("No derived disorder data was found.")
+            derived_disorder_data = None
+
+        try:
+            homology_disorder_data = data['homology-disorder-priority']
+        except KeyError:
+            self.log.error("No homology based disorder data was found.")
+            homology_disorder_data = None
+
+        try:
             predicted_disorder_data = data['prediction-disorder-priority']
         except KeyError:
             self.log.error("No predicted disorder data was found.")
             predicted_disorder_data = None
 
-        try:
-            observed_structure_data = data['derived-observed-priority']
-        except KeyError:
-            self.log.error("No observed structure data was found.")
-            observed_structure_data = None
+        #Initialisation for annotation
+        disorder_types=['curated-disorder-priority','derived-disorder-priority','homology-disorder-priority','prediction-disorder-priority']
+        evidence_types = {'curated-disorder-priority': 'curated',
+                        'derived-disorder-priority': 'derived',
+                        'homology-disorder-priority': 'homology',
+                        'prediction-disorder-priority': 'prediction'}
+
+        disorder_data={'curated-disorder-priority': curated_disorder_data,
+                        'derived-disorder-priority': derived_disorder_data,
+                        'homology-disorder-priority': homology_disorder_data,
+                        'prediction-disorder-priority': predicted_disorder_data}
 
         assignments = [None for p in sequence.positions]
 
-        # If specified data is available, annotate sequence accordingly
-        if curated_disorder_data is not None:
-            self.log.info("Curated disorder data is available")
-            regions = curated_disorder_data['regions']
-
-            for r in regions:
-                for i in range(r[0]-1, r[1]): # r[1]: -1 because of the 0-offset, +1 because of the [) of range, total 0
-                    try:
-                        assignments[i] = 'Disordered, curated' # Curated Disorder
-                    except IndexError:
-                        self.log.error("residue index %s not in sequence!" % i)
-                        return None
-
-        if predicted_disorder_data is not None:
-            self.log.info("Predicted disorder data is available")
-            regions = predicted_disorder_data['regions']
-
-            for r in regions:
-                for i in range(r[0]-1,r[1]): # r[1]: -1 because of the 0-offset, +1 because of the [) of range, total 0
-                    if assignments[i] is None:
+        # If specified data is available, annotate sequence accordingly 
+        for dis_term in disorder_types:
+            if disorder_data[dis_term] is not None:
+                regions = disorder_data[dis_term]['regions']
+                for r in regions:
+                    for i in range(r[0]-1, r[1]): # r[1]: -1 because of the 0-offset, +1 because of the [) of range, total 0
                         try:
-                            assignments[i] = 'Disordered, predicted' # Predicted Disorder
+                            assignments[i] = 'Disordered, '+evidence_types[dis_term]
                         except IndexError:
-                            self.log.error("residue %s not in sequence!" % i)
+                            self.log.error("residue index %s not in sequence!" % i)
                             return None
-        
-        if observed_structure_data is not None:
-            self.log.info("Observed structure data is available")
-            regions = observed_structure_data['regions']
-
-            for r in regions:
-                for i in range(r[0]-1,r[1]): # r[1]: -1 because of the 0-offset, +1 because of the [) of range, total 0
-                    if assignments[i] is None:
-                        try:
-                            assignments[i] = 'Structured, observed' # Structured
-                        except IndexError:
-                            self.log.error("residue %s not in sequence!" % i)
-                            return None
-        
-        if curated_disorder_data is None and predicted_disorder_data is None and observed_structure_data is None:
-            self.log.info("No data fitting the criteria was available from MobiDB. The sequence is not annotated.")
 
         return assignments
 
