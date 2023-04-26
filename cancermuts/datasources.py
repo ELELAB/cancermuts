@@ -1487,7 +1487,8 @@ class MobiDB(DynamicSource):
             self.log.error("No predicted disorder data was found.")
             predicted_disorder_data = None
 
-        #Initialisation for annotation
+        # Initialisation for annotation
+        # Disorder types should be in order of priority, with the highest priority first
         disorder_types=['curated-disorder-priority','derived-disorder-priority','homology-disorder-priority','prediction-disorder-priority']
         evidence_types = {'curated-disorder-priority': 'curated',
                         'derived-disorder-priority': 'derived',
@@ -1507,11 +1508,12 @@ class MobiDB(DynamicSource):
                 regions = disorder_data[dis_term]['regions']
                 for r in regions:
                     for i in range(r[0]-1, r[1]): # r[1]: -1 because of the 0-offset, +1 because of the [) of range, total 0
-                        try:
-                            assignments[i] = 'Disordered, '+evidence_types[dis_term]
-                        except IndexError:
-                            self.log.error("residue index %s not in sequence!" % i)
-                            return None
+                        if assignments[i] is None:
+                            try:
+                                assignments[i] = 'Disordered, '+evidence_types[dis_term]
+                            except IndexError:
+                                self.log.error("residue index %s not in sequence!" % i)
+                                return None
 
         return assignments
 
