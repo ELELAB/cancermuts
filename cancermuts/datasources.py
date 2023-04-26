@@ -1622,7 +1622,7 @@ class MobiDB(DynamicSource):
 
         super(MobiDB, self).__init__(name='MobiDB', version='0.1', description=self.description)
 
-        self._requests_url = 'http://mobidb.bio.unipd.it/ws/'
+        self._requests_url = 'https://mobidb.org/api/download?format=json&acc='
         self._data_cache = {}
         self._supported_properties = { 'mobidb_disorder_propensity' : self._get_mobidb_disorder_predictions }
                                     
@@ -1653,10 +1653,6 @@ class MobiDB(DynamicSource):
 
         assignments = self._get_mobidb_disorder_predictions_assignments(sequence, *args, **kwargs)
 
-        if assignments is None:
-            self.log.error("Couldn't retrieve prediction from MobiDB")
-            return False
-
         if len(assignments) != len(sequence.positions): 
             self.log.error("Error in the assignment of predictions: length of MobiDB structure assignment and sequence don't match")
             return False
@@ -1673,54 +1669,59 @@ class MobiDB(DynamicSource):
 
         data = self._get_mobidb(sequence, use_alias=use_alias)
 
+        # Collect data from MobiDB response
         try:
-            disorder_data = data['mobidb_consensus']['disorder']
+            curated_disorder_data = data['curated-disorder-priority']
         except KeyError:
-            self.log.error("No disorder data was found")
-            return None
+            self.log.error("No curated disorder data was found.")
+            curated_disorder_data = None
+        
+        try:
+            derived_disorder_data = data['derived-disorder-priority']
+        except KeyError:
+            self.log.error("No derived disorder data was found.")
+            derived_disorder_data = None
+
+        try:
+            homology_disorder_data = data['homology-disorder-priority']
+        except KeyError:
+            self.log.error("No homology based disorder data was found.")
+            homology_disorder_data = None
+
+        try:
+            predicted_disorder_data = data['prediction-disorder-priority']
+        except KeyError:
+            self.log.error("No predicted disorder data was found.")
+            predicted_disorder_data = None
+
+        # Initialisation for annotation
+        # Disorder types should be in order of priority, with the highest priority first
+        disorder_types=['curated-disorder-priority','derived-disorder-priority','homology-disorder-priority','prediction-disorder-priority']
+        evidence_types = {'curated-disorder-priority': 'curated',
+                        'derived-disorder-priority': 'derived',
+                        'homology-disorder-priority': 'homology',
+                        'prediction-disorder-priority': 'prediction'}
+
+        disorder_data={'curated-disorder-priority': curated_disorder_data,
+                        'derived-disorder-priority': derived_disorder_data,
+                        'homology-disorder-priority': homology_disorder_data,
+                        'prediction-disorder-priority': predicted_disorder_data}
 
         assignments = [None for p in sequence.positions]
 
-        if 'full' in disorder_data:
-            self.log.info("full consensus available")
+        # If specified data is available, annotate sequence accordingly 
+        for dis_term in disorder_types:
+            if disorder_data[dis_term] is not None:
+                regions = disorder_data[dis_term]['regions']
+                for r in regions:
+                    for i in range(r[0]-1, r[1]): # r[1]: -1 because of the 0-offset, +1 because of the [) of range, total 0
+                        if assignments[i] is None:
+                            try:
+                                assignments[i] = 'Disordered, '+evidence_types[dis_term]
+                            except IndexError:
+                                self.log.error("residue index %s not in sequence!" % i)
+                                return None
 
-            if len(data['mobidb_consensus']['disorder']['full']) > 0:
-                self.log.warning("More than one prediction found for MobiDB; will use the first")
-
-            regions = data['mobidb_consensus']['disorder']['full'][0]['regions']
-
-            for r in regions:
-                for i in range(r[0]-1, r[1]):
-                    try:
-                        assignments[i] = str(r[2])
-                    except IndexError:
-                        self.log.error("residue index %s not in sequence!" % i)
-                        return None
-            if None in assignments:
-                self.log.warning("Some positions were not assigned!")
-
-        elif 'predictors' in disorder_data:
-            self.log.info("full consensus not available - predictions will be used")
-
-            mobidb_lite = data['mobidb_consensus']['disorder']['predictors'][1]
-            if mobidb_lite['method'] != 'mobidb-lite':
-                self.log.error("ModiDB-lite consensus prediction is not available")
-                return None
-
-            regions = mobidb_lite['regions']
-            for r in regions:
-                for i in range(r[0]-1,r[1]): # r[1]: -1 because of the 0-offset, +1 because of the [) of range, total 0
-                    try:
-                        assignments[i] = str(r[2])
-                    except IndexError:
-                        self.log.error("residue %s not in sequence!" % i)
-                        return None
-            assignments = [ 'S' if a is None else a for a in assignments ]
-
-        else:
-            self.log.error("No disorder data or prediction available!")
-            return None
-        
         return assignments
 
     def _get_mobidb(self, sequence, use_alias='uniprot_acc'):
@@ -1730,14 +1731,16 @@ class MobiDB(DynamicSource):
         else:
             gene_id = sequence.gene_id
 
+        # Download request from MobiDB
         try:
-            url = ('/').join([self._requests_url, gene_id, 'consensus'])
+            url = ('').join([self._requests_url, gene_id])
             self.log.debug("fetching %s" % url)
             req = rq.get(url)
         except:
             self.log.error("Couldn't get data for %s" % gene_id)
             return None
 
+        #Check if MobiDB responded correctly
         if req.status_code == 200:
             try:
                 data = req.json()

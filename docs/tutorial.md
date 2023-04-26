@@ -539,26 +539,36 @@ Once again, we can check the result:
 
 #### structured regions with MobiDB
 
-We use the MobiDB website to predict structured or unstructured regions in our
-protein of interest. This works similarly as before:
+We use the MobiDB website to annotate disordered regions in our
+protein of interest using the consensus of the entry. This works similarly as before:
 
 ```py
->>> mdb = MobiDB()
->>> mdb.add_position_properties(seq)
+mdb = MobiDB()
+mdb.add_position_properties(seq)
 ```
 
-we can then check the annotation as done previously:
+We can then check the annotation as done previously:
 
 ```py
 >>> seq.positions[0].properties['mobidb_disorder_propensity']
-<StructuralDisorder, C>
+<StructuralDisorder, None>
 
 >>> seq.positions[10].properties['mobidb_disorder_propensity']
-<StructuralDisorder, S>
+<StructuralDisorder, Structured, observed>
 ```
 
-here an annotation of "C" means coil (disoredered), while an annotation of "S"
-means "structured".
+There are four types of annotations, here listed in order of priority.
+* Disordered, curated
+    * Based on manually curated data
+* Disordered, derived
+    * Based on primary data, e.g. PDB structures
+* Disordered, homology
+    * Based on homology inference
+* Disordered, predicted
+    * Based on predictions
+
+If none of these data are available for the consensus, the residue will not be annotated. 
+For more information about the types of evidence, please see the [MobiDB vocabulary](https://mobidb.bio.unipd.it/about/vocabulary)
 
 ### Sequence properties
 
