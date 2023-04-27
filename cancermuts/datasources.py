@@ -534,11 +534,8 @@ class COSMIC(DynamicSource, object):
         dataframes = []
 
         if database_files is None:
-            database_dir   = '/data/databases/cosmic'
-            databases      = [  'CosmicMutantExport' ]
-            self._database_files = [os.path.join(database_dir, i)+'.tsv' for i in databases]
-        else:
-            self._database_files = database_files
+            self.log.error('The database file for COSMIC is not specified.')
+            raise FileNotFoundError('The database file for COSMIC is not specified.')
 
         if database_encoding is None or isinstance(database_encoding, str):
             encodings = [ database_encoding for i in self._database_files ]
