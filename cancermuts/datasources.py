@@ -1143,7 +1143,7 @@ class ELMPredictions(DynamicSource, object):
             out.append(tmp2)
         return out
 
-    def add_sequence_properties(self, sequence, exclude_elm_classes='{100}', use_alias='uniprot', elm_wait=180):
+    def add_sequence_properties(self, sequence, exclude_elm_classes=r'{.*}', use_alias='uniprot', elm_wait=180):
         self.log.info("adding ELM predictions to sequence ...")
         if use_alias is None:
             data = self._get_prediction(sequence.gene_id, elm_wait=elm_wait)
