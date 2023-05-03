@@ -504,7 +504,7 @@ class cBioPortal(DynamicSource, object):
 
 class COSMIC(DynamicSource, object):
     @logger_init
-    def __init__(self, database_files=None, database_encoding=None):
+    def __init__(self, database_files, database_encoding=None):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
 
@@ -533,9 +533,10 @@ class COSMIC(DynamicSource, object):
 
         dataframes = []
 
-        if database_files is None:
-            self.log.error('The database file for COSMIC is not specified.')
-            raise FileNotFoundError('The database file for COSMIC is not specified.')
+        if isinstance(database_files, str):
+            self._database_files = list(database_files)
+        else:
+            self._database_files = database_files
 
         if database_encoding is None or isinstance(database_encoding, str):
             encodings = [ database_encoding for i in self._database_files ]
