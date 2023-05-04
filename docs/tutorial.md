@@ -284,14 +284,14 @@ In this cases, Cancermuts tries its best to infer it from the study name.
 As before, we first create a COSMIC data source object:
 
 ```py
-cosmic = COSMIC(database_files=['/data/databases/cosmic-v95/CosmicMutantExport.tsv'],
+cosmic = COSMIC(database_files='/data/databases/cosmic-v95/CosmicMutantExport.tsv',
 	            database_encoding=['latin1'])
 ```
 
-here the `database_files` argument is a list of strings, each of them is a
-database file to be considered. Usually, the argument for this file would
-be the COSMIC database file  that was downloaded as detailed in the Install
-section.
+here the `database_files` argument is a string. If the user wants to use
+more than one database file, these should be provided as a list of strings.
+Usually, the argument for this file would be the COSMIC database file  that 
+was downloaded as detailed in the Install section.
 
 Similarly, `database_encoding` defines the
 text file encoding for every file (it is `latin1` for COSMIC version 95).

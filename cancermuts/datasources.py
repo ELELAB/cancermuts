@@ -504,7 +504,7 @@ class cBioPortal(DynamicSource, object):
 
 class COSMIC(DynamicSource, object):
     @logger_init
-    def __init__(self, database_files=None, database_encoding=None):
+    def __init__(self, database_files, database_encoding=None):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
 
@@ -533,12 +533,15 @@ class COSMIC(DynamicSource, object):
 
         dataframes = []
 
-        if database_files is None:
-            database_dir   = '/data/databases/cosmic'
-            databases      = [  'CosmicMutantExport' ]
-            self._database_files = [os.path.join(database_dir, i)+'.tsv' for i in databases]
+        if isinstance(database_files, str):
+            self._database_files = [database_files]
         else:
-            self._database_files = database_files
+            if hasattr(database_files,'__iter__') and len(database_files) > 0:
+                self._database_files = database_files
+            else:
+                self.log.error('COSMIC database_files does not have the correct format.')
+                raise TypeError('COSMIC database_files does not have the correct format.')
+        
 
         if database_encoding is None or isinstance(database_encoding, str):
             encodings = [ database_encoding for i in self._database_files ]
