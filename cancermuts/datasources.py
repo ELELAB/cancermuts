@@ -536,10 +536,12 @@ class COSMIC(DynamicSource, object):
         if isinstance(database_files, str):
             self._database_files = [database_files]
         else:
-            if not hasattr(database_files,'__iter__'):
+            if hasattr(database_files,'__iter__') and len(database_files) > 0:
+                self._database_files = database_files
+            else:
                 self.log.error('COSMIC database_files does not have the correct format.')
                 raise TypeError('COSMIC database_files does not have the correct format.')
-        self._database_files = database_files
+        
 
         if database_encoding is None or isinstance(database_encoding, str):
             encodings = [ database_encoding for i in self._database_files ]
