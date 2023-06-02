@@ -1051,7 +1051,7 @@ class MyVariant(DynamicSource, object):
                 revel_score = hit['dbnsfp']['revel']['score']
             except KeyError:
                 self.log.warning("no revel score found for mutation %s in this hit; it will be skipped" % mutation)
-                return None
+                continue
 
             try:
                 revel_score = [float(revel_score)]
