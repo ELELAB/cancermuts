@@ -895,17 +895,18 @@ class MyVariant(DynamicSource, object):
             self.log.debug(f"pulling revel score for {mutation}, {gc}, {gm}")
             if gm is not None:
                 self.log.debug("genomic mutation will be used to retrieve revel score for mutation %s" % mutation)
-                revel_score = self._get_revel_from_gm(mutation, gm)
+                revel_scores = self._get_revel_from_gm(mutation, gm)
             elif gc is not None:
                 self.log.debug("genomic coordinates will be used to retrieve revel score for mutation %s" % mutation)
-                revel_score = self._get_revel_from_gc(mutation, gc)
+                revel_scores = self._get_revel_from_gc(mutation, gc)
             else:
                 self.log.warning("mutations %s has no genomic coordinates or genomic mutation available; it will be skipped" % mutation)
 
-            self.log.debug(f"final revel score for {gc} {gm} {revel_score}")
-            mutation.metadata['revel_score'].append(revel_score)
+            self.log.debug(f"final revel score for {gc} {gm} {revel_scores}")
+            mutation.metadata['revel_score'].extend(revel_scores)
 
         self.log.debug(f"final revel metadata for {mutation} {mutation.metadata['revel_score']}")
+
     def _validate_revel_hit(self, mutation, hit):
 
         try:
@@ -981,12 +982,13 @@ class MyVariant(DynamicSource, object):
         query_str = '%s:g.%d%s>%s' % (converted_coords[0], converted_coords[1], gm.ref, gm.alt)
 
         try:
-            revel_score = self._revel_cache_gm[query_str]
+            revel_scores = self._revel_cache_gm[query_str]
             self.log.info(f"Revel score for {query_str} retrieved from cache")
-            return DbnsfpRevel(source=self, score=revel_score)
+            return [ DbnsfpRevel(source=self, score=r) for r in revel_scores ]
         except KeyError:
             pass
 
+        self.log.debug(f"querying myvariant with string {query_str}")
         hit = self._mv.getvariant(query_str)
 
         if hit is None:
@@ -997,14 +999,21 @@ class MyVariant(DynamicSource, object):
             return None
         
         try:
-            revel_score = hit['dbnsfp']['revel']['score']
+            revel_scores = hit['dbnsfp']['revel']['score']
+            self.log.debug(f"downloaded revel score: {revel_scores}")
         except KeyError:
             self.log.warning("no revel score found for mutation %s in this hit; it will be skipped" % mutation)
             return None
 
-        self._revel_cache_gm[query_str] = revel_score
+        try:
+            revel_scores = [float(revel_scores)]
+        except TypeError:
+            pass
 
-        return DbnsfpRevel(source=self, score=revel_score)
+        revel_scores = sorted(list(set(revel_scores)))
+        self._revel_cache_gm[query_str] = revel_scores
+
+        return [ DbnsfpRevel(source=self, score=r) for r in revel_scores ]
 
     def _get_revel_from_gc(self, mutation, gc):
 
@@ -1042,20 +1051,28 @@ class MyVariant(DynamicSource, object):
                 revel_score = hit['dbnsfp']['revel']['score']
             except KeyError:
                 self.log.warning("no revel score found for mutation %s in this hit; it will be skipped" % mutation)
-                return None
+                continue
+
+            try:
+                revel_score = [float(revel_score)]
+            except TypeError:
+                pass
+
+            revel_score = sorted(list(set(revel_score)))
 
             revel_scores.append(revel_score)
 
-        revel_scores = list(set(revel_scores))
-        if len(revel_scores) > 1:
-            self.log.warning("more than one revel score found; it will be skipped (%s)" % ", ".join(['%.3f' % i for i in revel_scores]))
+        if len(revel_scores) > 1: # more than one hit had usable scores
+            self.log.warning("more than one hit had usable scores; it will be skipped")
             return None
         elif len(revel_scores) == 0:
             self.log.warning("no revel scores found using genomic coordinates for mutation %s" % mutation)
             return None
         else:
-            revel_md = DbnsfpRevel(source=self, score=revel_score)
-            return revel_md
+            revel_scores = revel_scores[0]
+            self.log.debug(f"downloaded revel score: {revel_scores}")
+            return [ DbnsfpRevel(source=self, score=r) for r in revel_scores ]
+
 
 class ELMDatabase(DynamicSource, object):
     def __init__(self):
