@@ -903,7 +903,9 @@ class MyVariant(DynamicSource, object):
                 self.log.warning("mutations %s has no genomic coordinates or genomic mutation available; it will be skipped" % mutation)
 
             self.log.debug(f"final revel score for {gc} {gm} {revel_scores}")
-            mutation.metadata['revel_score'].extend(revel_scores)
+
+            if revel_scores is not None:
+                mutation.metadata['revel_score'].extend(revel_scores)
 
         self.log.debug(f"final revel metadata for {mutation} {mutation.metadata['revel_score']}")
 
