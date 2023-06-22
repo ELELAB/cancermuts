@@ -1517,7 +1517,6 @@ class gnomAD(DynamicSource, object):
             variants['genome_af'] = variants['genome_ac'] / variants['genome_an']
             variants['total_af'] = pd.NA
         
-        print(variants)
         variants[['popmax_exome_ac',  'popmax_exome_an',  'popmax_exome_af',
                 'popmax_genome_ac', 'popmax_genome_an', 'popmax_genome_af',
                 'popmax_tot_ac',    'popmax_tot_an',    'popmax_tot_af']] = variants.apply(self._get_popmax_af, axis=1)
