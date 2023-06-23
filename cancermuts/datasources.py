@@ -1582,11 +1582,15 @@ class gnomAD(DynamicSource, object):
                 do_exome = True
                 popmax_exome = pd.DataFrame(variants['exome.populations']).set_index('id').loc[popmax_allowed_pops,:]
                 popmax_exome['af'] = popmax_exome['ac'] / popmax_exome['an']
-                popmax_exome = popmax_exome.loc[popmax_exome['af'].idxmax()]
-
-                popmax_exome_af = popmax_exome.af
-                popmax_exome_ac = popmax_exome.ac
-                popmax_exome_an = popmax_exome.an
+                if pd.isna(popmax_exome['af']).all():
+                    popmax_exome_ac = pd.NA
+                    popmax_exome_an = pd.NA
+                    popmax_exome_af = pd.NA
+                else:
+                    popmax_exome = popmax_exome.loc[popmax_exome['af'].idxmax()]
+                    popmax_exome_af = popmax_exome.af
+                    popmax_exome_ac = popmax_exome.ac
+                    popmax_exome_an = popmax_exome.an
             else:
                 do_exome = False
         else:
@@ -1604,12 +1608,15 @@ class gnomAD(DynamicSource, object):
                 do_genome = True
                 popmax_genome = pd.DataFrame(variants['genome.populations']).set_index('id').loc[['afr', 'eas', 'nfe', 'amr', 'sas'],:]
                 popmax_genome['af'] = popmax_genome['ac'] / popmax_genome['an']
-                popmax_genome = popmax_genome.loc[popmax_genome['af'].idxmax()]
-
-                popmax_genome_af = popmax_genome.af
-                popmax_genome_ac = popmax_genome.ac
-                popmax_genome_an = popmax_genome.an
-    
+                if pd.isna(popmax_genome['af']).all():
+                    popmax_genome_ac = pd.NA
+                    popmax_genome_an = pd.NA
+                    popmax_genome_af = pd.NA
+                else:
+                    popmax_genome = popmax_genome.loc[popmax_genome['af'].idxmax()]
+                    popmax_genome_af = popmax_genome.af
+                    popmax_genome_ac = popmax_genome.ac
+                    popmax_genome_an = popmax_genome.an
             else:
                 do_genome = False
         else:
@@ -1625,7 +1632,6 @@ class gnomAD(DynamicSource, object):
             popmax_tot_ac = popmax_exome_ac + popmax_genome_ac
             popmax_tot_an = popmax_exome_an + popmax_genome_an
             popmax_tot_af = popmax_tot_ac / popmax_tot_an
-
         else:
             popmax_tot_ac = pd.NA
             popmax_tot_an = pd.NA
