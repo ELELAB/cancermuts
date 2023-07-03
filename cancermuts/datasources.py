@@ -111,7 +111,7 @@ class StaticSource(Source, object):
 
 class UniProt(DynamicSource, object):
     """Class for the UniProt data source. It is used to download the protein
-    sequence of the main UniProt isoform for a certain gene and build the 
+    sequence of the main UniProt isoform for a certain gene and build the
     Sequence object, which is the main entry point for annotations in cancermuts"""
 
     @logger_init
@@ -120,8 +120,23 @@ class UniProt(DynamicSource, object):
         super(UniProt, self).__init__(name='UniProt', version='1.0', description=description)
         self._uniprot_service = bsUniProt()
 
-    def get_sequence(self, gene_id, upid=None):
-        if upid is None:
+    def get_sequence(self, gene_id, upid=None, upac=None):
+        if upac is not None or upid is not None:
+            if upac is not None:
+                self.log.info("The user-provided Uniprot AC (%s) will be used" % upid)
+                this_upac = upac
+            else:
+                self.log.info("UniProt AC will be mapped from UniProt ID")
+                this_upac = self._get_aliases(upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
+
+            if upid is not None:
+                self.log.info("The user-provided Uniprot ID (%s) will be used" % upid)
+                this_upid = upid
+            else:
+                self.log.info("UniProt ID will be mapped from UniProt AC")
+                this_upid = self._get_aliases(upac, ['UniProtKB_uniProtkbId'])['UniProtKB_uniProtkbId']
+
+        else:
             self.log.info("retrieving UniProt ID for human gene %s" % gene_id)
             try:
                 uniprot_table = pd.read_csv(StringIO(self._uniprot_service.search(f"(gene:{gene_id}) AND (organism_id:9606)")), sep='\t')
@@ -130,21 +145,25 @@ class UniProt(DynamicSource, object):
                 self.log.error("Failed to retrieve list of Uniprot IDs")
                 return None
 
-            upid = upids[0]
+            this_upid = upids[0]
+
             if len(upids) > 1:
-                self.log.warning("the following UniProt entries were found for gene %s: %s; will use %s" %(gene_id, ', '.join(upids), upid))
+                self.log.warning("the following UniProt entries were found for gene %s: %s; will use %s" %(gene_id, ', '.join(upids), this_upid))
             else:
                 self.log.info("will use Uniprot ID %s" % upid)
-        else:
-            self.log.info("The user-provided Uniprot ID (%s) will be used" % upid)
-        aliases = {'uniprot' : upid,
-                   'entrez' :       self._get_aliases(upid, ['GeneID'])['GeneID'],
-                   'uniprot_acc' : self._get_aliases(upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']}
 
-        self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s, gene %s" % (upid, gene_id))
+            this_upac = self._get_aliases(this_upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
+
+        aliases = {'uniprot'     : this_upid,
+                   'entrez'      : self._get_aliases(this_upac, ['GeneID'])['GeneID'],
+                   'uniprot_acc' : this_upac }
+
+        self.log.info("final aliases: %s" % aliases)
+
+        self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s, Uniprot AC %s, gene %s" % (this_upid, this_upac, gene_id))
 
         try:
-            sequence = self._get_fasta_sequence(str(upid))
+            sequence = self._get_fasta_sequence(this_upac)
         except:
             self.log.error("failed retrieving sequence for Uniprot ID %s" % upid)
             return None
@@ -159,7 +178,7 @@ class UniProt(DynamicSource, object):
         Parameters
         ----------
         upid : :obj:`str`
-            a valid UniProt identifier
+            a valid UniProt identifier (e.g. Uniprot ID or Uniprot AC)
 
         Returns
         -------
@@ -196,7 +215,7 @@ class UniProt(DynamicSource, object):
             else:
                 t_keyword = None
                 t_query = t
-
+            self.log.info("fetching alias, fr=%s, to=%s, query=%s" % (fr, t_query, gene_id))
             responses = self._uniprot_service.mapping( fr = fr,
                                                        to = t_query,
                                                        query = gene_id )['results']
@@ -213,6 +232,7 @@ class UniProt(DynamicSource, object):
             results = responses[0]
 
             if t_keyword is not None:
+                self.log.info('using extracted keyword %s to parse results' % t_keyword)
                 out[t] = results['to'][t_keyword]
             else:
                 out[t] = results['to']
@@ -222,7 +242,7 @@ class UniProt(DynamicSource, object):
 class cBioPortal(DynamicSource, object):
 
     default_strand = '+'
-    
+
     @logger_init
     def __init__(self, cancer_studies=None):
         description = "cBioPortal"
@@ -318,7 +338,7 @@ class cBioPortal(DynamicSource, object):
 
         self._cancer_types = pd.DataFrame(dict(
             [ (attr, [ getattr(entry, attr) for entry in result ]) for attr in dir(result[0]) ]))
- 
+
     def _get_cancer_studies(self, cancer_studies=None):
         self.log.info("retrieving cancer studies...")
         try:
@@ -354,7 +374,7 @@ class cBioPortal(DynamicSource, object):
 
         molecularProfileFilter = { "studyIds" : self._cache_cancer_studies['studyId'].values.tolist()}
 
-        result = self._client.Molecular_Profiles.fetchMolecularProfilesUsingPOST(molecularProfileFilter = molecularProfileFilter, 
+        result = self._client.Molecular_Profiles.fetchMolecularProfilesUsingPOST(molecularProfileFilter = molecularProfileFilter,
                                                                                  projection = 'DETAILED').result()
 
         result_df = pd.DataFrame(dict(
@@ -370,7 +390,7 @@ class cBioPortal(DynamicSource, object):
                                         "molecularProfileIds": self._cache_genetic_profiles.molecularProfileId.values.tolist()
                                       }
 
-        result = self._client.Mutations.fetchMutationsInMultipleMolecularProfilesUsingPOST(mutationMultipleStudyFilter=mutationMultipleStudyFilter, 
+        result = self._client.Mutations.fetchMutationsInMultipleMolecularProfilesUsingPOST(mutationMultipleStudyFilter=mutationMultipleStudyFilter,
                                                                                              projection='DETAILED').result()
 
         df = pd.DataFrame(dict(
@@ -541,7 +561,7 @@ class COSMIC(DynamicSource, object):
             else:
                 self.log.error('COSMIC database_files does not have the correct format.')
                 raise TypeError('COSMIC database_files does not have the correct format.')
-        
+
 
         if database_encoding is None or isinstance(database_encoding, str):
             encodings = [ database_encoding for i in self._database_files ]
@@ -750,11 +770,11 @@ class PhosphoSite(DynamicSource, object):
         super(PhosphoSite, self).__init__(name='PhosphoSite', version='1.0', description=description)
 
         self._ptm_types = ['acetylation', 'methylation', 'O-GalNAc', 'O-GlcNAc', 'phosphorylation', 'sumoylation', 'ubiquitination']
-        self._ptm_types_to_classes = {  'acetylation'     : 'ptm_acetylation', 
-                                        'methylation'     : 'ptm_methylation', 
-                                        'O-GalNAc'        : 'ptm_ogalnac', 
-                                        'O-GlcNAc'        : 'ptm_oglcnac', 
-                                        'phosphorylation' : 'ptm_phosphorylation', 
+        self._ptm_types_to_classes = {  'acetylation'     : 'ptm_acetylation',
+                                        'methylation'     : 'ptm_methylation',
+                                        'O-GalNAc'        : 'ptm_ogalnac',
+                                        'O-GlcNAc'        : 'ptm_oglcnac',
+                                        'phosphorylation' : 'ptm_phosphorylation',
                                         'sumoylation'     : 'ptm_sumoylation',
                                         'ubiquitination'  : 'ptm_ubiquitination' }
         self._ptm_suffixes = ['ac', 'm[0-9]', 'ga', 'gl', 'p', 'sm', 'ub']
@@ -826,7 +846,7 @@ class PhosphoSite(DynamicSource, object):
                         prop.sources.append(self)
                         self.log.info("site %s already annotated as %s; source will be added" % (m, position_properties_classes[ptm].name))
                         already_annotated = True
-                
+
                 if not already_annotated:
                     property_obj = position_properties_classes[self._ptm_types_to_classes[ptm]](  sources=[self],
                                                         position=sequence.positions[site_seq_idx]
@@ -999,7 +1019,7 @@ class MyVariant(DynamicSource, object):
 
         if not self._validate_revel_hit(mutation, hit):
             return None
-        
+
         try:
             revel_scores = hit['dbnsfp']['revel']['score']
             self.log.debug(f"downloaded revel score: {revel_scores}")
@@ -1041,7 +1061,7 @@ class MyVariant(DynamicSource, object):
         else:
             self.log.info("%d DBnsfp hits for mutation %s" % (len(hits), mutation))
         revel_scores = []
- 
+
         for hit in hits:
 
             revel_score = None
@@ -1120,17 +1140,17 @@ class ELMPredictions(DynamicSource, object):
         for line in tmp:
             if line.startswith('"ELME'):
                 tmp2 = line.strip().split("\t")
-                tmp2 = [ unicode(t) for t in tmp2 ]  
+                tmp2 = [ unicode(t) for t in tmp2 ]
                 tmp2 = [ unicode.strip(t, '"') for t in tmp2 ]
                 self._elm_classes[tmp2[1]] = tmp2[2:]
 
     def _get_prediction(self, gene_name, elm_wait):
-        
+
         if elm_wait > 0:
             self.log.info(f"waiting {elm_wait} seconds before querying ELM as requested")
         self.log.info("retrieving prediction for %s" % gene_name )
         time.sleep(elm_wait)
-        
+
         try:
             req_url = os.path.join(self._requests_url, gene_name) + ".tsv"
             response = rq.get(req_url)
@@ -1148,7 +1168,7 @@ class ELMPredictions(DynamicSource, object):
             return None
 
         out = []
-        
+
         tmp = response.split("\n")
 
         for line in tmp:
@@ -1156,7 +1176,7 @@ class ELMPredictions(DynamicSource, object):
             if line.startswith("#") or line.startswith('elm_identifier') or not line:
                 continue
             assert len(tmp2) == 10
-            
+
             tmp2[0] = str(tmp2[0])
             tmp2[1] = int(tmp2[1])
             tmp2[2] = int(tmp2[2])
@@ -1165,7 +1185,7 @@ class ELMPredictions(DynamicSource, object):
             out.append(tmp2)
         return out
 
-    def add_sequence_properties(self, sequence, exclude_elm_classes=r'{.*}', use_alias='uniprot', elm_wait=180):
+    def add_sequence_properties(self, sequence, exclude_elm_classes=r'{.*}', use_alias='uniprot_acc', elm_wait=180):
         self.log.info("adding ELM predictions to sequence ...")
         if use_alias is None:
             data = self._get_prediction(sequence.gene_id, elm_wait=elm_wait)
@@ -1196,7 +1216,7 @@ class ELMPredictions(DynamicSource, object):
             sequence.add_property(property_obj)
 
 class gnomAD(DynamicSource, object):
-    
+
     description = "gnomAD"
 
     _versions = {  '2.1' :             'gnomad_r2_1',
@@ -1225,7 +1245,7 @@ class gnomAD(DynamicSource, object):
                        '2.1_non-topmed' :  'gnomAD v2.1 (non-topmed)',
                        'exac' :            'EXaC',
                     }
-    
+
     #Supported metadata for the different gnomAD versions
     _v2_1=['gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency', 'gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency']
     _v3=['gnomad_genome_allele_frequency', 'gnomad_popmax_genome_allele_frequency']
@@ -1236,7 +1256,7 @@ class gnomAD(DynamicSource, object):
                                         '2.1_non-cancer' : _v2_1,
                                         '2.1_non-topmed' : _v2_1,
                                         '3' : _v3
-                                        } 
+                                        }
 
     #Supported data for gnomAD versions
     _exome_genome_support = ['2.1', '2.1_controls', '2.1_non-neuro', '2.1_non-cancer', '2.1_non-topmed']
@@ -1244,7 +1264,7 @@ class gnomAD(DynamicSource, object):
 
     @logger_init
     def __init__(self, version='2.1'):
-        
+
         self._gnomad_version = str(version)
         if self._gnomad_version not in self._versions.keys():
             self.log.error("gnomAD version %s not supported by the current implementation" % version)
@@ -1269,7 +1289,7 @@ class gnomAD(DynamicSource, object):
             if md not in self._version_metadata_compatability[self._gnomad_version]:
                 self.log.error(f"The  metadata type '{md}' is not compatible with the gnomAD version. Compatible metadata are {self._version_metadata_compatability[self._gnomad_version]}")
                 raise ValueError(f"The  metadata type '{md}' is not compatible with the gnomAD version. Compatible metadata are {self._version_metadata_compatability[self._gnomad_version]}")
-       
+
         if use_alias is not None:
             gene_id = sequence.aliases[use_alias]
             self.log.info("using alias %s as gene name" % sequence.aliases[use_alias])
@@ -1297,7 +1317,7 @@ class gnomAD(DynamicSource, object):
             for mut in pos.mutations:
                 for i,add_this_metadata in enumerate(metadata_functions):
                     mut.metadata[md_types[i]] = []
-    
+
                 if not 'genomic_mutations' in mut.metadata:
                     self.log.warning("no genomic mutation data available for gnomAD, mutation %s. It will be skipped" % mut)
                     continue
@@ -1353,7 +1373,7 @@ class gnomAD(DynamicSource, object):
 
     def _get_metadata(self, mutation, gene_id, md_type):
 
-        exac_key = {    'gnomad_exome_allele_frequency'  : 'exome_af', 
+        exac_key = {    'gnomad_exome_allele_frequency'  : 'exome_af',
                         'gnomad_genome_allele_frequency' : 'genome_af',
                         'gnomad_popmax_exome_allele_frequency' : 'popmax_exome_af',
                         'gnomad_popmax_genome_allele_frequency' : 'popmax_genome_af'       }
@@ -1369,9 +1389,9 @@ class gnomAD(DynamicSource, object):
             if data is None:
                 self._cache[gene_id] = None
                 return None
-            
+
             assemblies = set(data['reference_genome'])
-            
+
             if len(assemblies) != 1:
                 self.log.error("the downloaded data refers to more than one assembly!")
                 return None
@@ -1381,7 +1401,7 @@ class gnomAD(DynamicSource, object):
                 return None
 
             self._cache[gene_id] = data
-        
+
         else:
             data = self._cache[gene_id]
 
@@ -1461,7 +1481,7 @@ class gnomAD(DynamicSource, object):
                     }
                 }
             }"""
-        
+
         self.log.info("retrieving data for gene %s" % gene_id)
 
         try:
@@ -1516,7 +1536,7 @@ class gnomAD(DynamicSource, object):
             variants['exome_af']  =  pd.NA
             variants['genome_af'] = variants['genome_ac'] / variants['genome_an']
             variants['total_af'] = pd.NA
-        
+
         variants[['popmax_exome_ac',  'popmax_exome_an',  'popmax_exome_af',
                 'popmax_genome_ac', 'popmax_genome_an', 'popmax_genome_af',
                 'popmax_tot_ac',    'popmax_tot_an',    'popmax_tot_af']] = variants.apply(self._get_popmax_af, axis=1)
@@ -1533,11 +1553,11 @@ class gnomAD(DynamicSource, object):
                 Index:
                     RangeIndex
                 Columns:
-                    'exome.populations' and/or 'genome.populations' : 
+                    'exome.populations' and/or 'genome.populations' :
                         list of dicts in the format [{'id': , 'ac': , 'an': }]
         pops : :obj:`list`
-            Optional. List containing any or all of the populations 
-            ('afr', 'eas', 'nfe', 'amr', 'sas'). 
+            Optional. List containing any or all of the populations
+            ('afr', 'eas', 'nfe', 'amr', 'sas').
 
         Returns
         -------
@@ -1553,7 +1573,7 @@ class gnomAD(DynamicSource, object):
     #   Ashkenazi Jewish (asj),
     #   European Finnish (fin),
     #   and "Other" (oth) populations.
-    # 
+    #
     # For gnomAD v3, this excludes
     #   Amish (ami),
     #   Ashkenazi Jewish (asj),
@@ -1563,7 +1583,7 @@ class gnomAD(DynamicSource, object):
 
     # gnomAD version                  2    3
     ############################################################
-    # afr: african/african american   +    +   
+    # afr: african/african american   +    +
     # ami: Amish                      NA   -
     # amr: latino/admixed american    +    +
     # asj: ashkenazi jews             -    -
@@ -1573,7 +1593,7 @@ class gnomAD(DynamicSource, object):
     # mid: middle eastern             NA   -
     # oth: other                      -    -
     # sas: south asian                +    +
-    
+
         popmax_allowed_pops = ['afr', 'amr', 'eas', 'nfe', 'sas']
 
         popmax_exome = pd.NA
@@ -1601,7 +1621,7 @@ class gnomAD(DynamicSource, object):
             popmax_exome_an = pd.NA
             popmax_exome_af = pd.NA
 
-        
+
         popmax_genome = pd.NA
         if 'genome.populations' in variants.keys().tolist():
             if type(variants['genome.populations']) == list:
@@ -1636,7 +1656,7 @@ class gnomAD(DynamicSource, object):
             popmax_tot_ac = pd.NA
             popmax_tot_an = pd.NA
             popmax_tot_af = pd.NA
-                        
+
         return pd.Series([popmax_exome_ac,  popmax_exome_an,  popmax_exome_af,
                         popmax_genome_ac, popmax_genome_an, popmax_genome_af,
                         popmax_tot_ac,    popmax_tot_an,    popmax_tot_af])
@@ -1653,7 +1673,7 @@ class MobiDB(DynamicSource):
         self._requests_url = 'https://mobidb.org/api/download?format=json&acc='
         self._data_cache = {}
         self._supported_properties = { 'mobidb_disorder_propensity' : self._get_mobidb_disorder_predictions }
-                                    
+
     def add_position_properties(self, sequence, prop=['mobidb_disorder_propensity'], use_alias='uniprot_acc'):
         if type(prop) is str:
             props = [prop]
@@ -1681,7 +1701,7 @@ class MobiDB(DynamicSource):
 
         assignments = self._get_mobidb_disorder_predictions_assignments(sequence, *args, **kwargs)
 
-        if len(assignments) != len(sequence.positions): 
+        if len(assignments) != len(sequence.positions):
             self.log.error("Error in the assignment of predictions: length of MobiDB structure assignment and sequence don't match")
             return False
 
@@ -1703,7 +1723,7 @@ class MobiDB(DynamicSource):
         except KeyError:
             self.log.error("No curated disorder data was found.")
             curated_disorder_data = None
-        
+
         try:
             derived_disorder_data = data['derived-disorder-priority']
         except KeyError:
@@ -1737,7 +1757,7 @@ class MobiDB(DynamicSource):
 
         assignments = [None for p in sequence.positions]
 
-        # If specified data is available, annotate sequence accordingly 
+        # If specified data is available, annotate sequence accordingly
         for dis_term in disorder_types:
             if disorder_data[dis_term] is not None:
                 regions = disorder_data[dis_term]['regions']
@@ -1906,17 +1926,17 @@ class ManualAnnotation(StaticSource):
             mutation_indices = [i for i, x in enumerate(mutations) if x == m]
 
             if do_genomic_mutations:
-                #If there are multiple genomic mutation metadata for one mutation, move the 
+                #If there are multiple genomic mutation metadata for one mutation, move the
                 #additional entries to the end of out_metadata['genomic_mutations'] and
                 #and add the index number for this entry to mutation_indices
                 new_mut_ind = list()
-                for mi in mutation_indices:  
+                for mi in mutation_indices:
                     if out_metadata['genomic_mutations'][mi] is not None and len(out_metadata['genomic_mutations'][mi]) > 2:
                         num_md = len(out_metadata['genomic_mutations'][mi])
                         for i in range(2,num_md,2):
                             out_metadata['genomic_mutations'].append(out_metadata['genomic_mutations'][mi][i:i+2])
                             new_mut_ind.append(len(out_metadata['genomic_mutations'])-1)
-                        out_metadata['genomic_mutations'][mi] = out_metadata['genomic_mutations'][mi][0:2]        
+                        out_metadata['genomic_mutations'][mi] = out_metadata['genomic_mutations'][mi][0:2]
                 mutation_indices.extend(new_mut_ind)
 
             mutation_obj = Mutation(sequence.positions[site_seq_idx],
@@ -1977,7 +1997,7 @@ class ManualAnnotation(StaticSource):
             else:
                 positions = ( int(row['site']) )
 
-            try: 
+            try:
                 positions = [ sequence.positions[sequence.seq2index(p)] for p in positions ]
             except:
                 self.log.warning("position property %s is outside the protein sequence; it will be skipped" % row['type'])
