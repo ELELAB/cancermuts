@@ -23,11 +23,60 @@ import matplotlib.pyplot as plt
 from upsetplot import plot
 from upsetplot import from_memberships
 import numpy as np
+import io
 from cancermuts.table import Table
 
-def add_padding(amount: int):
-    for i in range(amount):
-        st.write('')
+def download_plot_button(filename):
+    fn = filename+'.png'
+    img = io.BytesIO()
+    plt.savefig(img, format='png')
+    
+    btn = st.download_button(
+                label="Download plot",
+                data=img,
+                file_name=fn,
+                mime="image/png")
+    
+def filter_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    # addFilter = st.checkbox("Add filter")
+
+    # if not addFilter:
+    #     return df
+    
+    df['Date'] = pd.to_datetime(df['Date'])
+
+    filter_container = st.container()
+    with filter_container:
+        filter_columns = st.multiselect("Filter dataframe on", df.columns)
+
+    for col in filter_columns:
+        left, right = st.columns((1, 20))
+        left.write("↳")
+
+        if df[col].dtype == 'datetime64[ns]':
+        #if len(df[col]) > 0 and isinstance(df[col][0], pd._libs.tslibs.timestamps.Timestamp):
+            user_date_input = right.date_input(f"Values for {col}",
+            value=(
+                df[col].min(),
+                df[col].max(),
+                ),)
+            
+            if len(user_date_input) == 2:
+                user_date_input = tuple(map(pd.to_datetime, user_date_input))
+                start_date, end_date = user_date_input
+                df = df.loc[df[col].between(start_date, end_date)]
+
+        else:
+            user_text_input = right.selectbox(
+                f"{col}", df[col])
+            #if user_text_input:
+            df = df[df[col].str.contains(user_text_input)]
+
+    for col in df.columns:
+        if df[col].dtype == 'datetime64[ns]':
+            df[col] = df[col].dt.strftime("%d-%m-%Y")
+
+    return df
 
 database_dir = './example_database'
 
@@ -36,7 +85,7 @@ st.set_page_config(layout="wide",
     page_icon="📖")
 
 st.header("Welcome to Cancermuts!")
-st.write("Navigate below to view and download datasets.")
+st.write("Navigate below to explore the data.")
 
 try:
     show_table = pd.read_csv(os.path.join(database_dir, 'index_table.csv'))
@@ -44,9 +93,14 @@ except FileNotFoundError:
     st.write('No entries are currently available.')
     st.stop()
 
+addFilter = st.checkbox("Add filter")
+
 df = pd.DataFrame(show_table)
 
-selection = get_selection(filter_dataframe(df))
+if addFilter:  
+    df = filter_dataframe(df)
+
+selection = get_selection(df)
 
 if len(selection) != 1:
     invalid_selection = True
@@ -106,6 +160,8 @@ if invalid_selection == False:
         plot(upset_df, fig=fig)
         st.pyplot(fig=fig)
 
+        download_plot_button(f'{protein}_upset_'+str(slider_values[0])+'-'+str(slider_values[1]))
+
     with revel:
         fig, ax = plt.subplots()
         hist_data = region_specific_data['REVEL_score'][region_specific_data['REVEL_score'].notna()].tolist()
@@ -134,9 +190,45 @@ if invalid_selection == False:
         else:
            st.write("No REVEL scores reported for this protein")
 
+        download_plot_button(f'{protein}_revel_'+str(slider_values[0])+'-'+str(slider_values[1]))
+
     with cancermuts:
+        vert_size = 10
+        section = 50
+
+        # for i in range(int(round(len(region_specific_data)/100))):
+        #     vert_size += 2
+        #     section -= 5
+
+        # st.write(vert_size, section)
+
+        if len(region_specific_data) <= 100:
+            vert_size = 6
+            section = 40
+        elif len(region_specific_data) > 100 and len(region_specific_data) <= 200:
+            vert_size = 10
+            section = 40
+        elif len(region_specific_data) > 200 and len(region_specific_data) <= 300:
+            vert_size = 12
+            section = 35
+        elif len(region_specific_data) > 300 and len(region_specific_data) <= 400:
+            vert_size = 17
+            section = 30
+        elif len(region_specific_data) > 400 and len(region_specific_data) <= 500:
+            vert_size = 22
+            section = 30
+        elif len(region_specific_data) > 500 and len(region_specific_data) <= 600:
+            vert_size = 30
+            section = 25
+        elif len(region_specific_data) > 600 and len(region_specific_data) <= 700:
+            vert_size = 38
+            section = 25
+
         tbl = Table()
-        fig, ax = tbl.plot_metatable(region_specific_data)
+        fig, ax = tbl.plot_metatable(region_specific_data, section_size=section, elm_y_ladder=(-0.2, -0.5, 5), rcParams={'font.size':8.0, 'font.sans-serif':['Arial']}, figsize=(10,vert_size))
         st.pyplot(fig=fig)
+
+        download_plot_button(f'{protein}_cancermuts_'+str(slider_values[0])+'-'+str(slider_values[1]))
+
 
 
