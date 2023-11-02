@@ -1,3 +1,20 @@
+# create_database.py for cancermuts
+# (c) 2023 Alberte Estad <ahestad@outlook.com>
+# This file is part of cancermuts
+#
+# cancermuts is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Nome-Programma is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Nome-Programma.  If not, see <http://www.gnu.org/licenses/>.
+
 import os
 import pandas as pd
 from pathlib import Path
@@ -5,8 +22,8 @@ import streamlit_utils as su
 from bioservices.uniprot import UniProt
 
 datadir = "/data/raw_data/computational_data/cancermuts_data/"
-entry_details_file = su.get_database_dir("example_entries.csv")
-database_dir = su.get_database_dir("example_database")
+entry_details_file = "example_entries.csv"
+database_dir = "example_database"
 
 entry_details_df = pd.read_csv(entry_details_file)
 
@@ -28,7 +45,7 @@ for index, row in entry_details_df.iterrows():
         filename = [filename for filename in os.listdir(dir_path) if filename.startswith('metatable')][0]
         file_path = os.path.join(dir_path, filename)
 
-        if os.path.isfile(file_path) and os.path.isfile(os.path.join(database_dir, filename)) != True:
+        if os.path.isfile(file_path) and not os.path.isfile(os.path.join(database_dir, filename)):
             file = pd.read_csv(file_path)
             file.to_csv(os.path.join(database_dir, row['protein_name']))
             #file.to_csv(os.path.join(database_dir, row['protein_name'] + '_' + most_recent.strftime("%d%m%Y")))
@@ -45,7 +62,7 @@ for index, row in entry_details_df.iterrows():
     else:
         print(f"Entry not found: {path} is not a directory")
 
-metatable.to_csv(os.path.join(database_dir, 'metatable.csv'), index=False)
+metatable.to_csv(os.path.join(database_dir, 'index_table.csv'), index=False)
 
 
 

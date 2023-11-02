@@ -1,4 +1,4 @@
 protein_class,protein_name,run_type,date,Reference
 af_db_human,ADH1C,pancancer_clinvar,15062023,https://doi.org/10.1101/2022.10.22.513328
 vus,ERCC4,pancancer_clinvar_others,3072023,https://doi.org/10.1101/2022.10.22.513328
-sno,TXN,pancancer,24062023,https://doi.org/10.1101/2022.10.22.513328;37085483
+sno,TXN,pancancer,24062023,https://doi.org/10.1101/2022.10.22.513328

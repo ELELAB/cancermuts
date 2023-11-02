@@ -1,3 +1,20 @@
+# main_page.py for cancermuts
+# (c) 2023 Alberte Estad <ahestad@outlook.com>
+# This file is part of cancermuts
+#
+# cancermuts is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Nome-Programma is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Nome-Programma.  If not, see <http://www.gnu.org/licenses/>.
+
 import streamlit as st
 import os
 import pandas as pd
@@ -6,12 +23,13 @@ import matplotlib.pyplot as plt
 from upsetplot import plot
 from upsetplot import from_memberships
 import numpy as np
+from cancermuts.table import Table
 
 def add_padding(amount: int):
     for i in range(amount):
         st.write('')
 
-database_dir = get_database_dir('example_database')
+database_dir = './example_database'
 
 st.set_page_config(layout="wide",
     page_title="Cancermuts",
@@ -21,7 +39,7 @@ st.header("Welcome to Cancermuts!")
 st.write("Navigate below to view and download datasets.")
 
 try:
-    show_table = load_main_table(database_dir)
+    show_table = pd.read_csv(os.path.join(database_dir, 'index_table.csv'))
 except FileNotFoundError:
     st.write('No entries are currently available.')
     st.stop()
@@ -70,7 +88,7 @@ if invalid_selection == False:
 
     region_specific_data = data[start:end+1]
 
-    dataset, upset, revel = st.tabs(["Data", "UpSet plot", "REVEL distribution plot"])
+    dataset, upset, revel, cancermuts = st.tabs(["Data", "UpSet plot", "REVEL distribution plot", "Cancermuts plot"])
 
     with dataset:
         st.write(f"Currently viewing: {protein}, in the AA range {start}-{end}")
@@ -115,5 +133,10 @@ if invalid_selection == False:
 
         else:
            st.write("No REVEL scores reported for this protein")
+
+    with cancermuts:
+        tbl = Table()
+        fig, ax = tbl.plot_metatable(region_specific_data)
+        st.pyplot(fig=fig)
 
 
