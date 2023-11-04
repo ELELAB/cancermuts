@@ -17,7 +17,7 @@
 
 import os
 import pandas as pd
-from pathlib import Path
+#from pathlib import Path
 import streamlit_utils as su
 from bioservices.uniprot import UniProt
 import collections
