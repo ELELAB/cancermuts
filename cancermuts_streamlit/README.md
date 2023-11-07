@@ -17,6 +17,7 @@ This application was developed with Python 3.8.0 with the following packages ins
 - upsetplot
 - numpy
 - cancermuts
+- bioservices
 
 ## Usage
 
@@ -34,7 +35,7 @@ source cancermuts_env/bin/activate
 ```
 3. Install requirements using `pip`:
 ```
-pip install streamlit pandas matplotlib upsetplot numpy
+pip install streamlit pandas matplotlib upsetplot numpy bioservices
 ```
 4. For the cancermuts package you'll have to clone the Cancermuts GitHub repository to a local folder:
 ```
