@@ -121,6 +121,7 @@ st.download_button(label="Download dataset",
 if invalid_selection == False:
         
     data = load_dataset(database_dir, protein)
+    data = data.drop(['Unnamed: 0', 'Unnamed: 0.1'], axis=1)
     # start = 0
     start = data['aa_position'].iloc[0]
     # end = len(data)
