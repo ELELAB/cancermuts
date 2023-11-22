@@ -1,5 +1,5 @@
 # streamlit_utils.py for cancermuts
-# (c) 2023 Alberte Estad <ahestad@outlook.com>
+# (c) 2023 Alberte Heering Estad <ahestad@outlook.com>
 # This file is part of cancermuts
 #
 # cancermuts is free software: you can redistribute it and/or modify

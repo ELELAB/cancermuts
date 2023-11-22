@@ -1,5 +1,5 @@
 # main_page.py for cancermuts
-# (c) 2023 Alberte Estad <ahestad@outlook.com>
+# (c) 2023 Alberte Heering Estad <ahestad@outlook.com>
 # This file is part of cancermuts
 #
 # cancermuts is free software: you can redistribute it and/or modify
@@ -121,8 +121,10 @@ st.download_button(label="Download dataset",
 if invalid_selection == False:
         
     data = load_dataset(database_dir, protein)
-    start = 0
-    end = len(data)
+    # start = 0
+    start = data['aa_position'].iloc[0]
+    # end = len(data)
+    end = data['aa_position'].iloc[-1]
 
     def update_slider():
         st.session_state["slider"] = (st.session_state["nb_input1"], st.session_state["nb_input2"])
@@ -140,7 +142,10 @@ if invalid_selection == False:
     start = nb_input_val1
     end = nb_input_val2
 
-    region_specific_data = data[start:end+1]
+    # region_specific_data = data[start:end+1].reset_index(drop=True)
+    start_i = min(data[data['aa_position'] == start].index.to_list())
+    end_i = max(data[data['aa_position'] == end].index.to_list())
+    region_specific_data = data[start_i:end_i+1].reset_index(drop=True)
 
     dataset, upset, revel, cancermuts = st.tabs(["Data", "UpSet plot", "REVEL distribution plot", "Cancermuts plot"])
 
