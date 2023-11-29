@@ -176,7 +176,7 @@ class Table:
 
 
 
-    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency','gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency'], 
+    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency','gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency'],
                         position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage', 'ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation', 'ptm_ogalnac', 'ptm_oglcnac', 'mobidb_disorder_propensity'],
                         sequence_properties=['linear_motif', 'structure']):
 
@@ -207,7 +207,7 @@ class Table:
 
             mut_strings = [str(m) for m in p.mutations]
             mut_strings_order = sorted(list(range(len(mut_strings))), key=mut_strings.__getitem__)
-            
+
             if len(mut_strings_order) == 0:
                 this_row = list(base_row)
                 this_row.append(None)
@@ -296,8 +296,12 @@ class Table:
         return df
 
     def _splice_metatable(self, df, section_size=100):
+        # position ranges are left and right-inclusive
+        # actual positions are left-inclusive only
 
         positions = sorted(list(set(df[self.headers['position']])))
+
+        start = positions[0]
 
         nsegments = len(positions) // section_size
 
@@ -307,16 +311,17 @@ class Table:
         position_ranges = []
 
         for i in range(nsegments):
-            position_ranges.append((i * section_size + 1, (i+1) * section_size + 1))
-            dfs.append(df[df[self.headers['position']].between(*position_ranges[-1])])
+            position_ranges.append((start +  i    * section_size,
+                                    start + (i+1) * section_size))
+            dfs.append(df[df[self.headers['position']].between(*position_ranges[-1], inclusive='left')])
 
         if rest > 0:
-            position_ranges.append(((i+1) * section_size + 1, (i+1) * section_size + 1 + rest))
-            dfs.append(df[df[self.headers['position']].between(*position_ranges[-1])])
+            position_ranges.append((start + (i+1) * section_size, start + (i+1) * section_size + rest))
+            dfs.append(df[df[self.headers['position']].between(*position_ranges[-1], inclusive='left')])
         return dfs, position_ranges
 
     def _y_ladder(self, miny, maxy, nelm):
-        return cycle(np.linspace(miny, maxy, nelm))        
+        return cycle(np.linspace(miny, maxy, nelm))
 
     def _plot_mutations(self, ax, df_i, revel, revel_not_annotated, revel_cutoff, y_ladder):
 
@@ -400,7 +405,7 @@ class Table:
                 ax.axvline(x=r, color=self.ptm_colors[t], lw=0.5)
 
     def _plot_elms(self, ax, df, df_i, mutation_elms_only=True, color='lightblue', color_manual='orange', y_ladder=(-0.2, -0.6, 5)):
-        
+
         all_elms = []
 
         df_e = df [ df[ self.headers['linear_motif'] ].notnull() ][ self.headers['linear_motif']]
@@ -408,6 +413,7 @@ class Table:
 
         df_mut_pos = set( df[ df[self.headers['mutated']].notnull() ][self.headers['position']] )
         df_i_pos = sorted(list(set(df_i[self.headers['position']])))
+
         df_i_range = (df_i_pos[0], df_i_pos[-1])
 
         for e in df_e:
@@ -426,9 +432,12 @@ class Table:
             elm_name = elm_string[:last_parenthesis_index].strip()
             elm_code = elm_string[last_parenthesis_index+1:-1]
 
+            elm_first = np.max((df_i_range[0], elm[1][0]))
+            elm_last  = np.min((df_i_range[1], elm[1][1]))
+
             all_elms[i].append( elm_name )
             all_elms[i].append( elm_code )
-            all_elms[i].append( elm[1][0] + (elm[1][1] - elm[1][0]) / 2.0 )
+            all_elms[i].append( elm_first + (elm_last - elm_first) / 2.0 )
 
         all_elms = sorted(all_elms, key=lambda x: x[3])
 
@@ -452,7 +461,6 @@ class Table:
                 this_color = color_manual
             else:
                 this_color = color
-
 
             ax.add_patch(patches.Rectangle((pos[0],0), pos[1]-pos[0], 1.0, alpha=0.8, color=this_color))
 
