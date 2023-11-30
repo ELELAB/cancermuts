@@ -1,5 +1,6 @@
 # create_database.py for cancermuts
-# (c) 2023 Alberte Heering Estad <ahestad@outlook.com>
+# (c) 2023 Alberte Heering Estad <ahestad@outlook.com>, Matteo Tiberti
+# Danish Cancer Institute 
 # This file is part of cancermuts
 #
 # cancermuts is free software: you can redistribute it and/or modify
@@ -7,24 +8,32 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# Nome-Programma is distributed in the hope that it will be useful,
+# cancermuts is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with Nome-Programma.  If not, see <http://www.gnu.org/licenses/>.
+# along with cancermuts.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
 import pandas as pd
-#from pathlib import Path
 import streamlit_utils as su
 from bioservices.uniprot import UniProt
 import collections
+import argparse
 
-datadir = "/data/raw_data/computational_data/cancermuts_data/"
-entry_details_file = "example_entries.csv"
-database_dir = "example_database"
+argparser = argparse.ArgumentParser(description='Create a database of cancermuts entries for the web application')
+
+argparser.add_argument('-d', '--datadir', type=str, help='Path to the directory containing cancermuts data', required=True)
+argparser.add_argument('-e', '--entry_details_file', type=str, help='Path to the file containing the entry details', required=True)
+argparser.add_argument('-o', '--output_dir', type=str, help='Path to the output directory', required=True)
+
+args = argparser.parse_args()
+
+datadir = args.datadir
+entry_details_file = args.entry_details_file
+database_dir = args.output_dir
 
 entry_details_df = pd.read_csv(entry_details_file)
 
@@ -55,7 +64,6 @@ for index, row in entry_details_df.iterrows():
             file = pd.read_csv(file_path)
             file.to_csv(os.path.join(database_dir, row['protein_name']))
 
-            u = UniProt(verbose=False)
             up_acc = u.search(row['protein_name']+"+and+taxonomy_id:9606", limit=3, columns="accession")
 
             rows['Gene'].append(row['protein_name'])
