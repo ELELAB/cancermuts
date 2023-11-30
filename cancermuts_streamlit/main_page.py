@@ -7,21 +7,20 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# Nome-Programma is distributed in the hope that it will be useful,
+# cancermuts is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with Nome-Programma.  If not, see <http://www.gnu.org/licenses/>.
+# along with cancermuts.  If not, see <http://www.gnu.org/licenses/>.
 
 import streamlit as st
 import os
 import pandas as pd
 from streamlit_utils import *
 import matplotlib.pyplot as plt
-from upsetplot import plot
-from upsetplot import from_memberships
+from upsetplot import plot, from_memberships
 import numpy as np
 import io
 from cancermuts.table import Table
@@ -39,9 +38,6 @@ def download_plot_button(filename):
     
 def filter_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     # addFilter = st.checkbox("Add filter")
-
-    # if not addFilter:
-    #     return df
     
     df['Date'] = pd.to_datetime(df['Date'])
 
@@ -78,7 +74,11 @@ def filter_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-database_dir = './example_database'
+database_dir = os.getenv('CANCERMUTS_DATABASE')
+if database_dir is None:
+    database_dir = './database'
+
+print(database_dir)
 
 st.set_page_config(layout="wide",
     page_title="Cancermuts",
@@ -143,7 +143,6 @@ if invalid_selection == False:
     start = nb_input_val1
     end = nb_input_val2
 
-    # region_specific_data = data[start:end+1].reset_index(drop=True)
     start_i = min(data[data['aa_position'] == start].index.to_list())
     end_i = max(data[data['aa_position'] == end].index.to_list())
     region_specific_data = data[start_i:end_i+1].reset_index(drop=True)
@@ -235,6 +234,3 @@ if invalid_selection == False:
         st.pyplot(fig=fig)
 
         download_plot_button(f'{protein}_cancermuts_'+str(slider_values[0])+'-'+str(slider_values[1]))
-
-
-
