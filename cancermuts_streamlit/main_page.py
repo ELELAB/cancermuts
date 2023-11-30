@@ -78,8 +78,6 @@ database_dir = os.getenv('CANCERMUTS_DATABASE')
 if database_dir is None:
     database_dir = './database'
 
-print(database_dir)
-
 st.set_page_config(layout="wide",
     page_title="Cancermuts",
     page_icon="📖")
