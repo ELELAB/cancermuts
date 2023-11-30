@@ -74,13 +74,13 @@ def filter_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+st.set_page_config(layout="wide",
+    page_title="Cancermuts database",
+    page_icon="📖")
+
 database_dir = os.getenv('CANCERMUTS_DATABASE')
 if database_dir is None:
     database_dir = './database'
-
-st.set_page_config(layout="wide",
-    page_title="Cancermuts",
-    page_icon="📖")
 
 st.header("Welcome to Cancermuts!")
 st.write("Navigate below to explore the data.")
