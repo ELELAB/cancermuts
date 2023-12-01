@@ -1,23 +1,37 @@
-
 # Cancermuts web app
 
 ## Introduction
 
-Cancermuts is a software that retrieves information on known cancer-associated mutations from a variety of data sources. This application 
-is made to make exploration and visualization of Cancermuts data convenient and accessible to provide a solid preliminary insight into 
-the effects of certain mutations.
+Cancermuts is a software that retrieves information on known cancer-associated
+mutations from a variety of data sources. This web app is made to make
+exploration and visualization of Cancermuts data convenient and accessible
+to provide a solid preliminary insight into the effects of certain mutations.
 
 ## Requirements
 
-This application was developed with Python 3.8.0 with the following packages installed:
+In principle, it is compatible with all operating systems that support Python.
+It requires Python >=3.8 and the following Python packages:
 
-- streamlit
-- pandas
-- matplotlib
-- upsetplot
-- numpy
-- cancermuts
-- bioservices
+- streamlit 1.28.2
+- pandas 2.1.3
+- matplotlib 3.8.2
+- upsetplot 0.8.0
+- numpy 1.26.2
+- cancermuts, from commit ID 4795011
+- bioservices 1.11.2
+
+It has been last test on Linux (Ubuntu 18.04), and on macOS (13.5.2),
+with Python 3.8.0 and the following package versions:
+
+This application was last tested with Python 3.9.6 and the following packages installed:
+
+- streamlit 1.28.2
+- pandas 2.1.3
+- matplotlib 3.8.2
+- upsetplot 0.8.0
+- numpy 1.26.2
+- cancermuts, commit ID 4795011
+- bioservices 1.11.2
 
 ## Usage
 
@@ -35,24 +49,38 @@ source cancermuts_env/bin/activate
 ```
 3. Install requirements using `pip`:
 ```
-pip install streamlit pandas matplotlib upsetplot numpy bioservices
+pip install streamlit==1.28.2 pandas==2.1.3 matplotlib==3.8.2 upsetplot==0.8.0 numpy==1.26.2 bioservices==1.11.2
 ```
-4. For the cancermuts package you'll have to clone the Cancermuts GitHub repository to a local folder:
+4. Install the cancermuts package, by cloning the Cancermuts GitHub repository to a local folder and then
+installing the package in your virtual environment:
 ```
 git clone https://github.com/ELELAB/cancermuts.git
+cd cancermuts
+pip install .
 ```
-5. Then install the package to your virtual environment:
-```
-pip install ./cancermuts
-```
+
 ### Downloading database
 
-No database currently available, an example database is available for testing and exploration.
+No database currently available, an example database is available for testing.
 
-### Running the app
+### Running the app - test database
 
-To run the app locally you can run the following command from within the cancermuts_streamlit folder of the cloned repository:
+After installing all requirements, in order to run the web app you will need
+to have your virtualenv Python environment still active (see previous instructions).
+If this is the case,
+
+1. Enter the `cancermuts_streamlit` folder. We will need to set a systen variable
+to make the web app aware of the location of the test database:
+
+```
+cd cancermuts_streamlit
+export CANCERMUTS_DATABASE=./example_data/example_database
+```
+
+2. start the web app:
+
 ```
 streamlit run main_page.py
 ```
 
+a web browser window pointing to the web app should open
