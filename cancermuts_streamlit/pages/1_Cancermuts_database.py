@@ -29,16 +29,16 @@ def download_plot_button(filename):
     fn = filename+'.png'
     img = io.BytesIO()
     plt.savefig(img, format='png')
-    
+
     btn = st.download_button(
                 label="Download plot",
                 data=img,
                 file_name=fn,
                 mime="image/png")
-    
+
 def filter_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     # addFilter = st.checkbox("Add filter")
-    
+
     df['Date'] = pd.to_datetime(df['Date'])
 
     filter_container = st.container()
@@ -56,7 +56,7 @@ def filter_dataframe(df: pd.DataFrame) -> pd.DataFrame:
                 df[col].min(),
                 df[col].max(),
                 ),)
-            
+
             if len(user_date_input) == 2:
                 user_date_input = tuple(map(pd.to_datetime, user_date_input))
                 start_date, end_date = user_date_input
@@ -95,7 +95,7 @@ addFilter = st.checkbox("Add filter")
 
 df = pd.DataFrame(show_table)
 
-if addFilter:  
+if addFilter:
     df = filter_dataframe(df)
 
 selection = get_selection(df)
@@ -117,7 +117,7 @@ st.download_button(label="Download dataset",
                 key='download-csv')
 
 if invalid_selection == False:
-        
+
     data = load_dataset(database_dir, protein)
     data = data.drop(['Unnamed: 0', 'Unnamed: 0.1'], axis=1)
     # start = 0
@@ -156,7 +156,7 @@ if invalid_selection == False:
         upset_df = from_memberships(upset_data.sources.str.split(','), data=upset_data)
         upset_df.index.rename({'Manual annotations from mutations_clinvar.csv': 'clinvar',
                                'Manual annotations from clinvar.csv': 'clinvar'}, inplace=True)
-        
+
         fig = plt.figure()
         plt.title(f'UpSet plot: {protein}, {start}-{end}')
         plt.axis('off')

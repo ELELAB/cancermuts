@@ -1,6 +1,6 @@
 # create_database.py for cancermuts
 # (c) 2023 Alberte Heering Estad <ahestad@outlook.com>, Matteo Tiberti
-# Danish Cancer Institute 
+# Danish Cancer Institute
 # This file is part of cancermuts
 #
 # cancermuts is free software: you can redistribute it and/or modify
@@ -55,10 +55,10 @@ for index, row in entry_details_df.iterrows():
             date_obj = pd.to_datetime(date, format="%d%m%Y")
             if date_obj > most_recent:
                 most_recent = date_obj
-            
+
     dir_path = os.path.join(path, most_recent.strftime("%d%m%Y"))
     filename = [filename for filename in os.listdir(dir_path) if filename.startswith('metatable') and filename.endswith('.csv')]
-    
+
     if len(filename) > 1:
         print("More than one Cancermuts metatable was found in the path: " + dir_path)
         continue
@@ -81,5 +81,5 @@ df.to_csv(os.path.join(database_dir, 'index_table.csv'), index=False)
 
 
 
-    
+
 
