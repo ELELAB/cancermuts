@@ -32,7 +32,7 @@ our framework for the prediction of cancer mutations, following our standard
 protocol for MAVISp.
 
 Cancermuts is developed at the Danish Cancer Institute, and is available as a
-Python package at our [GitHub repository](https://www.github.com/ELELAB/cancermuts)].
+Python package at our [GitHub repository](https://www.github.com/ELELAB/cancermuts).
 
 While this website contains results obtained using Cancermuts, the package itself
 is not required to access the data. We encourage interested users to use the Cancermuts
@@ -63,7 +63,7 @@ st.subheader("Accessing the data")
 
 st.write("""Please see the Database section on the left for the available data.
 The data is available in the form of a CSV file, which can be downloaded either
-from this website or from our (OSF repository)[https://www.osf.org])""")
+from this website or from our [OSF repository](https://osf.io/jc32x/)""")
 
 st.subheader("Data usage")
 
