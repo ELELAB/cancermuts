@@ -1,4 +1,4 @@
-# MAVISp - Streamlit application
+# Cancermuts - Streamlit application
 # Copyright (C) 2023 Matteo Tiberti, Danish Cancer Society
 #               2023 Elena Papaleo, Danish Cancer Society 
 #
@@ -14,9 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-# Text in this page was reviewed by Elena Papaleo (Danish Cancer Society,
-# Danish Technical University) on 2023-11-20
+
 
 import streamlit as st
 
@@ -58,10 +56,10 @@ We also would like to acknowledge our data sources. The datasets we have used
 are available under a variety of licensing terms, which are listed below for 
 reuse.
 
-Unless stated otherwise in the following text, MAVISp data is released under
+Unless stated otherwise in the following text, Cancermuts data is released under
 the [Creative Commons Attribution 4.0 International (CC BY 4.0) license](https://creativecommons.org/licenses/by/4.0/).
 
-Bulk download of MAVISp data tables is available at [our OSF repository](https://osf.io/)
+Bulk download of Cancermuts data tables is available at [our OSF repository](https://osf.io/)
 
 The Cancermuts software and source code for this website is available at our
 [Cancermuts GitHub repository](https://github.com/ELELAB/Cancermuts)
@@ -73,10 +71,10 @@ st.markdown('''Cancermuts uses the following datasets for the mutation data:
 
   - [**COSMIC**](https://cancer.sanger.ac.uk/cosmic): The Catalogue Of Somatic
     Mutations In Cancer. We use version 96 in our current releases. The data in
-    MAVISp is released according to the COSMIC Non-Commercial Terms and
-    Conditions, and released in MAVISp for non-commercial use only.
+    Cancermuts is released according to the COSMIC Non-Commercial Terms and
+    Conditions, and released in Cancermuts for non-commercial use only.
   - [**cBioPortal**](https://www.cbioportal.org/) for cancer genomics. Data from
-    cBioPortal present in MAVISp is released under the [Open Data Commons Open
+    cBioPortal present in Cancermuts is released under the [Open Data Commons Open
     Database License (ODbL) v1.0](https://opendatacommons.org/licenses/odbl/1-0/)
 
 By default, following the MAVISp protocol, we also include mutations found
@@ -100,10 +98,9 @@ st.markdown('''Cancermuts uses the following datasets for the mutation metadata:
 
 st.subheader('Protein metadata and predictions')
 
-st.markdown('''MAVISp uses the following datasets or software for the prediction
-or annotation of protein-level features, or structure:
+st.markdown('''Cancermuts uses the following datasets or software for the prediction or annotation of protein-level features, or structure:
 
-   - [**UniProt**](https://www.uniprot.org). It is released under the  Creative
+   - [**UniProt**](https://www.uniprot.org). It is released under the Creative
   Commons Attribution 4.0 International (CC BY 4.0) License
   - the [**Protein Data Bank**](https://www.rcsb.org). It is released under
   public domain.
@@ -112,6 +109,6 @@ or annotation of protein-level features, or structure:
   BY 4.0 DEED) License.
   - [**ELM**](http://elm.eu.org), the Eukaryotic Linear Motif resource for functional sites in proteins.
   - [**PhosphoSitePlus**](https://www.phosphosite.org), a database of
-  post-translational modifications. Data from PhosphoSitePlus in MAVISp, (i.e.
+  post-translational modifications. Data from PhosphoSitePlus in Cancermuts, (i.e.
   the PTMs column in our database files) is released according to the
   [PhosphoSitePlus' terms and conditions](https://www.phosphosite.org/staticDownloads), and it is not available for commercial use.''')
