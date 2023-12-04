@@ -17,10 +17,13 @@
 
 
 import streamlit as st
+from streamlit_utils import add_affiliation_logo
 
 st.set_page_config(layout="wide",
     page_title="Acknowledgements and data usage",
     page_icon="🙏")
+
+add_affiliation_logo()
 
 st.header('Acknowledgements and data usage')
 

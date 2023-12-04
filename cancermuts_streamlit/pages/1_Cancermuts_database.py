@@ -78,6 +78,8 @@ st.set_page_config(layout="wide",
     page_title="Cancermuts database",
     page_icon="📖")
 
+add_affiliation_logo()
+
 database_dir = os.getenv('CANCERMUTS_DATABASE')
 if database_dir is None:
     database_dir = './database'

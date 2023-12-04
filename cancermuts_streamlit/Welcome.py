@@ -16,10 +16,13 @@
 # along with cancermuts.  If not, see <http://www.gnu.org/licenses/>.
 
 import streamlit as st
+from streamlit_utils import add_affiliation_logo
 
 st.set_page_config(layout="wide",
     page_title="Welcome",
     page_icon="👋")
+
+add_affiliation_logo()
 
 st.header("Cancermuts")
 
