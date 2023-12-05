@@ -84,7 +84,7 @@ database_dir = os.getenv('CANCERMUTS_DATABASE')
 if database_dir is None:
     database_dir = './database'
 
-st.header("Welcome to Cancermuts!")
+st.header("Cancermuts database")
 st.write("Navigate below to explore the data.")
 
 try:

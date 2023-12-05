@@ -24,7 +24,7 @@ st.set_page_config(layout="wide",
 
 add_affiliation_logo()
 
-st.header("Cancermuts")
+st.header("Welcome to Cancermuts")
 
 st.subheader("Introduction")
 
