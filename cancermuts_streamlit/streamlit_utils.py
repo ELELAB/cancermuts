@@ -1,5 +1,7 @@
 # streamlit_utils.py for cancermuts
 # (c) 2023 Alberte Heering Estad <ahestad@outlook.com>
+# (c) 2023 Matteo Tiberti
+# Danish Cancer Institute
 # This file is part of cancermuts
 #
 # cancermuts is free software: you can redistribute it and/or modify
@@ -48,3 +50,12 @@ def load_dataset(data_dir, protein):
 
 def load_main_table(data_dir):
     return pd.read_csv(os.path.join(data_dir, 'index_table.csv'))
+
+def add_affiliation_logo():
+    columns = st.sidebar.columns(2)
+
+    with columns[0]:
+        st.write("""<div style="width:100%;text-align:center;"><a href="https://www.cancer.dk" style="float:center"><img src="app/static/dcs_logo.png" width="60px"></img></a></div>""", unsafe_allow_html=True)
+
+    with columns[1]:
+        st.write("""<div style="width:100%;text-align:center;"><a href="https://www.dtu.dk" style="float:center"><img src="app/static/dtu_logo.png" width="60px"></img></a></div>""", unsafe_allow_html=True)
