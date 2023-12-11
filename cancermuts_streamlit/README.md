@@ -21,7 +21,6 @@ It requires Python >=3.8 and the following Python packages:
 - bioservices 1.11.2
 - osfclient 0.0.5
 
-
 It has been last test on Linux (Ubuntu 18.04), and on macOS (13.5.2),
 with Python 3.8.0 and the following package versions:
 
@@ -116,7 +115,7 @@ export CANCERMUTS_DATABASE=./example_data/example_database
 2. start the web app:
 
 ```
-streamlit run main_page.py
+streamlit run Welcome.py
 ```
 
 a web browser window pointing to the web app should open
