@@ -106,17 +106,24 @@ if len(selection) != 1:
     invalid_selection = True
     protein=''
     data=''
+    st.download_button(label="Download dataset",
+                       disabled=invalid_selection,
+                       data=data,
+                       file_name=f'{protein}.csv',
+                       mime="text/csv",
+                       key='download-csv')
+
 else:
     invalid_selection = False
     protein = selection['Gene'].to_list()[0]
     data = os.path.join(database_dir, [filename for filename in os.listdir(database_dir) if filename.startswith(protein)][0])
-
-st.download_button(label="Download dataset",
-                disabled=invalid_selection,
-                data=data,
-                file_name=f'{protein}.csv',
-                mime="text/csv",
-                key='download-csv')
+    with open(data) as fh:
+        st.download_button(label="Download dataset",
+                           disabled=invalid_selection,
+                           data=fh,
+                           file_name=f'{protein}.csv',
+                           mime="text/csv",
+                           key='download-csv')
 
 if invalid_selection == False:
 
