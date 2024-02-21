@@ -26,3 +26,12 @@ mutations. At the moment it supports:
 
 Please see the [Cancermuts documentation on GitLab](https://matteo-tiberti.gitbook.io/cancermuts/) for further details
 
+### Cancermuts web server
+
+We have collected a number of Cancermuts entry in connection with the [MAVISp project](https://github.com/ELELAB/mavisp)
+and others. We are releasing this dataset on a webserver, hosted by the Technical University of Denmark,
+Department of Health Technologies.
+
+[The webserver is available at this link](https://services.healthtech.dtu.dk/services/Cancermuts-1.0/)
+
+
