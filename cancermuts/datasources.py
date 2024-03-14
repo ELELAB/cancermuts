@@ -29,7 +29,7 @@ Classes to interrogate data sources and annotate various data
 import time
 import requests as rq
 from bioservices.uniprot import UniProt as bsUniProt
-from Bio.PDB.Polypeptide import three_to_one
+from Bio.PDB.Polypeptide import three_to_index, index_to_one
 from Bio import SeqIO
 import numpy as np
 import pandas as pd
@@ -1903,8 +1903,8 @@ class ManualAnnotation(StaticSource):
 
             #checks if it is a synonymous mutation
             num = int(tokens['position'])
-            wt  = three_to_one(str.upper(tokens['wt']))
-            mut = three_to_one(str.upper(tokens['mut']))
+            wt  = index_to_one(three_to_index(str.upper(tokens['wt'])))
+            mut = index_to_one(three_to_index(str.upper(tokens['mut'])))
 
             if wt == mut:
                 self.log.info("synonymous mutation %s discarded" % m)
