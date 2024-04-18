@@ -1220,27 +1220,31 @@ class ggetELMPredictions(StaticSource, object):
     @logger_init
     def __init__(self):
         description = "ELM Prediction with gget"
-        super(ggeELMPredictions, self).__init__(name='ggetELM', version='1.0', description=description)
+        super(ggetELMPredictions, self).__init__(name='ggetELM', version='1.0', description=description)
 
-    def _get_prediction(sequence):
+    def _get_prediction(self, sequence):
 
-        ortho_slims, regex_slims = gget.elm(sequence, uniprot=False)
+        try:
+            ortho_slims, regex_slims = gget.elm(sequence, uniprot=False)
+        except FileNotFoundError:
+            gget.setup('elm')
+            ortho_slims, regex_slims = gget.elm(sequence, uniprot=False)
 
-        return regex_slim[['ELMIdentifier',
-                           'FunctionalSiteName',
-                           'Description',
-                           'motif_start_in_query',
-                           'motif_end_in_query']].drop_duplicates()
+        return regex_slims[['ELMIdentifier',
+                            'FunctionalSiteName',
+                            'Description',
+                            'motif_start_in_query',
+                            'motif_end_in_query']].drop_duplicates()
 
     def add_sequence_properties(self, sequence, exclude_elm_classes=r'{.*}'):
         self.log.info("adding gget ELM predictions to sequence ...")
 
         data = self._get_prediction(sequence.sequence)
         
-        for r in data.iterrows():
+        for _, r in data.iterrows():
 
             if re.match(exclude_elm_classes, r['ELMIdentifier']):
-                self.log.info("%s was filtered out as requested" % d[0])
+                self.log.info("%s was filtered out as requested" % r['ELMIdentifier'])
                 continue
 
             this_positions = []
