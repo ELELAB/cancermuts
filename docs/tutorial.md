@@ -617,6 +617,23 @@ and their specifics:
  <SequencePosition, residue T at position 12>]
 ```
 
+Alternatively, and in a very similar fashion, it is possible to use the [gget Python
+package](https://github.com/pachterlab/gget) to obtain short linear motifs definitions.
+The current implementation only considers "regexp" type of predictions from the
+full protein sequence. It should be noted that, unlike when using the ELM webserver
+as detailed above to obtain these data, no filtering is applied. For instance:
+
+```py
+>>> elm = ggetELMPredictions()
+>>> elm.add_sequence_properties(seq,
+	                            exclude_elm_classes="MOD_.")
+```
+
+This can be useful when e.g. the ELM webserver is not available or for when
+many calls in a row are necessary. The ELM webserver requires a minimum 3-minute
+interval between queries which has been baked into the current implementation of
+the ELM data source.
+
 ### Custom annotations
 
 We can further add annotations manually to our dataset. This is for data that
