@@ -51,6 +51,7 @@ from future.utils import iteritems
 from bravado.client import SwaggerClient
 from bravado.requests_client import RequestsClient
 from requests.adapters import HTTPAdapter
+import gget
 
 
 import sys
@@ -1214,6 +1215,87 @@ class ELMPredictions(DynamicSource, object):
             property_obj.metadata['function'] = [self._elm_classes[d[0]][0]]
             property_obj.metadata['ref']      = self.description
             sequence.add_property(property_obj)
+
+class ggetELMPredictions(StaticSource, object):
+    @logger_init
+    def __init__(self):
+        """
+        Data source for ELM which uses the gget Python package, rather than
+        interrogating the ELM webserver
+        """
+
+        description = "ELM Prediction with gget"
+        super(ggetELMPredictions, self).__init__(name='ggetELM', version='1.0', description=description)
+
+    def _get_prediction(self, sequence):
+        """
+        Gets predicted SLIMs using regexp mode only, using the gget Python
+        package
+
+        Parameters
+        ----------
+        sequence : :obj:`str`
+            Protein sequence, as a single string
+
+        Returns
+        ----------
+        slims : :obj:`pandas.DataFrame`
+            data frame containing SLIM definitions in form of:
+              - ELM identifier
+              - Name
+              - Description
+              - Start position
+              - End position
+        """
+
+        try:
+            ortho_slims, regex_slims = gget.elm(sequence, uniprot=False)
+        except FileNotFoundError:
+            gget.setup('elm')
+            ortho_slims, regex_slims = gget.elm(sequence, uniprot=False)
+
+        return regex_slims[['ELMIdentifier',
+                            'FunctionalSiteName',
+                            'Description',
+                            'motif_start_in_query',
+                            'motif_end_in_query']].drop_duplicates()
+
+    def add_sequence_properties(self, sequence, exclude_elm_classes=r'{.*}'):
+        """
+        Adds sequence properties to a sequence object
+
+        Parameters
+        ----------
+        sequence : :obj:`cancermuts.core.Sequence`
+            Sequence object with the protein to be annotated
+
+        exclude_elm_classes : :obj:`str`
+            Regular expression matching ELM classes to be excluded from the output
+        """
+
+        self.log.info("adding gget ELM predictions to sequence ...")
+
+        data = self._get_prediction(sequence.sequence)
+        
+        for _, r in data.iterrows():
+
+            if re.match(exclude_elm_classes, r['ELMIdentifier']):
+                self.log.info("%s was filtered out as requested" % r['ELMIdentifier'])
+                continue
+
+            this_positions = []
+            for p in range(r['motif_start_in_query'], r['motif_end_in_query']+1):
+                this_positions.append(sequence.positions[sequence.seq2index(p)])
+
+            property_obj = sequence_properties_classes['linear_motif']  (sources=[self],
+                                                                         positions=this_positions,
+                                                                         name=r['FunctionalSiteName'],
+                                                                         id=r['ELMIdentifier'])
+
+            property_obj.metadata['function'] = [r['Description']]
+            property_obj.metadata['ref']      = self.description
+            sequence.add_property(property_obj)
+
 
 class gnomAD(DynamicSource, object):
 
