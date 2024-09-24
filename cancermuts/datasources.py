@@ -984,7 +984,11 @@ class MyVariant(DynamicSource, object):
         if gc.genome_build == 'hg38':
             self.log.info("%s has genomic data in hg38 assembly - will be converted to hg19" % gc)
             converted_coords = self._lo.convert_coordinate('chr%s' % gc.chr, int(gc.get_coord()))
-            assert len(converted_coords) == 1
+
+            if len(converted_coords) != 1:
+                self.log.error("Could not convert genomic coordinates for %s (liftOver returned %d coords); it will be skipped" % (gc, len(converted_coords)))
+                return None
+
             converted_coords = (converted_coords[0][0], converted_coords[0][1])
         elif gc.genome_build == 'hg19':
             converted_coords = ('chr%s' % gc.chr, int(gc.get_coord()))
@@ -1495,9 +1499,15 @@ class gnomAD(DynamicSource, object):
 
         for variant in mutation.metadata['genomic_mutations']:
             if type(variant) is GenomicMutation and (variant.is_snv or variant.is_insdel):
-                v_str = variant.as_assembly(ref_assembly).get_value_str(fmt='gnomad')
+                try:
+                    v_str = variant.as_assembly(ref_assembly).get_value_str(fmt='gnomad')
+                except TypeError as e:
+                    self.log.error(str(e))
+                    v_str = None
+                    continue
             else:
                 v_str = None
+                continue
 
             if variant.is_snv:
                 this_df = data[ data['variant_id'] == v_str ]
