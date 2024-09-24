@@ -426,6 +426,14 @@ class Table:
         all_elms = [ elm.split(", ") for elm in all_elms ]
 
         for i, elm in enumerate(all_elms):
+
+            if len(elm) < 3:
+                raise TypeError(f"format of ELM entry {elm} was unexpected")
+            if len(elm) > 3: # this happens if the description contains a comma
+                description = ", ".join(elm[0:-2])
+                all_elms[i] = [ description, elm[-2], elm[-1] ]
+                elm = all_elms[i]
+
             all_elms[i][1] = [ int(e) for e in elm[1].split('-') ]
             elm_string = all_elms[i][0]
             last_parenthesis_index = elm_string.rfind("(")
