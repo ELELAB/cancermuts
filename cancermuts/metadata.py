@@ -223,13 +223,17 @@ class GenomicMutation(Metadata):
         elif self.genome_build == 'hg38':
             if self.is_snv:
                 converted_coords = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.coord))
-                assert len(converted_coords) == 1
+                if len(converted_coords) != 1:
+                    raise TypeError("Could not convert genomic coordinates (liftOver returned %d coords)" % len(converted_coords))
                 return GenomicMutation(self.source, 'hg19', f"{self.chr}:g.{converted_coords[0][1]}{self.ref}>{self.alt}")
             elif self.is_insdel:
                 converted_coords_start = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.coord_start))
                 converted_coords_end   = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.coord_end))
-                assert len(converted_coords_start) == 1
-                assert len(converted_coords_end)   == 1
+                if len(converted_coords_start) != 1:
+                    raise TypeError("Could not convert genomic coordinates (liftOver returned %d coords)" % len(converted_coords_start))
+                if len(converted_coords_end) != 1:
+                    raise TypeError("Could not convert genomic coordinates (liftOver returned %d coords)" % len(converted_coords_end))
+
                 return GenomicMutation(self.source, 'hg19', f"{self.chr}:g.{converted_coords_start[0][1]}_{converted_coords_end[0][1]}delins{self.substitution}")
             else:
                 raise TypeError
@@ -240,13 +244,16 @@ class GenomicMutation(Metadata):
         elif self.genome_build == 'hg19':
             if self.is_snv:
                 converted_coords = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.coord))
-                assert len(converted_coords) == 1
+                if len(converted_coords) != 1:
+                    raise TypeError("Could not convert genomic coordinates (liftOver returned %d coords)" % len(converted_coords))
                 return GenomicMutation(self.source, 'hg38', f"{self.chr}:g.{converted_coords[0][1]}{self.ref}>{self.alt}")
             elif self.is_insdel:
                 converted_coords_start = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.coord_start))
                 converted_coords_end   = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.coord_end))
-                assert len(converted_coords_start) == 1
-                assert len(converted_coords_end)   == 1
+                if len(converted_coords_start) != 1:
+                    raise TypeError("Could not convert genomic coordinates (liftOver returned %d coords)" % len(converted_coords_start))
+                if len(converted_coords_end) != 1:
+                    raise TypeError("Could not convert genomic coordinates (liftOver returned %d coords)" % len(converted_coords_end))
                 return GenomicMutation(self.source, 'hg38', f"{self.chr}:g.{converted_coords_start[0][1]}{converted_coords_end[0][1]}delins{self.substitution}")
             else:
                 raise TypeError
