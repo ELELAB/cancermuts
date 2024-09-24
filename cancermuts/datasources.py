@@ -1499,9 +1499,15 @@ class gnomAD(DynamicSource, object):
 
         for variant in mutation.metadata['genomic_mutations']:
             if type(variant) is GenomicMutation and (variant.is_snv or variant.is_insdel):
-                v_str = variant.as_assembly(ref_assembly).get_value_str(fmt='gnomad')
+                try:
+                    v_str = variant.as_assembly(ref_assembly).get_value_str(fmt='gnomad')
+                except TypeError as e:
+                    self.log.error(str(e))
+                    v_str = None
+                    continue
             else:
                 v_str = None
+                continue
 
             if variant.is_snv:
                 this_df = data[ data['variant_id'] == v_str ]
