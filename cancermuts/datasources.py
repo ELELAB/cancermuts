@@ -984,7 +984,11 @@ class MyVariant(DynamicSource, object):
         if gc.genome_build == 'hg38':
             self.log.info("%s has genomic data in hg38 assembly - will be converted to hg19" % gc)
             converted_coords = self._lo.convert_coordinate('chr%s' % gc.chr, int(gc.get_coord()))
-            assert len(converted_coords) == 1
+
+            if len(converted_coords) != 1:
+                self.log.error("Could not convert genomic coordinates for %s (liftOver returned %d coords); it will be skipped" % (gc, len(converted_coords)))
+                return None
+
             converted_coords = (converted_coords[0][0], converted_coords[0][1])
         elif gc.genome_build == 'hg19':
             converted_coords = ('chr%s' % gc.chr, int(gc.get_coord()))
