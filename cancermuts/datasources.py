@@ -155,9 +155,17 @@ class UniProt(DynamicSource, object):
 
             this_upac = self._get_aliases(this_upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
 
-        aliases = {'uniprot'     : this_upid,
-                   'entrez'      : self._get_aliases(this_upac, ['GeneID'])['GeneID'],
-                   'uniprot_acc' : this_upac }
+        this_entrez = self._get_aliases(this_upac, ['GeneID'])
+
+        if this_entrez is not None:
+            this_entrez = this_entrez['GeneID']
+
+            aliases = {'uniprot'     : this_upid,
+                       'entrez'      : this_entrez,
+                       'uniprot_acc' : this_upac }
+        else:
+            aliases = {'uniprot'     : this_upid,
+                       'uniprot_acc' : this_upac }
 
         self.log.info("final aliases: %s" % aliases)
 
@@ -226,9 +234,6 @@ class UniProt(DynamicSource, object):
                 return None
             if len(responses) > 1:
                 raise TypeError
-            if len(responses) > 1:
-                self.log.warning(f"More than one {t} found: {' '.join(responses)}")
-                self.log.warning("The first one will be used")
 
             results = responses[0]
 
