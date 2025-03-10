@@ -232,8 +232,10 @@ class UniProt(DynamicSource, object):
             if len(responses) == 0:
                 self.log.warning(f"No {t} found for {gene_id}")
                 return None
+
             if len(responses) > 1:
-                raise TypeError
+            	self.log.warning(f"Multiple {t} found for {gene_id}. Entrez ID processing and mutation retrieval from cBioPortal will be skipped. Found {t}: {[response['to'] for response in responses]}")
+            	return None
 
             results = responses[0]
 
