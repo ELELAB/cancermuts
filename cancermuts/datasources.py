@@ -294,7 +294,7 @@ class cBioPortal(DynamicSource, object):
     def add_mutations(self, sequence, metadata=[]):
         _cBioPortal_supported_metadata = ['cancer_type', 'cancer_study', 'genomic_coordinates', 'genomic_mutations']
 
-        if 'entrez' not in sequence.aliases.keys() or not sequence.aliases['entrez']:
+        if 'entrez' not in sequence.aliases.keys() or sequence.aliases['entrez'] is None:
             self.log.error('Entrez ID alias not available in sequence object')
             raise TypeError('Entrez ID alias not available in sequence object')
 
