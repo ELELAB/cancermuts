@@ -234,8 +234,9 @@ class UniProt(DynamicSource, object):
                 return None
 
             if len(responses) > 1:
-            	self.log.warning(f"Multiple {t} found for {gene_id}. Entrez ID processing and mutation retrieval from cBioPortal will be skipped. Found {t}: {[response['to'] for response in responses]}")
-            	return None
+                self.log.warning(f"Multiple {t} found for {gene_id}. Found {t}: {', '.join(response['to'] for response in responses)}. No {t} will be assigned.")
+                out[t] = None
+                continue
 
             results = responses[0]
 
@@ -244,6 +245,8 @@ class UniProt(DynamicSource, object):
                 out[t] = results['to'][t_keyword]
             else:
                 out[t] = results['to']
+
+
         return out
 
 
