@@ -232,8 +232,11 @@ class UniProt(DynamicSource, object):
             if len(responses) == 0:
                 self.log.warning(f"No {t} found for {gene_id}")
                 return None
+
             if len(responses) > 1:
-                raise TypeError
+                self.log.warning(f"Multiple {t} found for {gene_id}. Found {t}: {', '.join(response['to'] for response in responses)}. No {t} will be assigned.")
+                out[t] = None
+                continue
 
             results = responses[0]
 
@@ -242,6 +245,8 @@ class UniProt(DynamicSource, object):
                 out[t] = results['to'][t_keyword]
             else:
                 out[t] = results['to']
+
+
         return out
 
 
@@ -289,7 +294,7 @@ class cBioPortal(DynamicSource, object):
     def add_mutations(self, sequence, metadata=[]):
         _cBioPortal_supported_metadata = ['cancer_type', 'cancer_study', 'genomic_coordinates', 'genomic_mutations']
 
-        if 'entrez' not in sequence.aliases.keys():
+        if 'entrez' not in sequence.aliases.keys() or sequence.aliases['entrez'] is None:
             self.log.error('Entrez ID alias not available in sequence object')
             raise TypeError('Entrez ID alias not available in sequence object')
 
