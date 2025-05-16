@@ -43,6 +43,7 @@ import re
 import sys
 import os
 import myvariant
+from biothings_client import get_client
 import pyliftover
 import itertools
 from parse import parse
@@ -872,10 +873,10 @@ class PhosphoSite(DynamicSource, object):
 class MyVariant(DynamicSource, object):
     @logger_init
     def __init__(self):
-        description = "MyVariant.Info Database"
+        description = "MyVariant.Info Database via BioThings client"
         super(MyVariant, self).__init__(name='MyVariant', version='1,0', description=description)
 
-        self._mv = myvariant.MyVariantInfo()
+        self._biothings = get_client('variant')
         self._lo = pyliftover.LiftOver('hg38', 'hg19')
 
         self._supported_metadata = {'revel_score' : self._get_revel}
@@ -889,85 +890,77 @@ class MyVariant(DynamicSource, object):
         else:
             md_types = md_type
 
-        metadata_functions = []
-
-        for md_type in md_types:
-            try:
-                metadata_functions.append(self._supported_metadata[md_type])
-            except KeyError:
-                self.log.warning("MyVariant doesn't support metadata type %s" % md_type)
-
         for pos in sequence.positions:
             for mut in pos.mutations:
-                for add_this_metadata in metadata_functions:
-                    add_this_metadata(mut)
+                for md_name in md_types:
+                    if md_name in self._supported_metadata:
+                        self._supported_metadata[md_name](mut)
+                    else:
+                        self.log.warning(f"MyVariant doesn't support metadata type {md_name}")
+
 
     def _get_revel(self, mutation):
 
         revel_score = None
 
-        mutation.metadata['revel_score'] = list()
+        mutation.metadata['revel_score'] = []
 
-        if 'genomic_coordinates' not in mutation.metadata and 'genomic_mutations' not in mutation.metadata:
-            self.log.warning("no genomic coordinates or genomic mutations data for mutation %s; it will be skipped" % mutation)
-            return False
+        gcs = mutation.metadata.get('genomic_coordinates', [])
+        gms = mutation.metadata.get('genomic_mutations', [])
 
-        if 'genomic_coordinates' in mutation.metadata:
-            gcs = mutation.metadata['genomic_coordinates']
-        else:
-            self.log.warning("no genomic coordinates available for revel score, mutation %s" % mutation)
-            gcs = [None] * len(mutation.metadata['genomic_mutations'])
+        if gcs is None and gms is None:
+            self.log.warning(f"No genomic coordinates or mutations for {mutation}; skipping.")
+            return
 
-        if 'genomic_mutations' in mutation.metadata:
-            gms = mutation.metadata['genomic_mutations']
-        else:
-            self.log.warning("no genomic mutations available for revel score, mutation %s" % mutation)
-            gms = [None] * len(mutation.metadata['genomic_coordinates'])
+        if gcs is None:
+            gcs = [None] * len(gms)
+
+        if gms is None:
+            gcs = [None] * len(gms)
+
 
         gcs_gms = list(zip(gcs, gms))
 
         for gc,gm in gcs_gms:
-            self.log.debug(f"pulling revel score for {mutation}, {gc}, {gm}")
+            self.log.debug(f"Pulling revel score for {mutation}, {gc}, {gm}")
             if gm is not None:
-                self.log.debug("genomic mutation will be used to retrieve revel score for mutation %s" % mutation)
+                self.log.debug(f"Genomic mutation will be used to retrieve revel score for mutation {mutation}")
                 revel_scores = self._get_revel_from_gm(mutation, gm)
             elif gc is not None:
-                self.log.debug("genomic coordinates will be used to retrieve revel score for mutation %s" % mutation)
+                self.log.debug(f"Genomic coordinates will be used to retrieve revel score for mutation {mutation}")
                 revel_scores = self._get_revel_from_gc(mutation, gc)
-            else:
-                self.log.warning("mutations %s has no genomic coordinates or genomic mutation available; it will be skipped" % mutation)
 
-            self.log.debug(f"final revel score for {gc} {gm} {revel_scores}")
+            self.log.debug(f"Final revel score for {gc} {gm} {revel_scores}")
 
             if revel_scores is not None:
                 mutation.metadata['revel_score'].extend(revel_scores)
 
-        self.log.debug(f"final revel metadata for {mutation} {mutation.metadata['revel_score']}")
+        self.log.debug(f"Final revel metadata for {mutation} {mutation.metadata['revel_score']}")
 
     def _validate_revel_hit(self, mutation, hit):
 
         try:
             aa = hit['dbnsfp']['aa']
         except:
-            self.log.error("no residue information was found; it will be skipped")
+            self.log.error("No residue information was found; it will be skipped.")
             return False
 
         if not isinstance(aa, list):
             aa = [aa]
 
         aa_short = []
-        self.log.debug("{0} residue definitions will be tested".format(len(aa)))
+        self.log.debug(f"{len(aa)} residue definitions will be tested")
         for idx_this_aa, this_aa in enumerate(aa):
             try:
                 this_hit_pos = this_aa['pos']
                 this_hit_ref = this_aa['ref']
                 this_hit_alt = this_aa['alt']
             except:
-                self.log.info("no residue information was found in variant definition {0}".format(idx_this_aa))
+                self.log.info(f"No residue information was found in variant definition {idx_this_aa}")
                 continue
 
             if not mutation.sequence_position.wt_residue_type == this_hit_ref:
-                self.log.info("reference residue in revel does not correspond in variant definition {0}".format(idx_this_aa))
+                self.log.info(f"Reference residue in revel does not correspond in variant definition {idx_this_aa}")
                 continue
 
             if not mutation.sequence_position.sequence_position == this_hit_pos:
@@ -975,23 +968,23 @@ class MyVariant(DynamicSource, object):
                     if not mutation.sequence_position.sequence_position in [ int(a) for a in this_hit_pos ]:
                         raise TypeError
                 except:
-                    self.log.info("sequence position in revel does not correspond for in variant definition {0}".format(idx_this_aa))
+                    self.log.info(f"Sequence position in revel does not correspond for in variant definition {idx_this_aa}")
                     continue
 
             if mutation.mutated_residue_type != this_hit_alt:
-                self.log.info("protein mutation in revel does not correspond for this in variant definition {0}".format(idx_this_aa))
+                self.log.info(f"Protein mutation in revel does not correspond for this in variant definition {idx_this_aa}")
                 continue
 
             aa_short.append(idx_this_aa)
 
             if len(aa_short) == 1:
-                self.log.info("A single valid residue entry was found for revel score in mutation {0}".format(mutation))
+                self.log.info(f"A single valid residue entry was found for revel score in mutation {mutation}")
                 return True
             elif len(aa_short) > 1:
-                self.log.warning("More than one valid residue entry found for revel score in mutation {0}".format(mutation))
+                self.log.warning(f"More than one valid residue entry found for revel score in mutation {mutation}")
                 return True
             elif len(aa_short) == 0:
-                self.log.warning("No valid residue entry found for revel score in mutation {0}".format(mutation))
+                self.log.warning(f"No valid residue entry found for revel score in mutation {mutation}")
             return False
 
     def _convert_hg38_to_hg19(self, gc):
@@ -1029,11 +1022,11 @@ class MyVariant(DynamicSource, object):
         except KeyError:
             pass
 
-        self.log.debug(f"querying myvariant with string {query_str}")
-        hit = self._mv.getvariant(query_str)
+        self.log.debug(f"Querying myvariant with string {query_str}.")
+        hit = self._biothings.getvariant(query_str)
 
         if hit is None:
-            self.log.error("variant %s was not found in MyVariant!" % query_str)
+            self.log.error(f"Variant {query_str} was not found in MyVariant!")
             return None
 
         if not self._validate_revel_hit(mutation, hit):
@@ -1041,9 +1034,9 @@ class MyVariant(DynamicSource, object):
 
         try:
             revel_scores = hit['dbnsfp']['revel']['score']
-            self.log.debug(f"downloaded revel score: {revel_scores}")
+            self.log.debug(f"Downloaded revel score: {revel_scores}")
         except KeyError:
-            self.log.warning("no revel score found for mutation %s in this hit; it will be skipped" % mutation)
+            self.log.warning("No revel score found for mutation {mutation} in this hit; it will be skipped")
             return None
 
         try:
@@ -1064,7 +1057,7 @@ class MyVariant(DynamicSource, object):
             return None
 
         if gc.coord_start != gc.coord_end:
-            self.log.warning("mutation %s has more than one nucleotide change; it will be skipped" % mutation)
+            self.log.warning(f"Mutation {mutation} has more than one nucleotide change; it will be skipped")
             return None
 
         converted_coords = self._convert_hg38_to_hg19(gc)
@@ -1072,13 +1065,13 @@ class MyVariant(DynamicSource, object):
             return None
 
         query_str = 'chr%s:%d' % converted_coords
-        query = self._mv.query(query_str)
+        query = self._biothings.query(query_str)
         hits = query['hits']
         if len(hits) < 1:
-            self.log.warning("no DBnsfp hits for mutation %s; it will be skipped" % mutation)
+            self.log.warning(f"No DBnsfp hits for mutation {mutation}; it will be skipped")
             return None
         else:
-            self.log.info("%d DBnsfp hits for mutation %s" % (len(hits), mutation))
+            self.log.info(f"{len(hits)} DBnsfp hits for mutation {mutation}")
         revel_scores = []
 
         for hit in hits:
@@ -1091,7 +1084,7 @@ class MyVariant(DynamicSource, object):
             try:
                 revel_score = hit['dbnsfp']['revel']['score']
             except KeyError:
-                self.log.warning("no revel score found for mutation %s in this hit; it will be skipped" % mutation)
+                self.log.warning(f"No revel score found for mutation {mutation} in this hit; it will be skipped")
                 continue
 
             try:
@@ -1104,14 +1097,14 @@ class MyVariant(DynamicSource, object):
             revel_scores.append(revel_score)
 
         if len(revel_scores) > 1: # more than one hit had usable scores
-            self.log.warning("more than one hit had usable scores; it will be skipped")
+            self.log.warning("More than one hit had usable scores; it will be skipped")
             return None
         elif len(revel_scores) == 0:
-            self.log.warning("no revel scores found using genomic coordinates for mutation %s" % mutation)
+            self.log.warning(f"No revel scores found using genomic coordinates for mutation {mutation}")
             return None
         else:
             revel_scores = revel_scores[0]
-            self.log.debug(f"downloaded revel score: {revel_scores}")
+            self.log.debug(f"Downloaded revel score: {revel_scores}")
             return [ DbnsfpRevel(source=self, score=r) for r in revel_scores ]
 
 
