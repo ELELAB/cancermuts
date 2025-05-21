@@ -42,7 +42,7 @@ import json
 import re
 import sys
 import os
-import myvariant
+from biothings_client import get_client
 import pyliftover
 import itertools
 from parse import parse
@@ -872,10 +872,10 @@ class PhosphoSite(DynamicSource, object):
 class MyVariant(DynamicSource, object):
     @logger_init
     def __init__(self):
-        description = "MyVariant.Info Database"
+        description = "MyVariant.Info Database via BioThings client"
         super(MyVariant, self).__init__(name='MyVariant', version='1,0', description=description)
 
-        self._mv = myvariant.MyVariantInfo()
+        self._biothings = get_client('variant')
         self._lo = pyliftover.LiftOver('hg38', 'hg19')
 
         self._supported_metadata = {'revel_score' : self._get_revel}
@@ -901,6 +901,7 @@ class MyVariant(DynamicSource, object):
             for mut in pos.mutations:
                 for add_this_metadata in metadata_functions:
                     add_this_metadata(mut)
+
 
     def _get_revel(self, mutation):
 
@@ -943,6 +944,7 @@ class MyVariant(DynamicSource, object):
                 mutation.metadata['revel_score'].extend(revel_scores)
 
         self.log.debug(f"final revel metadata for {mutation} {mutation.metadata['revel_score']}")
+
 
     def _validate_revel_hit(self, mutation, hit):
 
@@ -994,6 +996,7 @@ class MyVariant(DynamicSource, object):
                 self.log.warning("No valid residue entry found for revel score in mutation {0}".format(mutation))
             return False
 
+
     def _convert_hg38_to_hg19(self, gc):
         if gc.genome_build == 'hg38':
             self.log.info("%s has genomic data in hg38 assembly - will be converted to hg19" % gc)
@@ -1030,7 +1033,7 @@ class MyVariant(DynamicSource, object):
             pass
 
         self.log.debug(f"querying myvariant with string {query_str}")
-        hit = self._mv.getvariant(query_str)
+        hit = self._biothings.getvariant(query_str)
 
         if hit is None:
             self.log.error("variant %s was not found in MyVariant!" % query_str)
@@ -1056,6 +1059,7 @@ class MyVariant(DynamicSource, object):
 
         return [ DbnsfpRevel(source=self, score=r) for r in revel_scores ]
 
+
     def _get_revel_from_gc(self, mutation, gc):
 
         found_scores = []
@@ -1072,7 +1076,7 @@ class MyVariant(DynamicSource, object):
             return None
 
         query_str = 'chr%s:%d' % converted_coords
-        query = self._mv.query(query_str)
+        query = self._biothings.query(query_str)
         hits = query['hits']
         if len(hits) < 1:
             self.log.warning("no DBnsfp hits for mutation %s; it will be skipped" % mutation)
@@ -1113,7 +1117,6 @@ class MyVariant(DynamicSource, object):
             revel_scores = revel_scores[0]
             self.log.debug(f"downloaded revel score: {revel_scores}")
             return [ DbnsfpRevel(source=self, score=r) for r in revel_scores ]
-
 
 class ELMDatabase(DynamicSource, object):
     def __init__(self):
