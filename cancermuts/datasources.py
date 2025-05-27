@@ -42,7 +42,6 @@ import json
 import re
 import sys
 import os
-import myvariant
 from biothings_client import get_client
 import pyliftover
 import itertools
@@ -890,13 +889,17 @@ class MyVariant(DynamicSource, object):
         else:
             md_types = md_type
 
+        warn_metadata = set()
+
         for pos in sequence.positions:
             for mut in pos.mutations:
                 for md_name in md_types:
                     if md_name in self._supported_metadata:
                         self._supported_metadata[md_name](mut)
                     else:
-                        self.log.warning(f"MyVariant doesn't support metadata type {md_name}")
+                        if md_name not in warn_metadata:
+                            self.log.warning(f"MyVariant doesn't support metadata type {md_name}")
+                            warn_metadata.add(md_name)
 
 
     def _get_revel(self, mutation):
@@ -908,14 +911,16 @@ class MyVariant(DynamicSource, object):
         gcs = mutation.metadata.get('genomic_coordinates', [])
         gms = mutation.metadata.get('genomic_mutations', [])
 
-        if gcs is None and gms is None:
+        if (gcs is None or gcs == [] or gcs == '') and (gms is None or gms == [] or gms == ''):
             self.log.warning(f"No genomic coordinates or mutations for {mutation}; skipping.")
-            return
+            return False
 
-        if gcs is None:
+        if gcs is None or gcs == [] or gcs == '':
+            self.log.warning(f"No genomic coordinates available for revel score, {mutation}")
             gcs = [None] * len(gms)
 
-        if gms is None:
+        if gms is None or gcs == [] or gcs == '':
+            self.log.warning(f"No genomic mutations available for revel score, {mutation}")
             gcs = [None] * len(gms)
 
 
