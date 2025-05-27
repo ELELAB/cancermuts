@@ -889,17 +889,18 @@ class MyVariant(DynamicSource, object):
         else:
             md_types = md_type
 
-        warn_metadata = set()
+        metadata_functions = []
+
+        for md_type in md_types:
+            try:
+                metadata_functions.append(self._supported_metadata[md_type])
+            except KeyError:
+                self.log.warning("MyVariant doesn't support metadata type %s" % md_type)
 
         for pos in sequence.positions:
             for mut in pos.mutations:
-                for md_name in md_types:
-                    if md_name in self._supported_metadata:
-                        self._supported_metadata[md_name](mut)
-                    else:
-                        if md_name not in warn_metadata:
-                            self.log.warning(f"MyVariant doesn't support metadata type {md_name}")
-                            warn_metadata.add(md_name)
+                for add_this_metadata in metadata_functions:
+                    add_this_metadata(mut)
 
 
     def _get_revel(self, mutation):
