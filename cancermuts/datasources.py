@@ -912,15 +912,15 @@ class MyVariant(DynamicSource, object):
         gcs = mutation.metadata.get('genomic_coordinates', [])
         gms = mutation.metadata.get('genomic_mutations', [])
 
-        if (gcs is None or gcs == [] or gcs == '') and (gms is None or gms == [] or gms == ''):
+        if (gcs is None or gcs == []) and (gms is None or gms == []):
             self.log.warning(f"No genomic coordinates or mutations for {mutation}; skipping.")
             return False
 
-        if gcs is None or gcs == [] or gcs == '':
+        if gcs is None or gcs == []:
             self.log.warning(f"No genomic coordinates available for revel score, {mutation}")
             gcs = [None] * len(gms)
 
-        if gms is None or gcs == [] or gcs == '':
+        if gms is None or gcs == []:
             self.log.warning(f"No genomic mutations available for revel score, {mutation}")
             gcs = [None] * len(gms)
 
