@@ -14,8 +14,11 @@ is available to be imported. If you have followed the recommended installation
 procedure and installed Cancermuts in a Python environment you need to activate
 it first, as detailed in point 3 of the installation.
 
-You also need to have downloaded the COSMIC mutation export file, as detailed in 
-the installation section.
+You also need to have downloaded the following COSMIC files:
+- Cosmic_CompleteTargetedScreensMutant_Tsv_v102_GRCh38.tar
+- Cosmic_GenomeScreensMutant_Tsv_v102_GRCh38.tar
+- Cosmic_Classification_Tsv_v102_GRCh38.tar
+as detailed in the installation section.
 
 Finally, you can decide to perform this tutorial either interactively (i.e. 
 running line by line in a Python command line) or as a script (i.e. saving
@@ -284,38 +287,44 @@ In this cases, Cancermuts tries its best to infer it from the study name.
 As before, we first create a COSMIC data source object:
 
 ```py
-cosmic = COSMIC(database_files='/data/databases/cosmic-v95/CosmicMutantExport.tsv',
-	            database_encoding=['latin1'])
+cosmic = COSMIC(targeted_database_files ='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv', screen_mutant_database_files = '/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv', classification_database_files = '/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv', database_encoding=['latin1', 'latin1', 'latin1'])
 ```
 
-here the `database_files` argument is a string. If the user wants to use
-more than one database file, these should be provided as a list of strings.
-Usually, the argument for this file would be the COSMIC database file  that 
+here the `targeted_database_files`, `screen_mutant_database_files`, `classification_database_files` argument are strings. If the user wants to use
+more than one file for each type, these should be provided as a list of strings.
+Usually, the argument for this file would be the COSMIC files  that 
 was downloaded as detailed in the Install section.
 
 Similarly, `database_encoding` defines the
-text file encoding for every file (it is `latin1` for COSMIC version 95).
+text file encoding for every file (it is `latin1` for COSMIC version 102).
 
 {% hint style='danger' %}
-As the default database file is rather large, we recommend running this step on
+As the default database files are rather large, we recommend running this step on
 a computer with at least 32 GB of free memory. Otherwise, it is possible to
-filter the database file first, for instnace keeping only the rows that
+filter the database files first, for instnace keeping only the rows that
 contain the gene name of interest. In bash this can be done by running:
 
 ```
-$ head -n 1 CosmicMutantExport.tsv > header.txt
-$ grep MAP1LC3B CosmicMutantExport.tsv > content.txt
-$ cat header.txt content.txt > COSMIC_map1lc3b.csv
+$ head -n 1 Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv > header.txt
+$ grep MAP1LC3B Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv > content.txt
+$ cat header.txt content.txt > COSMIC_map1lc3b_CompleteTargetedScreenMutant.csv
 $ rm header.txt content.txt
 ```
+The same procedure can be done for the file Cosmic_GenomeScreensMutant_v102_GRCh38.tsv.
 
-and then using the resulting file as the database file
+To map the COSMIC_PHENOTYPE_ID for the selected gene of interest in the  Cosmic_Classification_v102_GRCh38.tsv- run the following:
+
+```
+$ awk -F'\t' '{ gsub(/^[ \t"]+|[ \t"]+$/, "", $6); print $6 }' Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsvCosmic_GenomeScreensMutant_v102_GRCh38.tsv | sort | uniq > target_ids.txt
+$ awk -F'\t' 'NR==FNR { ids[$1]; next } FNR==1 || $1 in ids' target_ids.txt Cosmic_Classification_v102_GRCh38.tsv > COSMIC_map1lc3b_Classification.tsv
+```
 {% endhint %}
 
 We can then add mutations from the COSMIC data source:
 
 ```py
 cosmic.add_mutations(seq, 
+                     genome_assembly_version = '38',
 					 cancer_sites=['large_intestine'],
 					 cancer_site_subtype_1=['colon'],
 					 cancer_types=['carcinoma'],
@@ -332,7 +341,8 @@ It is also possible to search in any available cancer type or site as well (i.e.
 by not specifying cancer types or sites in the `add_mutations` call, for instance:
 
 ```py
-cosmic.add_mutations(seq, metadata=['genomic_coordinates', 'genomic_mutations', 
+cosmic.add_mutations(seq,genome_assembly_version = '38',
+                     metadata=['genomic_coordinates', 'genomic_mutations', 
                                        'cancer_site', 'cancer_histology'])
 ```
 {% endhint %}

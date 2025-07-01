@@ -659,7 +659,7 @@ class COSMIC(DynamicSource, object):
                        cancer_site_subtype_1=None,
                        cancer_site_subtype_2=None,
                        cancer_site_subtype_3=None,
-                       metadata=[], filter_snps=True):
+                       metadata=[]):
 
         mutations = []
 
@@ -760,7 +760,7 @@ class COSMIC(DynamicSource, object):
                     cancer_site_subtype_1=None,
                     cancer_site_subtype_2=None,
                     cancer_site_subtype_3=None,
-                    use_alias=None, filter_snps=True, metadata=[]):
+                    use_alias=None, metadata=[]):
         _cosmic_supported_metadata = ['cancer_type', 'genomic_coordinates', 'genomic_mutations', 'cancer_site', 'cancer_histology']
 
         for md in metadata:

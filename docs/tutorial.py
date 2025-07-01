@@ -40,10 +40,13 @@ print(seq.positions[38].mutations[0].metadata)
 
 
 # add mutations from COSMIC
-cosmic = COSMIC(database_files=['/data/databases/cosmic-v95/CosmicMutantExport.tsv'],
-                database_encoding=['latin1'])
+cosmic = COSMIC(targeted_database_files ='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv', 
+				screen_mutant_database_files = '/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv', 
+				classification_database_files = '/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv', 
+				database_encoding=['latin1', 'latin1', 'latin1'])
 
 cosmic.add_mutations(seq, 
+					 genome_assembly_version = '38',
 					 cancer_sites=['large_intestine'],
 					 cancer_site_subtype_1=['colon'],
 					 cancer_types=['carcinoma'],
