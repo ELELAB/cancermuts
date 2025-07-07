@@ -70,8 +70,11 @@ class Sequence(object):
     """
 
     @logger_init
-    def __init__(self, gene_id, sequence, source, aliases=None):
+    def __init__(self, gene_id, sequence, source, uniprot_ac=None, is_canonical=True, aliases=None):
         self.gene_id = gene_id
+        self.uniprot_ac = uniprot_ac
+        self.is_canonical = is_canonical
+
         if aliases is None:
             self.aliases = {}
         else:
@@ -124,7 +127,8 @@ class Sequence(object):
         return iter(self.positions)
 
     def __repr__(self):
-        return "<Sequence of %s from %s, %d positions>" % (self.gene_id, self.source.name, len(self.positions))
+        form = "canonical" if self.is_canonical else "isoform"
+        return "<Sequence of %s (%s) from %s, %d positions>" % (self.gene_id, form, self.source.name, len(self.positions))
 
     def add_property(self, prop):
         """
