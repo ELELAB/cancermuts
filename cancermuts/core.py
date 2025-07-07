@@ -70,15 +70,18 @@ class Sequence(object):
     """
 
     @logger_init
-    def __init__(self, gene_id, sequence, source, uniprot_ac=None, is_canonical=True, aliases=None):
+    def __init__(self, gene_id, uniprot_ac, sequence, source, isoform=None, is_canonical=False, aliases=None):
         self.gene_id = gene_id
         self.uniprot_ac = uniprot_ac
+        self.isoform = isoform
         self.is_canonical = is_canonical
 
         if aliases is None:
             self.aliases = {}
         else:
             self.aliases = aliases
+        self.aliases["uniprot"] = self.uniprot_ac
+        
         self.source = source
         self.sequence = sequence
         self.positions = []
@@ -128,8 +131,9 @@ class Sequence(object):
 
     def __repr__(self):
         form = "canonical" if self.is_canonical else "isoform"
-        return "<Sequence of %s (%s) from %s, %d positions>" % (self.gene_id, form, self.source.name, len(self.positions))
-
+        iso_str = self.isoform if self.isoform else "no_isoform"
+        return f"<Sequence {self.gene_id} ({form}, isoform={iso_str}, uniprot_ac={self.uniprot_ac}) from {self.source.name}, {len(self.positions)} positions>"
+    
     def add_property(self, prop):
         """
         Adds sequence property to sequence object. If a property of the same
