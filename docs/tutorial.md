@@ -149,6 +149,23 @@ MPSEKTFKQRRTFEQRVEDVRLIREQHPTKIPVIIERYKGEKQLPVLDKTKFLVPDHVNMSELIKIIRRRLQLNANQAFF
 
 ```
 
+### Optional: Loading a specific isoform
+
+Cancermuts allows loading alternative isoforms, if available in UniProt. To load a specific isoform, provide the isoform ID and set `is_canonical=False`:
+
+```py
+
+# OPTIONAL: Load a specific UniProt isoform instead of canonical
+>>> isoform_id = "H3BM99"
+>>> seq = up.get_sequence("MAP1LC3B", isoform=isoform_id, is_canonical=False)
+
+>>> print("Isoform sequence:", seq.sequence)
+MPSEKTFKQRRTFGECRREGGGCGGAGVRAVEGGRAWDAVRGRGRAGRPSGAGGCRPAGPRDAGPGAP
+```
+
+If the isoform is not found, Cancermuts will raise an error. Ensure you are using a valid and available UniProt isoform ID (e.g., `H3BM99` for MAP1LC3B).
+
+
 ### Collecting cancer mutations
 
 Now that we have the Sequence ready, we can start adding annotations to it.
