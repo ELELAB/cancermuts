@@ -121,8 +121,12 @@ class UniProt(DynamicSource, object):
         super(UniProt, self).__init__(name='UniProt', version='1.0', description=description)
         self._uniprot_service = bsUniProt()
 
-    def get_sequence(self, gene_id, upid=None, upac=None):
-        if upac is not None or upid is not None:
+    def get_sequence(self, gene_id, upid=None, upac=None, isoform=None, is_canonical=True):
+        if isoform is not None:
+            self.log.info(f"Isoform requested: {isoform}")
+            this_upac = isoform.split('-')[0]
+            this_upid = self._get_aliases(this_upac, ['UniProtKB_uniProtkbId'])['UniProtKB_uniProtkbId']
+        elif upac is not None or upid is not None:
             if upac is not None:
                 self.log.info("The user-provided Uniprot AC (%s) will be used" % upid)
                 this_upac = upac
@@ -151,7 +155,7 @@ class UniProt(DynamicSource, object):
             if len(upids) > 1:
                 self.log.warning("the following UniProt entries were found for gene %s: %s; will use %s" %(gene_id, ', '.join(upids), this_upid))
             else:
-                self.log.info("will use Uniprot ID %s" % upid)
+                self.log.info("will use Uniprot ID %s" % this_upid)
 
             this_upac = self._get_aliases(this_upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
 
@@ -169,15 +173,17 @@ class UniProt(DynamicSource, object):
 
         self.log.info("final aliases: %s" % aliases)
 
-        self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s, Uniprot AC %s, gene %s" % (this_upid, this_upac, gene_id))
+        fasta_id = isoform if isoform is not None else this_upac
+        
+        self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s, Uniprot AC %s, gene %s" % (this_upid, fasta_id, gene_id))
 
         try:
-            sequence = self._get_fasta_sequence(this_upac)
+            sequence = self._get_fasta_sequence(fasta_id)
         except:
-            self.log.error("failed retrieving sequence for Uniprot ID %s" % upid)
+            self.log.error("failed retrieving sequence for Uniprot ID %s" % fasta_id)
             return None
 
-        return Sequence(gene_id, sequence, self, aliases=aliases)
+        return Sequence(gene_id=gene_id, uniprot_ac=this_upac, sequence=sequence, source=self, isoform=isoform, is_canonical=is_canonical, aliases=aliases)
 
     def _get_fasta_sequence(self, upid):
         """This function downloads the sequence of the specified UniProt entry
