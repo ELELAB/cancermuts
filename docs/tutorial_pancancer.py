@@ -10,6 +10,11 @@ seq = up.get_sequence('MAP1LC3B')
 # alternatively, we can specifically ask for a Uniprot ID
 seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
 
+# OPTIONAL: Load a specific UniProt isoform instead of canonical
+
+#isoform_id= "H3BM99"
+#seq = up.get_sequence("MAP1LC3B", isoform=isoform_id, is_canonical=False)
+
 # this prints the downloaded protein sequence
 print(seq.sequence)
 
