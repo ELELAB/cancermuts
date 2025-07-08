@@ -130,7 +130,7 @@ class Sequence(object):
         return iter(self.positions)
 
     def __repr__(self):
-        form = "canonical" if self.is_canonical else "isoform"
+        form = "canonical" if self.is_canonical else "non_canonical"
         iso_str = self.isoform if self.isoform else "no_isoform"
         return f"<Sequence {self.gene_id} ({form}, isoform={iso_str}, uniprot_ac={self.uniprot_ac}) from {self.source.name}, {len(self.positions)} positions>"
     
