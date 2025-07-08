@@ -38,7 +38,7 @@ print(seq.positions[38].mutations[0].metadata)
 
 
 # add mutations from COSMIC
-cosmic = COSMIC(database_files=['/data/databases/cosmic-v95/CosmicMutantExport.tsv'],
+cosmic = COSMIC(database_files=['/data/databases/cosmic-v96/CosmicMutantExport.tsv'],
                 database_encoding=['latin1'])
 
 cosmic.add_mutations(seq, 
