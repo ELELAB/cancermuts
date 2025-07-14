@@ -122,25 +122,12 @@ class UniProt(DynamicSource, object):
         self._uniprot_service = bsUniProt()
 
     def get_sequence(self, gene_id, upid=None, upac=None, isoform=None, is_canonical=True):
-        if isoform is not None:
-            self.log.info(f"Isoform requested: {isoform}")
-            this_upac = isoform.split('-')[0]
-            this_upid = self._get_aliases(this_upac, ['UniProtKB_uniProtkbId'])['UniProtKB_uniProtkbId']
-        elif upac is not None or upid is not None:
-            if upac is not None:
-                self.log.info("The user-provided Uniprot AC (%s) will be used" % upid)
-                this_upac = upac
-            else:
-                self.log.info("UniProt AC will be mapped from UniProt ID")
-                this_upac = self._get_aliases(upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
-
-            if upid is not None:
-                self.log.info("The user-provided Uniprot ID (%s) will be used" % upid)
-                this_upid = upid
-            else:
-                self.log.info("UniProt ID will be mapped from UniProt AC")
-                this_upid = self._get_aliases(upac, ['UniProtKB_uniProtkbId'])['UniProtKB_uniProtkbId']
-
+        if upac is not None:
+            this_upac = upac
+            self.log.info(f"The user-provided UniProt AC ({upac}) will be used")
+        elif upid is not None:
+            self.log.info("UniProt AC will be mapped from UniProt ID")
+            this_upac = self._get_aliases(upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
         else:
             self.log.info("retrieving UniProt ID for human gene %s" % gene_id)
             try:
@@ -158,7 +145,20 @@ class UniProt(DynamicSource, object):
                 self.log.info("will use Uniprot ID %s" % this_upid)
 
             this_upac = self._get_aliases(this_upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
-
+        if upid is None:
+            this_upid = self._get_aliases(this_upac, ['UniProtKB_uniProtkbId'])['UniProtKB_uniProtkbId']
+        else:
+            this_upid = upid
+        
+        if isoform is not None:
+            self.log.info(f"Isoform requested: {isoform}")
+            isoform_base = isoform.split('-')[0]
+            if isoform_base != this_upac:
+                raise ValueError(f"Isoform base ({isoform_base}) does not match UniProt AC ({this_upac})")
+            fasta_id = isoform
+        else:
+            fasta_id = this_upac
+        
         this_entrez = self._get_aliases(this_upac, ['GeneID'])
 
         if this_entrez is not None:
