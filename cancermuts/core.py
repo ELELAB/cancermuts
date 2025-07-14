@@ -85,8 +85,8 @@ class Sequence(object):
                     f"and aliases['uniprot_acc'] ('{aliases['uniprot_acc']}')"
                 )
             self.aliases = aliases
-            
-        self.aliases["uniprot"] = self.uniprot_ac
+        
+        self.aliases["uniprot_acc"] = self.uniprot_ac
         self.source = source
         self.sequence = sequence
         self.positions = []
@@ -136,7 +136,7 @@ class Sequence(object):
 
     def __repr__(self):
         return f"<Sequence gene_id={self.gene_id}, uniprot_ac={self.uniprot_ac}, isoform={self.isoform}, is_canonical={self.is_canonical}, source={self.source.name}, {len(self.positions)} positions>"
-    
+
     def add_property(self, prop):
         """
         Adds sequence property to sequence object. If a property of the same
