@@ -121,7 +121,7 @@ class UniProt(DynamicSource, object):
         super(UniProt, self).__init__(name='UniProt', version='1.0', description=description)
         self._uniprot_service = bsUniProt()
 
-    def get_sequence(self, gene_id, upid=None, upac=None, isoform=None, is_canonical=True):
+    def get_sequence(self, gene_id, upid=None, upac=None, isoform=None):
         if upac is not None:
             this_upac = upac
             self.log.info(f"The user-provided UniProt AC ({upac}) will be used")
@@ -152,13 +152,26 @@ class UniProt(DynamicSource, object):
         
         if isoform is not None:
             self.log.info(f"Isoform requested: {isoform}")
-            isoform_base = isoform.split('-')[0]
-            if isoform_base != this_upac:
-                raise ValueError(f"Isoform base ({isoform_base}) does not match UniProt AC ({this_upac})")
+
+            fasta = self._uniprot_service.retrieve(isoform, frmt="fasta")
+            if not fasta:
+                raise ValueError(f"Isoform {isoform} not found in UniProt")
+            header = fasta.splitlines()[0]
+
+            parent_ac = header.split('|')[1].split('-')[0] 
+            if parent_ac != this_upac:
+                raise ValueError(f"Isoform {isoform} belongs to {parent_ac}, not to expected {this_upac}")
             fasta_id = isoform
+
+            isoform_seq = ''.join(fasta.splitlines()[1:])
+            parent_fasta = self._uniprot_service.retrieve(parent_ac, frmt="fasta")
+            parent_seq = ''.join(parent_fasta.splitlines()[1:]) if parent_fasta else None
+            is_canonical = (isoform_seq == parent_seq)
+
         else:
             fasta_id = this_upac
-        
+            is_canonical = True
+
         this_entrez = self._get_aliases(this_upac, ['GeneID'])
 
         if this_entrez is not None:
@@ -171,9 +184,7 @@ class UniProt(DynamicSource, object):
             aliases = {'uniprot'     : this_upid,
                        'uniprot_acc' : this_upac }
 
-        self.log.info("final aliases: %s" % aliases)
-
-        fasta_id = isoform if isoform is not None else this_upac
+        self.log.info("final aliases: %s" % aliases)      
         
         self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s, Uniprot AC %s, gene %s" % (this_upid, fasta_id, gene_id))
 
