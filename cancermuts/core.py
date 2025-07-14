@@ -135,9 +135,7 @@ class Sequence(object):
         return iter(self.positions)
 
     def __repr__(self):
-        form = "canonical" if self.is_canonical else "non_canonical"
-        iso_str = self.isoform if self.isoform else "no_isoform"
-        return f"<Sequence {self.gene_id} ({form}, isoform={iso_str}, uniprot_ac={self.uniprot_ac}) from {self.source.name}, {len(self.positions)} positions>"
+        return f"<Sequence gene_id={self.gene_id}, uniprot_ac={self.uniprot_ac}, isoform={self.isoform}, is_canonical={self.is_canonical}, source={self.source.name}, {len(self.positions)} positions>"
     
     def add_property(self, prop):
         """
