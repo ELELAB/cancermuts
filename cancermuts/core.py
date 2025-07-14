@@ -79,9 +79,14 @@ class Sequence(object):
         if aliases is None:
             self.aliases = {}
         else:
+            if "uniprot" in aliases and aliases["uniprot"] != uniprot_ac:
+                raise TypeError(
+                    f"Mismatch between provided uniprot_ac ('{uniprot_ac}') "
+                    f"and aliases['uniprot'] ('{aliases['uniprot']}')"
+                )
             self.aliases = aliases
+            
         self.aliases["uniprot"] = self.uniprot_ac
-        
         self.source = source
         self.sequence = sequence
         self.positions = []
