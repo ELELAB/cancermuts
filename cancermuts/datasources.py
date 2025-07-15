@@ -153,21 +153,30 @@ class UniProt(DynamicSource, object):
         if isoform is not None:
             self.log.info(f"Isoform requested: {isoform}")
 
-            fasta = self._uniprot_service.retrieve(isoform, frmt="fasta")
-            if not fasta:
-                raise ValueError(f"Isoform {isoform} not found in UniProt")
-            header = fasta.splitlines()[0]
+            url = f"https://rest.uniprot.org/uniprotkb/{this_upac}.json"
+            response = rq.get(url)
+            if not response.ok:
+                raise ValueError(f"Failed to fetch UniProt JSON entry for {this_upac}")
 
-            parent_ac = header.split('|')[1].split('-')[0] 
-            if parent_ac != this_upac:
-                raise ValueError(f"Isoform {isoform} belongs to {parent_ac}, not to expected {this_upac}")
+            data = response.json()
+            alt_prods = [x for x in data.get("comments", []) if x["commentType"] == "ALTERNATIVE PRODUCTS"] 
+            is_canonical = False
+            isoform_found = False
+            for prod in alt_prods:
+                for iso in prod.get("isoforms", []):
+                    ids = iso.get("isoformIds", [])
+                    status = iso.get("isoformSequenceStatus", "")
+                    if isoform in ids:
+                        isoform_found = True
+                        is_canonical = (status == "Displayed")
+                        break
+                if isoform_found:
+                    break
+
+            if not isoform_found:
+                raise ValueError(f"Isoform {isoform} not listed in UniProt entry {this_upac}")
+            
             fasta_id = isoform
-
-            isoform_seq = ''.join(fasta.splitlines()[1:])
-            parent_fasta = self._uniprot_service.retrieve(parent_ac, frmt="fasta")
-            parent_seq = ''.join(parent_fasta.splitlines()[1:]) if parent_fasta else None
-            is_canonical = (isoform_seq == parent_seq)
-
         else:
             fasta_id = this_upac
             is_canonical = True
