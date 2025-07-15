@@ -27,6 +27,7 @@ Classes to interrogate data sources and annotate various data
 """
 
 import time
+import requests
 import requests as rq
 from bioservices.uniprot import UniProt as bsUniProt
 from Bio.PDB.Polypeptide import three_to_index, index_to_one
@@ -52,6 +53,9 @@ from bravado.client import SwaggerClient
 from bravado.requests_client import RequestsClient
 from requests.adapters import HTTPAdapter
 import gget
+import xmltodict
+import time
+
 
 
 import sys
@@ -248,6 +252,7 @@ class UniProt(DynamicSource, object):
 
 
         return out
+
 
 
 class cBioPortal(DynamicSource, object):
@@ -536,6 +541,831 @@ class cBioPortal(DynamicSource, object):
                         out_metadata['genomic_mutations'].append(gm)
 
         return mutations, out_metadata
+
+
+class ClinVar(DynamicSource, object):
+
+    @logger_init
+    def __init__(self):
+        description = "ClinVar mutation database"
+        super(ClinVar, self).__init__(name='ClinVar', version='', description=description)
+
+        self.three_one_letter_annotation = {
+            'Ala': 'A', 'Arg': 'R', 'Asn': 'N', 'Asp': 'D', 'Cys': 'C', 'Gln': 'Q',
+            'Glu': 'E', 'Gly': 'G', 'His': 'H', 'Ile': 'I', 'Leu': 'L', 'Lys': 'K',
+            'Met': 'M', 'Phe': 'F', 'Pro': 'P', 'Ser': 'S', 'Thr': 'T', 'Trp': 'W',
+            'Tyr': 'Y', 'Val': 'V', 'Ter': '*'
+        }
+
+
+#----------------------------------------- utility functions -----------------------------------------------#
+
+
+    def mutations_convert(self,string,dic,print_message):
+
+        '''Convert the mutation in three letter code in a one letter code mutation
+        
+        The function takes a string of a mutation expressed in the following format 
+        p.[A-Z][a-z][a-z][0-9]+[A-Z][a-z][a-z] (Clinvar annotation i.e p.Ala128Ile)
+        and returns the mutation in the following format: [A-Z][0-9][A-Z].
+
+        Parameters
+        ----------
+        string: string
+               mutation expressed in three letters code (i.e p.Ala128Ile)
+        dic: dictionary
+               dictionary containing as keys three letters annotated aminoacids
+               and values one letters annotated aminoacids
+
+        Returns
+        -------
+        string containing the mutation expresed as one letter code.
+
+        '''
+
+        #this matches strings like p.Ala128Ile and creates one group 
+        #for each part of the string we need
+        match = re.search("p\.([A-Z][a-z][a-z])([0-9]+)([A-Z][a-z][a-z])", string)
+        match_output_df=re.search("([A-Z])([0-9]+)([A-Z])", string)
+        if match is not None and len(match.groups()) == 3:
+            #some variants are annotated as follow: p.Glu4Ter. 
+            #So we need the if statement to match the second element 
+            #after the number.
+            if match.group(3) in dic.keys():
+                substring_list = list(match.groups())
+                return f"{dic[substring_list[0]]}{substring_list[1]}{dic[substring_list[2]]}"
+        
+        else:
+            if match_output_df is None and print_message==True :
+                print(f"WARNING: {string} the function requires the variant expressed with"\
+                    " the three letters code, another annotation could have been used in the Clinvar database")
+
+    def from_321(self,string,dic):
+
+        '''Convert the mutation in one letter code in a three letter code mutation
+        
+        The function takes a string of a mutation expressed in the following 
+        format [A-Z][0-9]+[A-Z] (Clinvar annotation i.e A128I)
+        and returns the mutation in the following format: 
+        p.[A-Z][a-z][a-z][0-9]+[A-Z][a-z][a-z].
+
+        Parameters
+        ----------
+        string: string
+               mutation expressed in one letters code (A128I)
+        dic: dictionary
+               dictionary containing as keys three letters annotated aminoacids
+               and values one letters annotated aminoacids
+
+        Returns
+        -------
+        string containing the mutation expresed as three letter code.
+
+        '''
+        # this matches strings like A128I and creates one group 
+        # for each part of the string we need
+        match = re.search("([A-Z])([0-9]+)([A-Z])", string) 
+        if match is not None and len(match.groups()) == 3:
+            #some variants can have another symbol after the position number. 
+            #So we need the if statement to match the second element 
+            #after the number.
+            if match.group(3) in d.values():
+                substring_list = list(match.groups())
+                wt_residue     = {i for i in dic if dic[i] == substring_list[0]}
+                mutant_residue = {i for i in dic if dic[i] == substring_list[2]}
+                return "(p." + str(wt_residue)[2:-2] + substring_list[1] + str(mutant_residue)[2:-2] + ")"
+
+    def melting_dictionary(self,variants_annotation, add_method = False):
+        '''
+        Count the number of keys in the second element of variants annotation values
+        dictionary, create as many lists as the number of counted keys, inserting in each list
+        the corresponding value of the key and populate the output list.
+
+        The function takes as input a dictionary containing the ClinVar ID as keys and a list
+        with the variant information from ClinVar as value organized in dictionaries: mutation, 
+        gene, classification, condition, review status, and methods. The function counts how 
+        many classifications (keys) are reported in the classification, condition, and review 
+        status dictionaries and after checking that the keys per position are correct create as 
+        many lists as the number of classifications (keys) in which each list contains the corresponding 
+        element of the key. All the generated lists are grouped in the output_list.
+
+        Parameters
+        ----------
+        variants_annotation: dict
+            Input dictionary containing the ClinVar ID as key and a list with the following elements 
+            organized in dictionaries as value: mutation, gene, classification, condition, 
+            review status, methods.
+
+        Returns
+        -------
+        output_lists: list of lists
+            List of lists from the variants_annotation dictionary.
+        '''
+        output_list = []
+        classifications = ['GermlineClassification',
+                           'SomaticClinicalImpact',
+                           'OncogenicityClassification']
+
+        for clinvar_id in variants_annotation.keys():
+            variant_information = [clinvar_id,variants_annotation[clinvar_id]["variant"],variants_annotation[clinvar_id]["genomic_annotations"],variants_annotation[clinvar_id]["gene"]]
+            for classification in classifications:
+                classification_check = []
+                if classification in variants_annotation[clinvar_id]["classifications"].keys():
+                    classification_check.append(variants_annotation[clinvar_id]["classifications"][classification])
+                if classification in variants_annotation[clinvar_id]["conditions"].keys():
+                    classification_check.append(variants_annotation[clinvar_id]["conditions"][classification])
+                if classification in variants_annotation[clinvar_id]["review_status"].keys():
+                    classification_check.append(variants_annotation[clinvar_id]["review_status"][classification])
+                if add_method:
+                    classification_check.append(variants_annotation[clinvar_id]["methods"])
+                if len(classification_check) == 3 or len(classification_check) == 4:
+                    variant_features = variant_information+classification_check
+                    output_list.append(variant_features)
+                else:
+                    print(f"No information for {classification} associated to the clinvar id {clinvar_id}")
+
+        return output_list
+
+
+    #----------------------------------------------- URL query functions -----------------------------------------------------#
+
+
+    def URL_response_check(self,URL, error_message, function):
+
+        ''' check the response from the queried URL
+
+        The function tries to access to the given URL. if it succeeds, 
+        it will return the response, 
+        otherwise it'll try again for 200 times before giving error.
+
+        Parameters
+        ----------
+        URL: string
+             contains the URL to be checked
+
+        Returns
+        -------
+        response 
+            output from the function requests.get()
+        '''
+        max_retries = 200
+        attempts = 0
+        delay = 3
+        while attempts < max_retries:
+            try:
+                response = requests.get(URL)
+            except:
+                print(f"WARNING: An error occurred during the ClinVar databse query."
+                      f" Will try again in {delay} seconds (attempt {attempts+1}/{max_retries})")
+                attempts +=1
+                time.sleep(delay)
+                continue
+            if response and response.status_code == 200:
+                return response
+            elif response:
+                print(f"WARNING: The query to the ClinVar database to access {error_message}"\
+                      f" returned {response.status_code} as response."\
+                      f" Will try again in {delay} seconds (attempt {attempts+1}/{max_retries})")
+                attempts +=1
+                time.sleep(delay)
+            else:
+                print("WARNING: No response received. Retrying...")
+                attempts += 1
+                time.sleep(delay)
+            
+        raise RuntimeError("ERROR: request failed after 200 attempts; exiting...")
+        
+
+
+    def VCV_summary_retriever(self,clinvar_id):
+        '''
+        Retrieve the XML summary file associated with a specific ClinVar ID.
+
+        The function takes a clinvar_id as input, retrieves the corresponding VCV
+        code in order to retrieve the summary XML file associated with that 
+        clinvar_id, returning it as output.
+
+        Parameters
+        ----------
+        clinvar_id: str
+            ClinVar ID code to access the VCV code from which to retrieve the 
+            summary XML associated with a specific ClinVar ID.
+
+        Returns
+        -------
+        parse_VCV: OrderedDict
+            XML summary output associated with the VCV code provided as input.
+        '''
+        URL_summary="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id="+clinvar_id
+        error_message=f"summary xml file for the variant_id {clinvar_id}"
+        function = "VCV_summary_retriever"
+        parse_summary=xmltodict.parse(self.URL_response_check(URL_summary,error_message,function).content)
+        try:
+            VCV=(parse_summary['eSummaryResult']\
+                              ["DocumentSummarySet"]\
+                              ['DocumentSummary']['accession'])
+        except KeyError:
+            raise KeyError("Error in parsing the summary XML file. Check the ClinVar summary XML structure. Exiting...")
+        URL_VCV="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=clinvar&rettype=vcv&id="+VCV
+        error_message=f"the XML for the following VCV accession: {VCV}"
+        parse_VCV=xmltodict.parse(self.URL_response_check(URL_VCV,error_message,function).content)
+
+        return parse_VCV
+
+
+    def filtered_variants_extractor(self,URL_filter,gene,isoform,mutation_type):
+
+        '''
+        Retrieve all the variant IDs belonging to certain ClinVar classes (e.g., missense,
+        pathogenic, likely pathogenic, likely benign, or benign classifications) from an XML file
+        associated with a specific query on the ClinVar database.
+
+        The function takes as input a URL filter with which to perform the specific query,
+        the gene name in the Hugo name format, and one of the RefSeq codes associated 
+        with that gene. It extracts all the ClinVar IDs whose mutations are classified 
+        according to the filter provided as input and returns a dictionary with the classifications
+        as keys and a list of variant IDs belonging to missense mutations as values.
+
+        Parameters
+        ----------
+        gene: str
+            Input gene name in the Hugo name format.
+        isoform: str
+            RefSeq belonging to that gene.
+        url_filter: str
+            URL filter used to perform the specific query on ClinVar.
+
+        Returns
+        -------
+        classified_missense_ids: dict 
+            Dictionary in which the keys are the classifications from ClinVar database and
+            the values are lists of variant IDs belonging to missense mutations.
+        '''
+
+        function="filtered_variants_extractor" 
+
+        ##################################################################################################################################################
+        #                                                                                                                                                #
+        #                           Extraction of ids with a ClinVar classification belonging to a mutations category                                    #
+        #                                                                                                                                                #
+        ##################################################################################################################################################
+
+        
+        URL="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=clinvar&term="+URL_filter
+        error_message=f"the XML file with the total number of {mutation_type} mutations for {gene} gene"
+        if "clinvar id" in mutation_type:
+            error_message=f"the XML file with the total number of missense mutation in {gene} gene"
+
+        first_search=xmltodict.parse(self.URL_response_check(URL,error_message,function).content)
+
+        #---------------------------- extract the ClinVar ids associated to a mutations with a ClinVar classification -------------------------------#
+
+        # return clinvar_id if there are variants associated to the query
+
+        try:
+            first_search["eSearchResult"]["Count"]
+        except KeyError:
+            raise KeyError("Error in parsing the XML file at the Count key level. Check the ClinVar XML structure")
+
+        if first_search["eSearchResult"]["Count"] != "0":
+            if "clinvar_id" in mutation_type:
+                clinvar_ids = self.variant_ids_extractors(first_search)
+            else:
+                tot_variant=first_search["eSearchResult"]["Count"]
+                error_message=f"the number of missense variants for {gene} gene"
+                filtered_URL="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=clinvar&term="+URL_filter+"&retmax="+str(tot_variant)
+                parse_search=xmltodict.parse(self.URL_response_check(filtered_URL,error_message,function).content)
+                clinvar_ids = self.variant_ids_extractors(parse_search)
+
+                print("Gene "+gene+" has " +str(tot_variant)+" "+mutation_type+" variants.")
+
+            return clinvar_ids,""
+                        
+        # if no variants are annotated in Clinvar Database the script return a WARNING message
+        else:
+            if "missense" in URL_filter and "clinvar_id" not in mutation_type:
+                print("No missense variants are annotated in Clinvar Database for "+gene+" "+\
+                      "gene, the variants provided as input will be annotated in entry_not_found.csv file.")
+
+            return None,gene
+
+
+    #------------------------------------- functions to parse the ClinVar Xml file --------------------------------------------#
+
+
+
+    def coding_region_variants_extractor(self,clinvar_VCV_xml,clinvar_code):
+        '''
+        Retrieve the HGVS annotations for a given VCV XML file associated with a 
+        ClinVar variant ID.
+
+        The function takes as input a VCV XML file from a ClinVar variant ID and 
+        returns the list of HGVS annotations belonging to coding and protein 
+        expression types.
+
+        Parameters
+        ----------
+        clinvar_VCV_xml: file-like object
+            XML file from a VCV ClinVar entry.
+        clinvar_id: str
+            ClinVar variant ID associated with the clinvar_VCV_xml variable.
+
+        Returns
+        -------
+        hgvss: list 
+            List of HGVS annotations belonging to coding and protein expression 
+            types.
+        '''
+
+        try:
+            simple_allele_accession = clinvar_VCV_xml['ClinVarResult-Set']\
+                                                     ['VariationArchive']\
+                                                     ['ClassifiedRecord']\
+                                                     ['SimpleAllele']
+        except KeyError:
+            print("Error with 'SimpleAllele' key: the clinvar_id "+clinvar_code+ " could have a different annotation structure. It will be annotated in variants_to_check.csv")
+            simple_allele_accession={}
+            
+        if "HGVSlist" in simple_allele_accession.keys():
+            try:
+                HGVS_accession = clinvar_VCV_xml['ClinVarResult-Set']\
+                                                ['VariationArchive']\
+                                                ['ClassifiedRecord']\
+                                                ['SimpleAllele']\
+                                                ["HGVSlist"]\
+                                                ["HGVS"]
+            except KeyError:
+                print("Error with 'HGVS' key: the clinvar_id "+clinvar_code+ " could have a different annotation structure for the mutations. It will be annotated in variants_to_check.csv")
+                return list(),list()
+
+            try:
+                hgvss_coding = [ x for x in HGVS_accession if x['@Type'] == 'coding' and "ProteinExpression" in x.keys()]
+                hgvss_genomic = [ x for x in HGVS_accession if "@Assembly" in x.keys()]
+                    
+                # there are cases in which the field "InterpretedRecord" is "Included Record", so epeat the previous step with the 
+                # new key
+
+            except KeyError:
+                print("Error with '@Type' key: the clinvar_id "+clinvar_code+ " could have a different annotation structure for the mutations. It will be annotated in variants_to_check.csv")
+                return list(),list()
+            except TypeError:
+                print("the  following clinvar_id "+clinvar_code+ " is not associated with a missense mutation in a protein coding region")
+                return list(),list()
+
+        else:
+            hgvss_coding = []
+            hgvss_genomic = []
+
+
+        return hgvss_coding,hgvss_genomic
+
+    def missense_variants_extractor(self,hgvss, gene, clinvar_id, isoform_to_check):
+        '''
+        Given an HGVS list from a VCV XML file associated with a ClinVar variant ID, 
+        returns the coding mutations in HGVS format.
+
+        The function takes as input an HGVS list obtained from a VCV XML file, the 
+        corresponding gene, the ClinVar variant ID associated with the VCV XML file, 
+        and an isoform associated with the input gene. It extracts the coding mutations 
+        associated with the given gene in the HGVS format.
+
+        Parameters
+        ----------
+        hgvss: list
+            HGVS list belonging to coding and protein expression type.
+        gene: str
+            Gene to which the mutations belong.
+        clinvar_id: str
+            ClinVar variant ID associated with the VCV XML file from which the HGVS 
+            has been extracted.
+        isoform_to_check: str
+            RefSeq associated with the gene.
+
+        Returns
+        -------
+        correct_variant: str
+            Missense coding variant expressed in the HGVS format.
+        '''
+        correct_variant = ""
+        for mut_info in hgvss:
+            #look for isoform identifier in the hgvss list of dictionaries
+            if "@sequenceAccession" in mut_info["ProteinExpression"]:
+                
+                identifier = mut_info["ProteinExpression"]["@sequenceAccession"]
+                variant = mut_info["ProteinExpression"]["@change"]            
+                # use the information associated to the right isoform to build the correct entry
+                if identifier == isoform_to_check:
+                    index = mut_info['NucleotideExpression']['Expression'].rfind(":")
+                    correct_variant = correct_variant + mut_info['NucleotideExpression']['Expression'][:index]+ f"({gene})"+\
+                                      mut_info['NucleotideExpression']['Expression'][index:]+ f" ({variant})"
+                    return correct_variant
+
+                else:
+                    print(f"{identifier} associated to the variant_id {clinvar_id}"\
+                            f" is an alternative isoform of {gene} gene, only the mutations"\
+                            f" belonging to the {isoform_to_check} isoform will be considered")
+        return "wrong isoform"
+
+    def genomic_annotation_extractor(self,hgvss):
+        '''
+        Given an HGVS list from a VCV XML file associated with a ClinVar variant ID, 
+        returns the genomic coordinate in GRCh38 and GRCh37 assemblies of the mutation.
+
+        Parameters
+        ----------
+        hgvss: list
+            HGVS list with genomic coordinates for a secific mutation.
+
+        Returns
+        -------
+        str
+            string contianing the genomic coordinates for GRCh38 and GRCh37 assemblies
+        '''
+        genomic_coordinates = []
+        for key in hgvss:
+            genomic_coordinates.append(",".join([key['@Assembly'],key['NucleotideExpression']['Expression']]))
+        return " ".join(genomic_coordinates)
+
+    def variant_ids_extractors(self,clinvar_VCV_xml):
+        '''
+        Retrieve all the variant IDs from an XML file associated with a specific query on ClinVar.
+
+        The function takes as input a VCV XML file from a ClinVar variant ID and 
+        returns the list of ClinVar IDs contained in the XML file and associated
+        with a specific query on the ClinVar database.
+
+        Parameters
+        ----------
+        clinvar_VCV_xml: file-like object
+            XML file from a VCV ClinVar entry.
+
+        Returns
+        -------
+        ids: list 
+            List with the ClinVar IDs of interest.
+        '''
+        
+        try:
+            ids = clinvar_VCV_xml["eSearchResult"]\
+                                 ["IdList"]\
+                                 ["Id"]
+        except:
+            raise KeyError("Error in parsing the XML file at the IdList key level. Check the ClinVar XML structure")
+
+        if isinstance(ids, list):
+            return ids
+        else:
+            return [ids]
+
+    def classification_methods_extractor(self,clinvar_VCV_xml,clinvar_id):
+        '''
+        Retrieve all the methods used for the variants classification
+        reported in the XML file associated with a specific ClinVar ID
+        from the ClinVar database.
+
+        The function takes as input a VCV XML file from a ClinVar variant ID and 
+        returns the list of methods used for the classification of the variant 
+        associated with that specific variant ID.
+
+        Parameters
+        ----------
+        clinvar_VCV_xml: xml file
+            XML file from a VCV ClinVar entry 
+
+        Returns
+        -------
+        methods: list 
+            List of methods associated with a specific variant ID
+        '''
+        method = clinvar_VCV_xml['ClinVarResult-Set']\
+                                ['VariationArchive']\
+                                ['ClassifiedRecord']\
+                                ['ClinicalAssertionList']\
+                                ['ClinicalAssertion']
+        try:
+            if isinstance(method, list):
+                methods = []
+                for i in method:
+                    methods.append(i['AttributeSet']['Attribute']['#text'])
+                return list(set(methods))
+            else:
+                return [method['AttributeSet']['Attribute']['#text']]
+
+        except:
+            return ["not provided"],clinvar_VCV_xml
+
+
+    def conditions_extractor(self,clinvar_VCV_xml,clinvar_id):
+
+        ''' retrive all the condition reported in the xml file associated to a
+        specific clinvar id from ClinVar database 
+
+        The function takes as input a VCV xml file from a ClinVar variant id and 
+        return the dictionary of conditions associated to that specific variant id
+
+        Parameters
+        ----------
+        clinvar_VCV_xml: xml file
+                xml file from a VCV ClinVar entry 
+
+        Returns
+        -------
+        conditions: dictionary 
+           dictionary of conditions associated to a specific variant id
+        '''
+        classification_types = ['GermlineClassification',
+                                'SomaticClinicalImpact',
+                                'OncogenicityClassification']
+        condition_out = {}
+        condition_value =[]
+
+        for classification_type in classification_types:
+            try:               
+                condition = clinvar_VCV_xml['ClinVarResult-Set']\
+                                           ['VariationArchive']\
+                                           ['ClassifiedRecord']\
+                                           ['Classifications']\
+                                           [classification_type]
+
+                traits = condition['ConditionList']["TraitSet"]
+                if not isinstance(traits, list):
+                    traits = [traits]
+                for trait in traits:
+                    if isinstance(trait['Trait'],list):
+                        trait_entity = trait['Trait'][0]['Name']
+                    else:
+                        trait_entity = trait['Trait']['Name']
+
+                    if isinstance(trait_entity,list):
+                        for element in trait_entity:
+                            if element['ElementValue']["@Type"] == "Preferred":
+                                condition_value.append(element['ElementValue']['#text'])
+                    else:
+                        if trait_entity['ElementValue']["@Type"] == "Preferred":
+                                condition_value.append(trait_entity['ElementValue']['#text'])
+
+                condition_out[classification_type] = condition_value
+
+            except:
+                print(f"No condition associated to {classification_type} classification for variant {clinvar_id}")
+
+        return condition_out
+
+
+    def classifications_extractor(self,clinvar_VCV_xml,clinvar_id):
+        '''
+        Retrieve all the ClinVar classifications reported in the XML file 
+        associated with a specific ClinVar ID from the ClinVar database.
+
+        The function takes as input a VCV XML file from a ClinVar variant ID and
+        returns the list of classifications associated with that specific variant ID.
+
+        Parameters
+        ----------
+        clinvar_VCV_xml: file-like object
+            XML file from a VCV ClinVar entry.
+
+        Returns
+        -------
+        classifications: dictionary 
+           dictionary of classifications associated with a specific ClinVar variant ID.
+        '''
+
+        ########################### Add description, review status and condition to the dictionary #####################
+        # Description adding 
+        classification_types = ['GermlineClassification',
+                                'SomaticClinicalImpact',
+                                'OncogenicityClassification']
+        classifications = {}
+
+        for classification_type in classification_types:
+            try:               
+                classification = clinvar_VCV_xml['ClinVarResult-Set']\
+                                                ['VariationArchive']\
+                                                ['ClassifiedRecord']\
+                                                ['Classifications']\
+                                                [classification_type]['Description']
+
+                classifications[classification_type] = classification
+            except:
+               print(f"No {classification_type} classification for variant {clinvar_id}")
+        return classifications
+
+    # add Review status information
+
+    def review_status_extractor(self,clinvar_VCV_xml,clinvar_id):
+        ''' retrive the ClinVar review_status in the input xml file
+        associated to a specific clinvar id from ClinVar database
+
+        The function takes as input a VCV xml file from a ClinVar variant id and
+        return the list of conditions associated to that specific variant id
+
+        Parameters
+        ----------
+        clinvar_VCV_xml: xml file
+                xml file from a VCV ClinVar entry 
+
+        Returns
+        -------
+        review_status: dictionary
+           dictionary containing the review_status associated to a specific ClinVar variant id
+        '''
+        review_status = {}
+        
+        clinical_assertions = clinvar_VCV_xml['ClinVarResult-Set']\
+                                             ['VariationArchive']\
+                                             ['ClassifiedRecord']\
+                                             ['Classifications']
+
+
+        clinvar_id = clinvar_VCV_xml['ClinVarResult-Set']\
+                                    ['VariationArchive']\
+                                    ['ClassifiedRecord']\
+                                    ['SimpleAllele']\
+                                    ['@VariationID']
+                                             
+
+        for classification_type in clinical_assertions:
+            try:
+                review_status[classification_type] = clinical_assertions[classification_type]['ReviewStatus']
+            except:
+                print(f"no review status associated to {classification_type} classification for variant {clinvar_id}")
+
+        return review_status
+    
+    
+    def add_mutations(self, sequence, metadata=[]):
+        gene = sequence.gene_id
+        refseq = sequence.aliases.get("refseq")
+        if not refseq:
+            raise ValueError("Missing RefSeq identifier in sequence.aliases['refseq']")
+
+        # Metadata check
+        _clinvar_supported_metadata = [
+            'clinvar_classification',
+            'clinvar_condition',
+            'clinvar_review_status',
+            'clinvar_genomic_annotation',
+            'clinvar_method',
+            'clinvar_variant_id',
+            'clinvar_variant_name'
+        ]
+
+        for md in metadata:
+            if md not in _clinvar_supported_metadata:
+                self.log.error(f'{md} is not a valid metadata. Supported metadata are: {_clinvar_supported_metadata}')
+                raise ValueError(f'{md} is not a valid metadata. Supported metadata are: {_clinvar_supported_metadata}')
+
+        # Initialize tracking variables
+        missense_variants = {}
+        strange_variant_annotation = {}
+        key_to_remove = []
+        not_found_gene = []
+        not_found_var = []
+        var_right_iso = 0
+        var_other_iso = 0
+        uncanonical_annotation = 0
+
+
+        filter_missense_variants = "(" + gene + "%5Bgene%5D%20AND%20((%22missense%20variant%22%5Bmolecular%20consequence%5D%20OR%20%22SO%200001583%22%5Bmolecular%20consequence%5D)))"
+        mutation_type = "missense"
+
+
+        try:
+            clinvar_ids, out_gene = self.filtered_variants_extractor(filter_missense_variants, gene, refseq, mutation_type)
+        except RuntimeError as e:
+            print(e)
+            exit(1)
+
+        if not clinvar_ids:
+            not_found_gene.append(out_gene)
+            return
+
+        for clinvar_id in clinvar_ids:
+            missense_variants[clinvar_id] = {"gene": gene, "isoform": refseq}
+
+
+        counter = 0
+        for clinvar_id in missense_variants:
+            gene = missense_variants[clinvar_id]["gene"]
+            isoform_to_check = missense_variants[clinvar_id].pop("isoform")
+            correct_variant = ""
+            counter += 1
+
+            print(f"Processing information for {clinvar_id} clinvar id from ClinVar. Progress --> {counter}/{len(missense_variants)}")
+
+            try:
+                parse_VCV = self.VCV_summary_retriever(clinvar_id)
+            except (RuntimeError, KeyError) as e:
+                print(e)
+                exit(1)
+
+            hgvss_coding, hgvss_genomic = self.coding_region_variants_extractor(parse_VCV, clinvar_id)
+
+            if not hgvss_coding or not hgvss_genomic:
+                clinvar_id_features = {}
+                clinvar_id_features["gene"] = gene
+                clinvar_id_features["variant"] = "to check"
+                strange_variant_annotation[clinvar_id] = clinvar_id_features
+                key_to_remove.append(clinvar_id)
+                continue
+            
+            correct_variant = self.missense_variants_extractor(hgvss_coding, gene, clinvar_id, isoform_to_check)
+
+            if correct_variant is None:
+                print(f"The clinvar_id {clinvar_id} has a different annotation structure. It will be annotated in variants_to_check.csv")
+                uncanonical_annotation += 1
+                clinvar_id_features = {}
+                clinvar_id_features["variant"] = "to check"
+                clinvar_id_features["gene"] = gene
+                strange_variant_annotation[clinvar_id] = clinvar_id_features
+                key_to_remove.append(clinvar_id)
+                continue
+
+            if correct_variant == "wrong isoform":
+                print(f"The {clinvar_id} clinvar id for {gene} gene does not contain any mutation in the isoform provided as input. The entry will be added to entry_not_found.csv")
+                var_other_iso += 1
+                not_found_var.append(clinvar_id)
+                not_found_gene.append(gene)
+                key_to_remove.append(clinvar_id)
+                continue
+
+            classifications = self.classifications_extractor(parse_VCV,clinvar_id)
+            conditions = self.conditions_extractor(parse_VCV,clinvar_id)
+            methods = self.classification_methods_extractor(parse_VCV,clinvar_id)
+            if isinstance(methods, tuple):
+                methods = methods[0]
+            review_status = self.review_status_extractor(parse_VCV,clinvar_id)
+            genomic_annotations = self.genomic_annotation_extractor(hgvss_genomic)
+
+            var_right_iso += 1
+
+            if re.search("p.[A-Z][a-z][a-z][0-9]+[A-Z][a-z][a-z]", correct_variant) or re.search("p.\\w+delins\\w+", correct_variant):
+                missense_variants[clinvar_id]["variant"] = correct_variant
+                missense_variants[clinvar_id].update({
+                    "classifications": classifications,
+                    "conditions": conditions,
+                    "review_status": review_status,
+                    "methods": methods,
+                    "genomic_annotations": genomic_annotations
+                })
+            else:
+                clinvar_id_features = {}
+                clinvar_id_features["variant"] = correct_variant
+                clinvar_id_features["gene"] = gene
+                strange_variant_annotation[clinvar_id] = clinvar_id_features
+                uncanonical_annotation += 1
+                key_to_remove.append(clinvar_id)
+
+        print(f"{var_right_iso}/{len(missense_variants)} missense mutations belong to the input isoform of which {var_right_iso - uncanonical_annotation} with the canonical annotation and {uncanonical_annotation} with a different annotation, {var_other_iso}/{len(missense_variants)} missense mutations do not belong to the input isoform")
+
+        for clinvar_id in key_to_remove:
+            missense_variants.pop(clinvar_id, None)
+
+        for clinvar_id, data in missense_variants.items():
+            try:
+                full_variant = data["variant"]
+                
+                # Extract "p.Met88Thr" from the full variant string
+                match = re.search(r"\(p\.([A-Z][a-z][a-z][0-9]+[A-Z][a-z][a-z])\)", full_variant)
+                three_letter_mut = "p." + match.group(1)
+
+                # Convert 3-letter to 1-letter format
+                one_letter_mut = self.mutations_convert(three_letter_mut, self.three_one_letter_annotation, print_message=True)
+
+                # Parse one-letter mutation format
+                ref, pos, alt = one_letter_mut[0], int(one_letter_mut[1:-1]), one_letter_mut[-1]
+
+                # Find position in sequence
+                site_idx = sequence.seq2index(pos)
+                position = sequence.positions[site_idx]
+
+                if position.wt_residue_type != ref:
+                    print(f"Error with ClinVar ID  {clinvar_id}:Ref AA mismatch at position {pos} (expected {ref}, found {position.wt_residue_type})")
+                    exit(1)
+
+                # Create mutation
+                mutation = Mutation(position, alt, [self])
+
+
+                # Direct assignment to mutation.metadata using metadata classes
+                mutation.metadata["clinvar_classification"] = [ClinVarClassification(self, data.get("classifications", {}))]
+                mutation.metadata["clinvar_condition"] = [ClinVarCondition(self, data.get("conditions", {}))]
+                mutation.metadata["clinvar_review_status"] = [ClinVarReviewStatus(self, data.get("review_status", {}))]
+                mutation.metadata["clinvar_genomic_annotation"] = [ClinVarGenomicAnnotation(self, data.get("genomic_annotations"))]
+                mutation.metadata["clinvar_method"] = [ClinVarMethod(self, *data.get("methods", []))]
+                mutation.metadata["clinvar_variant_id"] = [ClinVarVariantID(self, clinvar_id)]
+                mutation.metadata["clinvar_variant_name"] = [ClinVarVariantName(self, data.get("variant"))]
+
+
+                # Add mutation to sequence
+                position.add_mutation(mutation)
+
+                print(f"[ClinVar] Added mutation {mutation} at position {pos} for ClinVar ID {clinvar_id}")
+
+            except Exception as e:
+                print(f"[ClinVar] Failed to process mutation for {clinvar_id}: {e}")
+
 
 class COSMIC(DynamicSource, object):
     @logger_init
