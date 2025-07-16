@@ -42,6 +42,21 @@ print(seq.positions[64].mutations[0].mutated_residue_type)
 
 print(seq.positions[38].mutations[0].metadata)
 
+# add mutations from COSMIC
+cosmic = COSMIC(database_files=['/data/databases/cosmic-v96/CosmicMutantExport.tsv'],
+                database_encoding=['latin1'])
+
+cosmic.add_mutations(seq, 
+					 metadata=['genomic_coordinates', 'genomic_mutations', 
+					 			'cancer_site', 'cancer_histology'])
+
+# let's check them out
+print(seq.positions[64].mutations[0])
+
+print(seq.positions[64].mutations[0].sources)
+
+print(seq.positions[64].mutations[0].metadata)
+
 # add mutations from ClinVar
 clinvar = ClinVar()
 clinvar.add_mutations(seq, metadata=[
@@ -54,30 +69,10 @@ clinvar.add_mutations(seq, metadata=[
     'clinvar_variant_name'
 ])
 
-
 # Check ClinVar metadata (variant ID, condition, classification, etc.)
-print(seq.positions[64].mutations[0].metadata.get('clinvar_variant_id'))
-print(seq.positions[64].mutations[0].metadata.get('condition'))
-print(seq.positions[64].mutations[0].metadata.get('classification'))
-
-from cancermuts.datasources import MyVariant
-
-
-# add mutations from COSMIC
-cosmic = COSMIC(database_files=['/data/databases/cosmic-v96/CosmicMutantExport.tsv'],
-                database_encoding=['latin1'])
-
-cosmic.add_mutations(seq, 
-					 metadata=['genomic_coordinates', 'genomic_mutations', 
-					 			'cancer_site', 'cancer_histology'])
-
-
-# let's check them out
-print(seq.positions[64].mutations[0])
-
-print(seq.positions[64].mutations[0].sources)
-
-print(seq.positions[64].mutations[0].metadata)
+print(seq.positions[15].mutations[0].metadata.get('clinvar_variant_id'))
+print(seq.positions[15].mutations[0].metadata.get('condition'))
+print(seq.positions[15].mutations[0].metadata.get('classification'))
                                         
 # add annotations from MyVariant (REVEL)
 from cancermuts.datasources import MyVariant

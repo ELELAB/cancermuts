@@ -1216,7 +1216,7 @@ class ClinVar(DynamicSource, object):
                 self.log.error(f'{md} is not a valid metadata. Supported metadata are: {_clinvar_supported_metadata}')
                 raise ValueError(f'{md} is not a valid metadata. Supported metadata are: {_clinvar_supported_metadata}')
 
-        # Initialize tracking variables
+        # Initial object assignment:
         missense_variants = {}
         strange_variant_annotation = {}
         key_to_remove = []
@@ -1240,6 +1240,29 @@ class ClinVar(DynamicSource, object):
         if not clinvar_ids:
             not_found_gene.append(out_gene)
             return
+
+
+        # Step 1: Prepare classification-based queries for consistence check:
+        filter_ids = {}
+        classifications = ["Pathogenic", "Benign", "Likely Pathogenic", "Likely Benign", "vus", "Conflicting"]
+        filters_on_classification = [
+            f"({gene}[gene] AND ((\"clinsig pathogenic\"[Properties] or \"clinsig pathogenic low penetrance\"[Properties] or \"clinsig established risk allele\"[Properties]))",
+            f"({gene}[gene] AND (\"clinsig benign\"[Properties]))",
+            f"({gene}[gene] AND ((\"clinsig likely pathogenic\"[Properties] or \"clinsig likely pathogenic low penetrance\"[Properties] or \"clinsig likely risk allele\"[Properties]))",
+            f"({gene}[gene] AND (\"clinsig benign\"[Properties])) AND (\"clinsig likely benign\"[Properties])",
+            f"({gene}[gene] AND ((\"clinsig vus\"[Properties] or \"clinsig uncertain risk allele\"[Properties])))",
+            f"({gene}[gene] AND (\"clinsig has conflicts\"[Properties]))"
+        ]
+
+        for classification, URL in zip(classifications, filters_on_classification):
+            try:
+                clinvar_ids_class, out_gene = self.filtered_variants_extractor(URL, gene, refseq, classification)
+            except RuntimeError as e:
+                print(e)
+                continue
+            if clinvar_ids_class:
+                filter_ids[classification] = [clinvar_ids_class, [gene], [refseq]]
+
 
         for clinvar_id in clinvar_ids:
             missense_variants[clinvar_id] = {"gene": gene, "isoform": refseq}
@@ -1282,14 +1305,6 @@ class ClinVar(DynamicSource, object):
                 key_to_remove.append(clinvar_id)
                 continue
 
-            if correct_variant == "wrong isoform":
-                print(f"The {clinvar_id} clinvar id for {gene} gene does not contain any mutation in the isoform provided as input. The entry will be added to entry_not_found.csv")
-                var_other_iso += 1
-                not_found_var.append(clinvar_id)
-                not_found_gene.append(gene)
-                key_to_remove.append(clinvar_id)
-                continue
-
             classifications = self.classifications_extractor(parse_VCV,clinvar_id)
             conditions = self.conditions_extractor(parse_VCV,clinvar_id)
             methods = self.classification_methods_extractor(parse_VCV,clinvar_id)
@@ -1297,6 +1312,14 @@ class ClinVar(DynamicSource, object):
                 methods = methods[0]
             review_status = self.review_status_extractor(parse_VCV,clinvar_id)
             genomic_annotations = self.genomic_annotation_extractor(hgvss_genomic)
+
+            if correct_variant == "wrong isoform":
+                print(f"The {clinvar_id} clinvar id for {gene} gene does not contain any mutation in the isoform provided as input. The entry will be added to entry_not_found.csv")
+                var_other_iso += 1
+                not_found_var.append(clinvar_id)
+                not_found_gene.append(gene)
+                key_to_remove.append(clinvar_id)
+                continue
 
             var_right_iso += 1
 
@@ -1321,6 +1344,44 @@ class ClinVar(DynamicSource, object):
 
         for clinvar_id in key_to_remove:
             missense_variants.pop(clinvar_id, None)
+
+        # Consistency check block
+        inconsistent_annotations = {}
+
+        for classification, ids_info in filter_ids.items():
+            clinvar_ids = ids_info[0]
+            for clinvar_id in clinvar_ids:
+                try:
+                    parse_VCV = self.VCV_summary_retriever(clinvar_id)
+                except (RuntimeError, KeyError) as e:
+                    print(e)
+                    continue
+
+                hgvss_coding, hgvss_genomic = self.coding_region_variants_extractor(parse_VCV, clinvar_id)
+                if not hgvss_coding:
+                    continue
+
+                correct_variant = self.missense_variants_extractor(hgvss_coding, gene, clinvar_id, refseq)
+
+                if clinvar_id not in missense_variants:
+                    classifications_data = self.classifications_extractor(parse_VCV, clinvar_id)
+                    conditions = self.conditions_extractor(parse_VCV, clinvar_id)
+                    methods = self.classification_methods_extractor(parse_VCV, clinvar_id)
+                    if isinstance(methods, tuple):
+                        methods = methods[0]
+                    review_status = self.review_status_extractor(parse_VCV, clinvar_id)
+                    genomic_annotations = self.genomic_annotation_extractor(hgvss_genomic)
+
+                    inconsistent_annotations[clinvar_id] = {
+                        "gene": gene,
+                        "variant": correct_variant,
+                        "classifications": classifications_data,
+                        "conditions": conditions,
+                        "methods": methods,
+                        "review_status": review_status,
+                        "genomic_annotations": genomic_annotations
+                    }
+
 
         for clinvar_id, data in missense_variants.items():
             try:
@@ -1365,6 +1426,55 @@ class ClinVar(DynamicSource, object):
 
             except Exception as e:
                 print(f"[ClinVar] Failed to process mutation for {clinvar_id}: {e}")
+
+
+
+        # === Write auxiliary files ===
+
+        #Write variants with uncanonical or problematic annotations
+        if strange_variant_annotation:
+            data_strange = {}
+            for clinvar_id, information in strange_variant_annotation.items():
+                data_strange[clinvar_id] = [information["variant"], information["gene"]]
+            df_strange = pd.DataFrame.from_dict(data_strange, 
+                                                orient="index",
+                                                columns=['variant_name','gene_name'])
+
+            df_strange.index.name = 'clinvar_id'
+            df_strange.to_csv(f"variants_to_check.csv", sep=";")
+            print("[ClinVar] Wrote variants_to_check.csv")
+
+
+        #Write the file with the the entry not found
+        if len(not_found_gene) != 0:
+            if len(not_found_var) != 0:
+                pd.DataFrame(list(zip(not_found_gene,not_found_var)), 
+                             columns=['gene_name',"variant_name"]).to_csv(f"entry_not_found.csv", 
+                                                                         sep=";", 
+                                                                         index=False)
+            else:
+                pd.DataFrame(list(not_found_gene), 
+                             columns=['gene_name']).to_csv(f"entry_not_found.csv", 
+                                                           sep=";", 
+                                                           index=False)
+            print("[ClinVar] Wrote entry_not_found.csv")
+
+
+        # Write the inconsistency annotations 
+        if inconsistent_annotations:
+            columns = ['variant_id',
+                       'variant_name',
+                       'genomic_annotation',
+                       'gene_name', 
+                       'interpretation', 
+                       'condition',
+                       'review_status',
+                       'methods']
+            
+            inconsistency_output_list = melting_dictionary(inconsistent_annotations, methods=True)
+            df2 = pd.DataFrame(inconsistency_output_list, columns=columns)
+            df2.to_csv("inconsistency_annotations.csv", sep=";", index=False)
+            print("[ClinVar] Wrote inconsistency_annotations.csv")
 
 
 class COSMIC(DynamicSource, object):
