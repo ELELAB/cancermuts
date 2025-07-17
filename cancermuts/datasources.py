@@ -159,13 +159,13 @@ class UniProt(DynamicSource, object):
                 raise ValueError(f"Failed to fetch UniProt JSON entry for {this_upac}")
 
             data = response.json()
-            alt_prods = [x for x in data.get("comments", []) if x["commentType"] == "ALTERNATIVE PRODUCTS"] 
+            alt_prods = [x for x in data["comments"] if x["commentType"] == "ALTERNATIVE PRODUCTS"] 
             is_canonical = False
             isoform_found = False
             for prod in alt_prods:
-                for iso in prod.get("isoforms", []):
-                    ids = iso.get("isoformIds", [])
-                    status = iso.get("isoformSequenceStatus", "")
+                for iso in prod["isoforms"]:
+                    ids = iso["isoformIds"]
+                    status = iso["isoformSequenceStatus"]
                     if isoform in ids:
                         isoform_found = True
                         is_canonical = (status == "Displayed")
