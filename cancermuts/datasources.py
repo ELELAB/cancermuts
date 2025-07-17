@@ -743,7 +743,7 @@ class COSMIC(DynamicSource, object):
 
         return mutations, out_metadata
 
-    def add_mutations(self, sequence, genome_assembly_version = '38',
+    def add_mutations(self, sequence, genome_assembly_version = 'GRCh38',
                     cancer_types=None,
                     cancer_histology_subtype_1=None,
                     cancer_histology_subtype_2=None,
