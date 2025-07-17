@@ -157,21 +157,33 @@ class UniProt(DynamicSource, object):
             response = rq.get(url)
             if not response.ok:
                 raise ValueError(f"Failed to fetch UniProt JSON entry for {this_upac}")
-
-            data = response.json()
+            try:
+                data = response.json()
+            except Exception as e:
+                raise ValueError(f"Invalid JSON response from UniProt for {this_upac}: {str(e)}")
+            
+            if "comments" not in data:
+                raise ValueError(f"No 'comments' section found in UniProt entry for {this_upac}")
+            
             alt_prods = [x for x in data["comments"] if x["commentType"] == "ALTERNATIVE PRODUCTS"] 
+            if not alt_prods:
+                raise ValueError(f"No alternative products found in UniProt entry for {this_upac}. Cannot resolve isoform '{isoform}'.")
+            
             is_canonical = False
             isoform_found = False
-            for prod in alt_prods:
-                for iso in prod["isoforms"]:
-                    ids = iso["isoformIds"]
-                    status = iso["isoformSequenceStatus"]
-                    if isoform in ids:
-                        isoform_found = True
-                        is_canonical = (status == "Displayed")
+            try:
+                for prod in alt_prods:
+                    for iso in prod["isoforms"]:
+                        ids = iso["isoformIds"]
+                        status = iso["isoformSequenceStatus"]
+                        if isoform in ids:
+                            isoform_found = True
+                            is_canonical = (status == "Displayed")
+                            break
+                    if isoform_found:
                         break
-                if isoform_found:
-                    break
+            except KeyError as e:
+                raise ValueError(f"Missing expected field '{e.args[0]}' in ALTERNATIVE PRODUCTS for UniProt entry {this_upac}")
 
             if not isoform_found:
                 raise ValueError(f"Isoform {isoform} not listed in UniProt entry {this_upac}")
