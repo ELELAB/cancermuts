@@ -1,6 +1,7 @@
 # datasources.py - data sources handling for the cancermuts package
 # (c) 2018 Matteo Tiberti <matteo.tiberti@gmail.com>
 # (c) 2023 Katrine Meldgård <katrine@meldgaard.dk>
+# (c) 2025 Pablo Sanchez-Izquierdo
 # This file is part of cancermuts
 # The function '_get_popmax_af' is taken and modified from the 'gnomad2csv' script
 # which is part of the ELELAB/CSB-scripts repository
@@ -10,13 +11,13 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# Nome-Programma is distributed in the hope that it will be useful,
+# cancermuts is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with Nome-Programma.  If not, see <http://www.gnu.org/licenses/>.
+# along with cancermuts.  If not, see <http://www.gnu.org/licenses/>.
 
 
 """
@@ -145,6 +146,7 @@ class UniProt(DynamicSource, object):
                 self.log.info("will use Uniprot ID %s" % this_upid)
 
             this_upac = self._get_aliases(this_upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
+        
         if upid is None:
             this_upid = self._get_aliases(this_upac, ['UniProtKB_uniProtkbId'])['UniProtKB_uniProtkbId']
         else:
