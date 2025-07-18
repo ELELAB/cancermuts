@@ -141,14 +141,17 @@ In order to obtain it:
     register and log in
 
 2. head to the Data menu at the top and select the Downloads option
+3. head to "Targeted Screens Mutants" section and download the corresponding 
+    Whole file (Cosmic_CompleteTargetedScreensMutant_Tsv_v102_GRCh38.tar)
+3. head to the "Genome Screen Mutant" section and downlaod the corresponding
+    Whole file (Cosmic_GenomeScreensMutant_Tsv_v102_GRCh38.tar)
+4. head to the "Classification" section and downlaod the corresponding
+    Whole file (Cosmic_Classification_Tsv_v102_GRCh38.tar)
 
-3. head to the "COSMIC Mutation Data" section and downlaod the corresponding
-    Whole file (CosmicMutantExport.tsv.gz)
-
-4. decompress the file, e.g. using `gzip`:
+5. decompress the file, e.g. using `tar -xzf `:
 
     ```
-    gunzip -d CosmicMutantExport.tsv.gz
+    tar -xzf  Cosmic_GenomeScreensMutant_Tsv_v102_GRCh38.tar
     ```
 
 {% hint style='warning' %}

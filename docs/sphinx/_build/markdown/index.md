@@ -349,7 +349,7 @@ Otherwise, the property is just added to the object.
 Classes to interrogate data sources and annotate various data
 
 
-### _class_ cancermuts.datasources.COSMIC(database_files=None, database_encoding=None, cancer_type=None)
+### _class_ cancermuts.datasources.COSMIC(targeted_database_files=None, screen_mutant_database_files= None, classification_database_files=None, database_encoding=None, cancer_type=None)
 Bases: `cancermuts.datasources.DynamicSource`, `object`
 
 
