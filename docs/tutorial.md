@@ -120,9 +120,9 @@ the analysis and links together all the information we are going to collect. In 
 create it we use a data source class for UniProt from which we can downlaod protein sequences.
 This is only source for sequences available at the moment, more can be added in the future.
 
-To download the main UniProt sequence, you will need the corresponding HGCN symbol only.
-The UniProt object automatically identifies the most likely UniProt ID corresponding to the
-gene name. Alternatively, it is possible to provide the UniProt ID manually as an option.
+To download the canonical UniProt sequence, you will need the corresponding HGCN symbol only.
+The UniProt object automatically identifies the most likely UniProt ID and AC corresponding to the
+gene name. Alternatively, it is possible to provide the UniProt ID manually.
 
 This is done as follows:
 
@@ -137,8 +137,8 @@ This is done as follows:
 # get the sequence for the protein
 >>> seq = up.get_sequence('MAP1LC3B')
 
-# alternatively, we can specifically ask for a Uniprot ID
->>> seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
+# alternatively, we can specifically ask for a Uniprot ID and/or AC
+>>> seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN', upac='Q9GZQ8')
 
 # this prints the downloaded protein sequence
 >>> print(seq.sequence)
@@ -149,22 +149,27 @@ MPSEKTFKQRRTFEQRVEDVRLIREQHPTKIPVIIERYKGEKQLPVLDKTKFLVPDHVNMSELIKIIRRRLQLNANQAFF
 
 ```
 
-### Optional: Loading a specific isoform
+### Optional: Requesting a specific isoform
 
-Cancermuts allows loading alternative isoforms, if available in UniProt. To load a specific isoform, provide the isoform ID and set `is_canonical=False`:
+Cancermuts allows requesting alternative isoforms, if available in UniProt.
+To request a specific isoform, provide a isoform ID, in the form of a UniProt isoform
+identifier, to the isoform argument, as in the following example. If this is not done,
+the canonical UniProt isoform will be used. Notice that, currently, only some
+data sources support alternative isoform; those that do not support them will
+raise exceptions if a Sequence object containing an alternative isoform is provided to them.
 
 ```py
 
-# OPTIONAL: Load a specific UniProt isoform instead of canonical
->>> isoform_id = "H3BM99"
->>> seq = up.get_sequence("MAP1LC3B", isoform=isoform_id, is_canonical=False)
-
->>> print("Isoform sequence:", seq.sequence)
-MPSEKTFKQRRTFGECRREGGGCGGAGVRAVEGGRAWDAVRGRGRAGRPSGAGGCRPAGPRDAGPGAP
+# OPTIONAL: Load a specific UniProt isoform instead of canonical. In this example
+# we use the AMBRA1 protein:
+>>> isoform_id = "Q9C0C7-3"
+>>> up = UniProt()
+>>> seq = up.get_sequence("AMBRA1", isoform=isoform_id)
+>>> print(seq.isoform)
+Q9C0C7-3
+>>> print(seq.is_canonical)
+False
 ```
-
-If the isoform is not found, Cancermuts will raise an error. Ensure you are using a valid and available UniProt isoform ID (e.g., `H3BM99` for MAP1LC3B).
-
 
 ### Collecting cancer mutations
 
