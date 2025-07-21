@@ -1,6 +1,3 @@
-import sys
-sys.path.insert(0, "/data/user/elenikia/cancermuts")
-
 # import the UniProt data source class
 from cancermuts.datasources import UniProt 
 
@@ -76,11 +73,13 @@ clinvar.add_mutations(seq, metadata=[
     'clinvar_variant_name'
 ])
 
-# Check ClinVar metadata (variant ID, condition, classification, etc.)
-print(seq.positions[15].mutations[0].metadata.get('clinvar_variant_id'))
-print(seq.positions[15].mutations[0].metadata.get('condition'))
-print(seq.positions[15].mutations[0].metadata.get('classification'))
-                                         
+# Check ClinVar Variant
+print(seq.positions[14].mutations)
+print(seq.positions[14].mutations[0].sources)
+print(seq.positions[14].mutations[0].mutated_residue_type)
+print(seq.positions[14].mutations[0].metadata['clinvar_condition'][0].get_value_str())
+print(seq.positions[14].mutations[0].metadata['clinvar_classification'][0].get_value_str())
+
 # add annotations from MyVariant (REVEL)
 from cancermuts.datasources import MyVariant
 

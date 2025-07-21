@@ -1,0 +1,75 @@
+#
+#  This file is part of bioservices software
+#
+#  Copyright (c) 2013-2014 - EBI-EMBL
+#
+#  File author(s):
+#      Thomas Cokelaer <cokelaer@ebi.ac.uk>
+#
+#
+#  Distributed under the GPLv3 License.
+#  See accompanying file LICENSE.txt or copy at
+#      http://www.gnu.org/licenses/gpl-3.0.html
+#
+#  website: https://github.com/cokelaer/bioservices
+#  documentation: http://packages.python.org/bioservices
+#
+##############################################################################
+"""Interface to some part of the Pfam web service
+
+.. topic:: What is Pfam ?
+
+    :URL: http://www.uniprot.org
+    :Citation:
+
+    .. highlights::
+
+
+        -- From Pfam  web site (help/about), Aug 2013
+
+
+
+"""
+from bioservices.services import REST
+from bioservices import logger
+
+logger.name = __name__
+
+__all__ = ["Pfam"]
+
+
+class Pfam:
+    """Interface to `Pfam <http://pfam.sanger.ac.uk>`_ pages
+
+    This is not a REST interface actually but rather a parser to some of the
+    HTML pages relatd to pathways.
+
+    One can retrieve the pathways names and their list of proteins.
+
+        >>> from bioservics import *
+        >>> p = Pfam()
+
+    """
+
+    _url = "http://pfam.xfam.org/"
+
+    def __init__(self, verbose=True):
+        """**Constructor**
+
+        :param verbose: set to False to prevent informative messages
+        """
+        self.services = REST(name="Pfam", url=Pfam._url, verbose=verbose)
+
+    def show(self, Id):
+        """Just an example of opening a web page with a uniprot Id
+
+        p = Pfam()
+        p.show("P43403")
+
+        """
+        url = self._url + "/protein/" + Id
+        self.services.on_web(url)
+
+    def get_protein(self, ID):
+        res = self.services.http_get("protein", params={"id": ID, "output": "xml"})
+        return res.content

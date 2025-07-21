@@ -1,0 +1,10 @@
+jsonref
+jsonschema[format-nongpl]>=2.5.1
+python-dateutil
+pyyaml
+requests
+simplejson
+six
+swagger-spec-validator>=2.0.1
+pytz
+msgpack>=0.5.2

@@ -1,0 +1,2 @@
+[console_scripts]
+gget = gget.main:main
