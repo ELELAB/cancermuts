@@ -26,18 +26,22 @@ from cancermuts.datasources import cBioPortal, COSMIC
 
 cb = cBioPortal()
 
-cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
+try:
+    cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
+except ValueError as e:
+    print(f"cBioPortal error: {e}")
 
 # let us check out some of the mutations
-print(seq.positions[38].mutations)
-print(seq.positions[64].mutations)
-print(seq.positions[122].mutations)
+try:
+    print(seq.positions[38].mutations)
+    print(seq.positions[64].mutations)
+    print(seq.positions[122].mutations)
 
-print(seq.positions[64].mutations[0].sources)
-
-print(seq.positions[64].mutations[0].mutated_residue_type)
-
-print(seq.positions[38].mutations[0].metadata)
+    print(seq.positions[64].mutations[0].sources)
+    print(seq.positions[64].mutations[0].mutated_residue_type)
+    print(seq.positions[38].mutations[0].metadata)
+except (IndexError, AttributeError) as e:
+    print(f"Could not display cBioPortal mutations: {e}")
 
 
 # add mutations from COSMIC

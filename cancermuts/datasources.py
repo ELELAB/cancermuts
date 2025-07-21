@@ -337,6 +337,9 @@ class cBioPortal(DynamicSource, object):
         if 'entrez' not in sequence.aliases.keys() or sequence.aliases['entrez'] is None:
             self.log.error('Entrez ID alias not available in sequence object')
             raise TypeError('Entrez ID alias not available in sequence object')
+        
+        if hasattr(sequence, "is_canonical") and not sequence.is_canonical:
+            raise ValueError("cBioPortal mutation annotation only supports canonical isoforms.")
 
         for md in metadata:
             if md not in _cBioPortal_supported_metadata:

@@ -5,13 +5,13 @@ from cancermuts.datasources import UniProt
 up = UniProt()
 
 # get the sequence for the protein
-seq = up.get_sequence('MAP1LC3B')
+#seq = up.get_sequence('MAP1LC3B')
 
 # alternatively, we can specifically ask for a Uniprot ID
-seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
+#seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
 
 # OPTIONAL: Use a specific UniProt isoform instead of canonical
-# seq = up.get_sequence("AMBRA1", isoform='Q9C0C7-2')
+seq = up.get_sequence("AMBRA1", isoform='Q9C0C7-2')
 
 
 # this prints the downloaded protein sequence
@@ -29,18 +29,22 @@ cb = cBioPortal(cancer_studies=['coadread_dfci_2016',
 	                            'coadread_genentech',
 	                            'coadread_tcga_pan_can_atlas_2018'])
 
-cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
+try:
+    cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
+except ValueError as e:
+    print(f"cBioPortal error: {e}")
 
 # let us check out some of the mutations
-print(seq.positions[38].mutations)
-print(seq.positions[64].mutations)
-print(seq.positions[122].mutations)
+try:
+    print(seq.positions[38].mutations)
+    print(seq.positions[64].mutations)
+    print(seq.positions[122].mutations)
 
-print(seq.positions[64].mutations[0].sources)
-
-print(seq.positions[64].mutations[0].mutated_residue_type)
-
-print(seq.positions[38].mutations[0].metadata)
+    print(seq.positions[64].mutations[0].sources)
+    print(seq.positions[64].mutations[0].mutated_residue_type)
+    print(seq.positions[38].mutations[0].metadata)
+except (IndexError, AttributeError) as e:
+    print(f"Could not display cBioPortal mutations: {e}")
 
 
 # add mutations from COSMIC
