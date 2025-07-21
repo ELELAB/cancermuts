@@ -5,13 +5,13 @@ from cancermuts.datasources import UniProt
 up = UniProt()
 
 # get the sequence for the protein
-#seq = up.get_sequence('MAP1LC3B')
+ seq = up.get_sequence('MAP1LC3B')
 
 # alternatively, we can specifically ask for a Uniprot ID
-#seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
+ seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
 
 # OPTIONAL: Use a specific UniProt isoform instead of canonical
-seq = up.get_sequence("AMBRA1", isoform='Q9C0C7-2')
+# seq = up.get_sequence("AMBRA1", isoform='Q9C0C7-2')
 
 
 # this prints the downloaded protein sequence
