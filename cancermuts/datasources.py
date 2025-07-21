@@ -38,6 +38,7 @@ from .core import Sequence, Mutation
 from .properties import *
 from .metadata import *
 from .log import *
+from .exceptions import UnexpectedIsoformError
 from io import StringIO
 import json
 import re
@@ -339,7 +340,7 @@ class cBioPortal(DynamicSource, object):
             raise TypeError('Entrez ID alias not available in sequence object')
         
         if hasattr(sequence, "is_canonical") and not sequence.is_canonical:
-            raise ValueError("cBioPortal mutation annotation only supports canonical isoforms.")
+            raise UnexpectedIsoformError("cBioPortal mutation annotation only supports canonical isoforms.")
 
         for md in metadata:
             if md not in _cBioPortal_supported_metadata:

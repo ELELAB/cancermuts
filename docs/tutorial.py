@@ -5,10 +5,10 @@ from cancermuts.datasources import UniProt
 up = UniProt()
 
 # get the sequence for the protein
- seq = up.get_sequence('MAP1LC3B')
+seq = up.get_sequence('MAP1LC3B')
 
 # alternatively, we can specifically ask for a Uniprot ID
- seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
+seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
 
 # OPTIONAL: Use a specific UniProt isoform instead of canonical
 # seq = up.get_sequence("AMBRA1", isoform='Q9C0C7-2')
@@ -22,6 +22,7 @@ seq.positions[0:3]
 
 # import data sources classes
 from cancermuts.datasources import cBioPortal, COSMIC
+from cancermuts.exceptions import UnexpectedIsoformError
 
 # add mutations from cBioPortal
 
@@ -31,7 +32,7 @@ cb = cBioPortal(cancer_studies=['coadread_dfci_2016',
 
 try:
     cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
-except ValueError as e:
+except UnexpectedIsoformError as e:
     print(f"cBioPortal error: {e}")
 
 # let us check out some of the mutations

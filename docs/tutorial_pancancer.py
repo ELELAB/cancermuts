@@ -21,14 +21,17 @@ seq.positions[0:3]
 
 # import data sources classes
 from cancermuts.datasources import cBioPortal, COSMIC
+from cancermuts.exceptions import UnexpectedIsoformError
 
 # add mutations from cBioPortal
 
-cb = cBioPortal()
+cb = cBioPortal(cancer_studies=['coadread_dfci_2016',
+                                'coadread_genentech',
+                                'coadread_tcga_pan_can_atlas_2018'])
 
 try:
     cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
-except ValueError as e:
+except UnexpectedIsoformError as e:
     print(f"cBioPortal error: {e}")
 
 # let us check out some of the mutations
