@@ -339,8 +339,8 @@ class cBioPortal(DynamicSource, object):
             self.log.error('Entrez ID alias not available in sequence object')
             raise TypeError('Entrez ID alias not available in sequence object')
         
-        if hasattr(sequence, "is_canonical") and not sequence.is_canonical:
-            raise UnexpectedIsoformError("cBioPortal mutation annotation only supports canonical isoforms.")
+        if not sequence.is_canonical:
+            raise UnexpectedIsoformError("cBioPortal mutation annotation only supports canonical isoforms. Please use a canonical UniProt sequence")
 
         for md in metadata:
             if md not in _cBioPortal_supported_metadata:
