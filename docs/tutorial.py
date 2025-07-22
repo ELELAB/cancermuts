@@ -10,7 +10,10 @@ seq = up.get_sequence('MAP1LC3B')
 # alternatively, we can specifically ask for a Uniprot ID
 seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
 
-seq.aliases["refseq"] = "NP_073729"
+# OPTIONAL: Use a specific UniProt isoform instead of canonical
+# seq = up.get_sequence("AMBRA1", isoform='Q9C0C7-2')
+
+aeq.aliases["refseq"] = "NP_073729"
 
 # this prints the downloaded protein sequence
 print(seq.sequence)

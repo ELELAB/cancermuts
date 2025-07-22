@@ -1,6 +1,7 @@
 # datasources.py - data sources handling for the cancermuts package
 # (c) 2018 Matteo Tiberti <matteo.tiberti@gmail.com>
 # (c) 2023 Katrine Meldgård <katrine@meldgaard.dk>
+# (c) 2025 Pablo Sanchez-Izquierdo
 # This file is part of cancermuts
 # The function '_get_popmax_af' is taken and modified from the 'gnomad2csv' script
 # which is part of the ELELAB/CSB-scripts repository
@@ -10,13 +11,13 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# Nome-Programma is distributed in the hope that it will be useful,
+# cancermuts is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with Nome-Programma.  If not, see <http://www.gnu.org/licenses/>.
+# along with cancermuts.  If not, see <http://www.gnu.org/licenses/>.
 
 
 """
@@ -125,22 +126,13 @@ class UniProt(DynamicSource, object):
         super(UniProt, self).__init__(name='UniProt', version='1.0', description=description)
         self._uniprot_service = bsUniProt()
 
-    def get_sequence(self, gene_id, upid=None, upac=None):
-        if upac is not None or upid is not None:
-            if upac is not None:
-                self.log.info("The user-provided Uniprot AC (%s) will be used" % upid)
-                this_upac = upac
-            else:
-                self.log.info("UniProt AC will be mapped from UniProt ID")
-                this_upac = self._get_aliases(upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
-
-            if upid is not None:
-                self.log.info("The user-provided Uniprot ID (%s) will be used" % upid)
-                this_upid = upid
-            else:
-                self.log.info("UniProt ID will be mapped from UniProt AC")
-                this_upid = self._get_aliases(upac, ['UniProtKB_uniProtkbId'])['UniProtKB_uniProtkbId']
-
+    def get_sequence(self, gene_id, upid=None, upac=None, isoform=None):
+        if upac is not None:
+            this_upac = upac
+            self.log.info(f"The user-provided UniProt AC ({upac}) will be used")
+        elif upid is not None:
+            self.log.info("UniProt AC will be mapped from UniProt ID")
+            this_upac = self._get_aliases(upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
         else:
             self.log.info("retrieving UniProt ID for human gene %s" % gene_id)
             try:
@@ -155,9 +147,57 @@ class UniProt(DynamicSource, object):
             if len(upids) > 1:
                 self.log.warning("the following UniProt entries were found for gene %s: %s; will use %s" %(gene_id, ', '.join(upids), this_upid))
             else:
-                self.log.info("will use Uniprot ID %s" % upid)
+                self.log.info("will use Uniprot ID %s" % this_upid)
 
             this_upac = self._get_aliases(this_upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
+        
+        if upid is None:
+            this_upid = self._get_aliases(this_upac, ['UniProtKB_uniProtkbId'])['UniProtKB_uniProtkbId']
+        else:
+            this_upid = upid
+        
+        if isoform is not None:
+            self.log.info(f"Isoform requested: {isoform}")
+
+            url = f"https://rest.uniprot.org/uniprotkb/{this_upac}.json"
+            response = rq.get(url)
+            if not response.ok:
+                raise ValueError(f"Failed to fetch UniProt JSON entry for {this_upac}")
+            try:
+                data = response.json()
+            except Exception as e:
+                raise ValueError(f"Invalid JSON response from UniProt for {this_upac}: {str(e)}")
+            
+            if "comments" not in data:
+                raise ValueError(f"No 'comments' section found in UniProt entry for {this_upac}")
+            
+            alt_prods = [x for x in data["comments"] if x["commentType"] == "ALTERNATIVE PRODUCTS"] 
+            if not alt_prods:
+                raise ValueError(f"No alternative products found in UniProt entry for {this_upac}. Cannot resolve isoform '{isoform}'.")
+            
+            is_canonical = False
+            isoform_found = False
+            try:
+                for prod in alt_prods:
+                    for iso in prod["isoforms"]:
+                        ids = iso["isoformIds"]
+                        status = iso["isoformSequenceStatus"]
+                        if isoform in ids:
+                            isoform_found = True
+                            is_canonical = (status == "Displayed")
+                            break
+                    if isoform_found:
+                        break
+            except KeyError as e:
+                raise ValueError(f"Missing expected field '{e.args[0]}' in ALTERNATIVE PRODUCTS for UniProt entry {this_upac}")
+
+            if not isoform_found:
+                raise ValueError(f"Isoform {isoform} not listed in UniProt entry {this_upac}")
+            
+            fasta_id = isoform
+        else:
+            fasta_id = this_upac
+            is_canonical = True
 
         this_entrez = self._get_aliases(this_upac, ['GeneID'])
 
@@ -171,17 +211,17 @@ class UniProt(DynamicSource, object):
             aliases = {'uniprot'     : this_upid,
                        'uniprot_acc' : this_upac }
 
-        self.log.info("final aliases: %s" % aliases)
-
-        self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s, Uniprot AC %s, gene %s" % (this_upid, this_upac, gene_id))
+        self.log.info("final aliases: %s" % aliases)      
+        
+        self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s, Uniprot AC %s, gene %s" % (this_upid, fasta_id, gene_id))
 
         try:
-            sequence = self._get_fasta_sequence(this_upac)
+            sequence = self._get_fasta_sequence(fasta_id)
         except:
-            self.log.error("failed retrieving sequence for Uniprot ID %s" % upid)
+            self.log.error("failed retrieving sequence for Uniprot ID %s" % fasta_id)
             return None
 
-        return Sequence(gene_id, sequence, self, aliases=aliases)
+        return Sequence(gene_id=gene_id, uniprot_ac=this_upac, sequence=sequence, source=self, isoform=isoform, is_canonical=is_canonical, aliases=aliases)
 
     def _get_fasta_sequence(self, upid):
         """This function downloads the sequence of the specified UniProt entry
