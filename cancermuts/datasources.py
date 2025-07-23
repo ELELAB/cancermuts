@@ -38,6 +38,7 @@ from .core import Sequence, Mutation
 from .properties import *
 from .metadata import *
 from .log import *
+from .exceptions import UnexpectedIsoformError
 from io import StringIO
 import json
 import re
@@ -333,6 +334,9 @@ class cBioPortal(DynamicSource, object):
 
     def add_mutations(self, sequence, metadata=[]):
         _cBioPortal_supported_metadata = ['cancer_type', 'cancer_study', 'genomic_coordinates', 'genomic_mutations']
+
+        if not sequence.is_canonical:
+            raise UnexpectedIsoformError("cBioPortal mutation annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
 
         if 'entrez' not in sequence.aliases.keys() or sequence.aliases['entrez'] is None:
             self.log.error('Entrez ID alias not available in sequence object')
