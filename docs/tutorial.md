@@ -120,11 +120,11 @@ the canonical UniProt isoform will be used. Notice that, currently, only some
 data sources support alternative isoform; those that do not support them will
 raise exceptions if a Sequence object containing an alternative isoform is provided to them.
 In this case we provide an example which use a non-canonical isoform as input in the 
-`tutorial_isoforms.py` file. It's run in the same way as with the other 
+`tutorial_alternative_isoforms.py` file. It's run in the same way as with the other 
 tutorial scripts:
 
 ```
-$ python tutorial_isoforms.py
+$ python tutorial_alternative_isoforms.py
 ```
 It loads a specific AMBRA1 isoform (since LC3B lacks characterized non-canonical isoforms) and 
 ends after successfully downloading and displaying the isoform sequence.

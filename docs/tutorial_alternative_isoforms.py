@@ -13,6 +13,6 @@ print(seq.sequence)
 # the seq.positions attribute is an ordered list of the protein positions:
 print(seq.positions[0:5])
 
-# confirm canonical status
+# confirm non-canonical status
 print("Is canonical?", seq.is_canonical)
 
