@@ -876,6 +876,10 @@ class PhosphoSite(DynamicSource, object):
 
     def add_position_properties(self, sequence, properties=None):
 
+        if not sequence.is_canonical:
+            raise UnexpectedIsoformError(
+                "PhosphoSite annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
+
         if properties is None:
             properties = self._ptm_types
 

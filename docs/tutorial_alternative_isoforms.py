@@ -1,5 +1,5 @@
 # import the UniProt data source class
-from cancermuts.datasources import UniProt, cBioPortal
+from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite
 from cancermuts.exceptions import *
 
 # create the UniProt object
@@ -24,4 +24,12 @@ try:
     cbioportal.add_mutations(seq)
 except UnexpectedIsoformError:
     print("cBioPortal mutations will not be added, as a non-canonical isoform has been provided")
+
+# PhosphoSite does not support non-canonical mutations
+ps = PhosphoSite('/data/databases/phosphosite/')
+
+try:
+    ps.add_position_properties(seq)
+except UnexpectedIsoformError:
+    print("PhosphoSite annotations will not be added, as a non-canonical isoform has been provided")
 
