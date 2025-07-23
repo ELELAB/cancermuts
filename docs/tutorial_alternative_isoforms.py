@@ -1,5 +1,6 @@
 # import the UniProt data source class
-from cancermuts.datasources import UniProt
+from cancermuts.datasources import UniProt, cBioPortal
+from cancermuts.exceptions import *
 
 # create the UniProt object
 up = UniProt()
@@ -14,5 +15,13 @@ print(seq.sequence)
 print(seq.positions[0:5])
 
 # confirm non-canonical status
-print("Is canonical?", seq.is_canonical)
+print("Is the sequence canonical?", seq.is_canonical)
+
+# cBioPortal does not support non-canonical mutations
+cbioportal = cBioPortal()
+
+try:
+    cbioportal.add_mutations(seq)
+except UnexpectedIsoformError:
+    print("cBioPortal mutations will not be added, as a non-canonical isoform has been provided")
 
