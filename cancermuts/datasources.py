@@ -1206,9 +1206,7 @@ class ClinVar(DynamicSource, object):
             'clinvar_condition',
             'clinvar_review_status',
             'clinvar_genomic_annotation',
-            'clinvar_method',
-            'clinvar_variant_id',
-            'clinvar_variant_name'
+            'clinvar_variant_id'
         ]
 
         for md in metadata:
@@ -1414,10 +1412,7 @@ class ClinVar(DynamicSource, object):
                 mutation.metadata["clinvar_condition"] = [ClinVarCondition(self, data.get("conditions", {}))]
                 mutation.metadata["clinvar_review_status"] = [ClinVarReviewStatus(self, data.get("review_status", {}))]
                 mutation.metadata["clinvar_genomic_annotation"] = [ClinVarGenomicAnnotation(self, data.get("genomic_annotations"))]
-                mutation.metadata["clinvar_method"] = [ClinVarMethod(self, *data.get("methods", []))]
                 mutation.metadata["clinvar_variant_id"] = [ClinVarVariantID(self, clinvar_id)]
-                mutation.metadata["clinvar_variant_name"] = [ClinVarVariantName(self, data.get("variant"))]
-
 
                 # Add mutation to sequence
                 position.add_mutation(mutation)
@@ -1445,7 +1440,7 @@ class ClinVar(DynamicSource, object):
             print("[ClinVar] Wrote variants_to_check.csv")
 
 
-        #Write the file with the the entry not found
+        #Write the file with the entry not found
         if len(not_found_gene) != 0:
             if len(not_found_var) != 0:
                 pd.DataFrame(list(zip(not_found_gene,not_found_var)), 

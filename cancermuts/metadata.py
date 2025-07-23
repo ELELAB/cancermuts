@@ -566,24 +566,6 @@ class ClinVarVariantID(Metadata):
         return f"<ClinVarVariantID {self.variant_id} from {self.source.name}>"
 
 
-class ClinVarVariantName(Metadata):
-    description = "ClinVar variant name"
-    header = "clinvar_variant_name"
-
-    def __init__(self, source, name):
-        super().__init__(source)
-        self.name = str(name)
-
-    def get_value(self):
-        return self.name
-
-    def get_value_str(self):
-        return self.name
-
-    def __repr__(self):
-        return f"<ClinVarVariantName {self.name} from {self.source.name}>"
-
-
 class ClinVarCondition(Metadata):
     description = "ClinVar condition"
     header = "clinvar_condition"
@@ -640,25 +622,6 @@ class ClinVarReviewStatus(Metadata):
         return f"<ClinVarReviewStatus {self.stars} (from: {self.status}) from {self.source.name}>"
 
 
-
-class ClinVarMethod(Metadata):
-    description = "ClinVar method"
-    header = "clinvar_method"
-
-    def __init__(self, source, *methods):
-        super().__init__(source)
-        self.methods = list(methods)
-
-    def get_value(self):
-        return self.methods
-
-    def get_value_str(self):
-        return ", ".join(self.methods)
-
-    def __repr__(self):
-        return f"<ClinVarMethod {self.get_value_str()} from {self.source.name}>"
-
-
 class ClinVarClassification(Metadata):
     description = "ClinVar classification"
     header = "clinvar_classification"
@@ -706,10 +669,8 @@ metadata_classes = {
                      'cancer_site'                 : CancerSite,
                      'cancer_histology'            : CancerHistology,
                      'clinvar_variant_id'         : ClinVarVariantID,
-                     'clinvar_variant_name'       : ClinVarVariantName,
                      'clinvar_condition'          : ClinVarCondition,
                      'clinvar_review_status'      : ClinVarReviewStatus,
-                     'clinvar_method'             : ClinVarMethod,
                      'clinvar_classification'     : ClinVarClassification,
                      'clinvar_genomic_annotation' : ClinVarGenomicAnnotation,
 
