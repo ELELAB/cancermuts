@@ -111,7 +111,7 @@ $ python tutorial_pancancer.py
 Similarly as before, the result should be a `metatable_pancancer.csv` output file
 together with a `my_table_pancancer.pdf` figure.
 
-### Isoform tutorial
+### Alternative isoform tutorial
 
 Cancermuts allows requesting alternative isoforms, if available in UniProt.
 To request a specific isoform, provide a isoform ID, in the form of a UniProt isoform
@@ -126,7 +126,7 @@ tutorial scripts:
 ```
 $ python tutorial_isoforms.py
 ```
-It loads a specific AMBRA1 isoform (here we use AMBRA1 because LC3B has not-main isoforms) and 
+It loads a specific AMBRA1 isoform (since LC3B lacks characterized non-canonical isoforms) and 
 ends after successfully downloading and displaying the isoform sequence.
 
 ## Tutorial steps
