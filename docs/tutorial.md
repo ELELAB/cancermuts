@@ -121,7 +121,7 @@ data sources support alternative isoform; those that do not support them will
 raise exceptions if a Sequence object containing an alternative isoform is provided to them.
 In this case we provide an example which use a non-canonical isoform as input in the 
 `tutorial_alternative_isoforms.py` file. It's run in the same way as with the other 
-tutorial scripts:
+tutorial script:
 
 ```
 $ python tutorial_alternative_isoforms.py
