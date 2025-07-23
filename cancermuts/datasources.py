@@ -27,7 +27,7 @@ Classes to interrogate data sources and annotate various data
 """
 
 import time
-import requests
+#import requests
 import requests as rq
 from bioservices.uniprot import UniProt as bsUniProt
 from Bio.PDB.Polypeptide import three_to_index, index_to_one
@@ -706,14 +706,14 @@ class ClinVar(DynamicSource, object):
         Returns
         -------
         response 
-            output from the function requests.get()
+            output from the function rq.get()
         '''
         max_retries = 200
         attempts = 0
         delay = 3
         while attempts < max_retries:
             try:
-                response = requests.get(URL)
+                response = rq.get(URL)
             except:
                 print(f"WARNING: An error occurred during the ClinVar databse query."
                       f" Will try again in {delay} seconds (attempt {attempts+1}/{max_retries})")
