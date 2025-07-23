@@ -21,9 +21,7 @@ from cancermuts.datasources import cBioPortal, COSMIC
 
 # add mutations from cBioPortal
 
-cb = cBioPortal(cancer_studies=['coadread_dfci_2016',
-                                'coadread_genentech',
-                                'coadread_tcga_pan_can_atlas_2018'])
+cb = cBioPortal()
 
 cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
 
