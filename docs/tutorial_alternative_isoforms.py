@@ -1,5 +1,5 @@
 # import the UniProt data source class
-from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite
+from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, MobiDB
 from cancermuts.exceptions import *
 
 # create the UniProt object
@@ -33,3 +33,10 @@ try:
 except UnexpectedIsoformError:
     print("PhosphoSite annotations will not be added, as a non-canonical isoform has been provided")
 
+# MobiDB does not suport non-canonical mutations
+mdb = MobiDB()
+
+try:
+    mdb.add_position_properties(seq)
+except UnexpectedIsoformError:
+    print("MobiDB annotations will not be added, as a non-canonical isoform has been provided")

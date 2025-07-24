@@ -1828,6 +1828,10 @@ class MobiDB(DynamicSource):
         self._supported_properties = { 'mobidb_disorder_propensity' : self._get_mobidb_disorder_predictions }
 
     def add_position_properties(self, sequence, prop=['mobidb_disorder_propensity'], use_alias='uniprot_acc'):
+        
+        if not sequence.is_canonical:
+            raise UnexpectedIsoformError("MobiDB mutation annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
+
         if type(prop) is str:
             props = [prop]
         else:
