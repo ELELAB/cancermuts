@@ -235,7 +235,7 @@ class Table:
                             md_values.append(this_value)
                             self.log.info(f"appending {single_md.get_value_str()}")
                         self.log.info(f"values to be joined {md}: {sorted(list(set(md_values)))}")
-                        md_str = ", ".join(sorted(list(set(md_values))))
+                        md_str = ", ".join(list(map(str, sorted(set(md_values)))))
                     except KeyError:
                         md_str = None
                     this_row.append(md_str)

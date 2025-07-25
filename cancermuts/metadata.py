@@ -587,24 +587,24 @@ class ClinVarReviewStatus(Metadata):
     header = "clinvar_review_status"
 
     stars_map = {
-        'practice guideline': '4', 
-        'reviewed by expert panel': '3', 
-        'criteria provided, multiple submitters, no conflicts': '2',
+        'practice guideline': 4, 
+        'reviewed by expert panel': 3, 
+        'criteria provided, multiple submitters, no conflicts': 2,
         'criteria provided, multiple submitters': 'NA',
-        'criteria provided, conflicting interpretations': '1',
-        'criteria provided, conflicting classifications': '1',
-        'criteria provided, single submitter': '1',
-        'no assertion for the individual variant': '0', 
-        'no interpretation for the single variant': '0',
-        'no assertion criteria provided': '0', 
-        'no assertion provided': '0',
-        'no classification provided': '0'
+        'criteria provided, conflicting interpretations': 1,
+        'criteria provided, conflicting classifications': 1,
+        'criteria provided, single submitter': 1,
+        'no assertion for the individual variant': 0, 
+        'no interpretation for the single variant': 0,
+        'no assertion criteria provided': 0, 
+        'no assertion provided': 0,
+        'no classification provided': 0
     }
 
     def __init__(self, source, data):
         super().__init__(source)
         self.status = data["GermlineClassification"]
-        self.stars = self.stars_map.get(self.status.lower(), "0") if self.status else "0"
+        self.stars = self.stars_map[self.status]
 
     def get_value(self):
         return self.stars
