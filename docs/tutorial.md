@@ -76,6 +76,8 @@ the gathered information.
 
 ## Tutorial script
 
+### Canonical isoform tutorial
+
 The steps performed in the following tutorial are also written in a pre-built
 Python script available in the `docs` folder, called `tutorial.py`. In order
 to run it, you should have installed the Cancermuts package and activated the
@@ -108,6 +110,24 @@ $ python tutorial_pancancer.py
 
 Similarly as before, the result should be a `metatable_pancancer.csv` output file
 together with a `my_table_pancancer.pdf` figure.
+
+### Alternative isoform tutorial
+
+Cancermuts allows requesting alternative isoforms, if available in UniProt.
+To request a specific isoform, provide a isoform ID, in the form of a UniProt isoform
+identifier, to the isoform argument, as in the following example. If this is not done,
+the canonical UniProt isoform will be used. Notice that, currently, only some
+data sources support alternative isoform; those that do not support them will
+raise exceptions if a Sequence object containing an alternative isoform is provided to them.
+In this case we provide an example which use a non-canonical isoform as input in the 
+`tutorial_alternative_isoforms.py` file. It's run in the same way as with the other 
+tutorial script:
+
+```
+$ python tutorial_alternative_isoforms.py
+```
+It loads a specific AMBRA1 isoform (since LC3B lacks characterized non-canonical isoforms) and 
+ends after successfully downloading and displaying the isoform sequence.
 
 ## Tutorial steps
 
@@ -148,15 +168,6 @@ MPSEKTFKQRRTFEQRVEDVRLIREQHPTKIPVIIERYKGEKQLPVLDKTKFLVPDHVNMSELIKIIRRRLQLNANQAFF
 >>> seq.positions[0:3]
 
 ```
-
-### Optional: Requesting a specific isoform
-
-Cancermuts allows requesting alternative isoforms, if available in UniProt.
-To request a specific isoform, provide a isoform ID, in the form of a UniProt isoform
-identifier, to the isoform argument, as in the following example. If this is not done,
-the canonical UniProt isoform will be used. Notice that, currently, only some
-data sources support alternative isoform; those that do not support them will
-raise exceptions if a Sequence object containing an alternative isoform is provided to them.
 
 ```py
 
