@@ -33,7 +33,7 @@ try:
 except UnexpectedIsoformError:
     print("PhosphoSite annotations will not be added, as a non-canonical isoform has been provided")
 
-# MobiDB does not suport non-canonical mutations
+# MobiDB does not suport non-canonical positions
 mdb = MobiDB()
 
 try:
