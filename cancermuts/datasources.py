@@ -1192,8 +1192,53 @@ class ClinVar(DynamicSource, object):
                 print(f"no review status associated to {classification_type} classification for variant {clinvar_id}")
 
         return review_status
-    
-    
+
+    def parse_genomic_annotations(self, annotation_string):
+        """
+        Parse ClinVar-style annotation strings into GenomicMutation objects.
+
+        - Converts genome builds (GRCh38 → hg38, GRCh37 → hg19)
+        - Handles both SNVs and indels
+
+        Parameters
+        ----------
+        annotation_string : str
+            Example: "GRCh38,NC_000016.10:g.87402982T>C GRCh37,NC_000016.9:g.87436588T>C".
+
+        Returns
+        -------
+        dict
+            Keys are genome builds ('hg19', 'hg38') and values are GenomicMutation objects.
+        """
+        genomic_mutations = {}
+        for ann in annotation_string.strip().split():
+            try:
+                genome_build, hgvs = ann.split(",")
+
+                # Normalize genome build
+                if genome_build == "GRCh38":
+                    genome_build = "hg38"
+                elif genome_build == "GRCh37":
+                    genome_build = "hg19"
+
+                # Extract just the part after 'NC_...:g.' (e.g., "123A>G" or "123_124delinsAA")
+                hgvs_match = re.search(r"NC_0*(\d+)\.\d+:g\.(.+)", hgvs)
+                if not hgvs_match:
+                    continue
+
+                chrom = hgvs_match.group(1)
+                raw_change = hgvs_match.group(2)
+
+                definition = f"{int(chrom)}:g.{raw_change}"
+
+                # Instantiate GenomicMutation directly
+                gm = GenomicMutation(source=self, genome_build=genome_build, definition=definition)
+                genomic_mutations[genome_build] = gm
+
+            except Exception as e:
+                self.log.warning(f"Could not parse annotation: {ann} → {e}")
+        return genomic_mutations
+
     def add_mutations(self, sequence, metadata=[]):
         gene = sequence.gene_id
         refseq = sequence.aliases.get("refseq")
@@ -1205,8 +1250,9 @@ class ClinVar(DynamicSource, object):
             'clinvar_classification',
             'clinvar_condition',
             'clinvar_review_status',
-            'clinvar_genomic_annotation',
-            'clinvar_variant_id'
+            'genomic_mutations',
+            'clinvar_variant_id',
+            'genomic_coordinates'
         ]
 
         for md in metadata:
@@ -1224,10 +1270,8 @@ class ClinVar(DynamicSource, object):
         var_other_iso = 0
         uncanonical_annotation = 0
 
-
-        filter_missense_variants = "(" + gene + "%5Bgene%5D%20AND%20((%22missense%20variant%22%5Bmolecular%20consequence%5D%20OR%20%22SO%200001583%22%5Bmolecular%20consequence%5D)))"
+        filter_missense_variants = f'({gene}[gene] AND ("missense variant"[molecular consequence] OR "SO:0001583"[molecular consequence]))'
         mutation_type = "missense"
-
 
         try:
             clinvar_ids, out_gene = self.filtered_variants_extractor(filter_missense_variants, gene, refseq, mutation_type)
@@ -1238,7 +1282,6 @@ class ClinVar(DynamicSource, object):
         if not clinvar_ids:
             not_found_gene.append(out_gene)
             return
-
 
         # Step 1: Prepare classification-based queries for consistence check:
         filter_ids = {}
@@ -1261,10 +1304,8 @@ class ClinVar(DynamicSource, object):
             if clinvar_ids_class:
                 filter_ids[classification] = [clinvar_ids_class, [gene], [refseq]]
 
-
         for clinvar_id in clinvar_ids:
             missense_variants[clinvar_id] = {"gene": gene, "isoform": refseq}
-
 
         counter = 0
         for clinvar_id in missense_variants:
@@ -1310,6 +1351,7 @@ class ClinVar(DynamicSource, object):
                 methods = methods[0]
             review_status = self.review_status_extractor(parse_VCV,clinvar_id)
             genomic_annotations = self.genomic_annotation_extractor(hgvss_genomic)
+            genomic_annotations_obj = self.parse_genomic_annotations(genomic_annotations)
 
             if correct_variant == "wrong isoform":
                 print(f"The {clinvar_id} clinvar id for {gene} gene does not contain any mutation in the isoform provided as input. The entry will be added to entry_not_found.csv")
@@ -1328,8 +1370,9 @@ class ClinVar(DynamicSource, object):
                     "conditions": conditions,
                     "review_status": review_status,
                     "methods": methods,
-                    "genomic_annotations": genomic_annotations
+                    "genomic_annotations_obj": genomic_annotations_obj
                 })
+
             else:
                 clinvar_id_features = {}
                 clinvar_id_features["variant"] = correct_variant
@@ -1406,13 +1449,20 @@ class ClinVar(DynamicSource, object):
                 # Create mutation
                 mutation = Mutation(position, alt, [self])
 
-
                 # Direct assignment to mutation.metadata using metadata classes
                 mutation.metadata["clinvar_classification"] = [ClinVarClassification(self, data.get("classifications", {}))]
                 mutation.metadata["clinvar_condition"] = [ClinVarCondition(self, data.get("conditions", {}))]
                 mutation.metadata["clinvar_review_status"] = [ClinVarReviewStatus(self, data.get("review_status", {}))]
-                mutation.metadata["clinvar_genomic_annotation"] = [ClinVarGenomicAnnotation(self, data.get("genomic_annotations"))]
+                mutation.metadata["genomic_mutations"] = list(data["genomic_annotations_obj"].values())
                 mutation.metadata["clinvar_variant_id"] = [ClinVarVariantID(self, clinvar_id)]
+                mutation.metadata["genomic_coordinates"] = [
+                    GenomicCoordinates(self, gm.genome_build, gm.chr,
+                    gm.coord if gm.is_snv else gm.coord_start,
+                    gm.coord if gm.is_snv else gm.coord_end,
+                    gm.ref if gm.is_snv else gm.substitution)
+                    for gm in genomic_annotations_obj.values()
+                ]
+
 
                 # Add mutation to sequence
                 position.add_mutation(mutation)
@@ -1421,8 +1471,6 @@ class ClinVar(DynamicSource, object):
 
             except Exception as e:
                 print(f"[ClinVar] Failed to process mutation for {clinvar_id}: {e}")
-
-
 
         # === Write auxiliary files ===
 

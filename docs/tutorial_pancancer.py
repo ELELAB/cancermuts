@@ -60,8 +60,9 @@ clinvar.add_mutations(seq, metadata=[
     'clinvar_classification',
     'clinvar_condition',
     'clinvar_review_status',
-    'clinvar_genomic_annotation',
-    'clinvar_variant_id'
+    'clinvar_variant_id',
+    'genomic_mutations',
+    'genomic_coordinates'
 ])
 
 # Check ClinVar Variant

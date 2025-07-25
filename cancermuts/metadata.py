@@ -636,26 +636,6 @@ class ClinVarClassification(Metadata):
     def get_value_str(self):
         return self.classification
 
-
-class ClinVarGenomicAnnotation(Metadata):
-    description = "ClinVar genomic annotation"
-    header = "clinvar_genomic_annotation"
-
-    def __init__(self, source, annotation):
-        super().__init__(source)
-        self.annotation = str(annotation)
-
-    def get_value(self):
-        return self.annotation
-
-    def get_value_str(self):
-        return self.annotation
-
-    def __repr__(self):
-        return f"<ClinVarGenomicAnnotation {self.annotation} from {self.source.name}>"
-
-
-
 metadata_classes = { 
                      'cancer_type'                 : CancerType,
                      'cancer_study'                : CancerStudy,
@@ -672,6 +652,5 @@ metadata_classes = {
                      'clinvar_condition'          : ClinVarCondition,
                      'clinvar_review_status'      : ClinVarReviewStatus,
                      'clinvar_classification'     : ClinVarClassification,
-                     'clinvar_genomic_annotation' : ClinVarGenomicAnnotation,
 
                     }

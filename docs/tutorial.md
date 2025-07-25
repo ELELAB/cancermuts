@@ -398,7 +398,8 @@ Once the RefSeq is set, we can annotate the sequence object with all ClinVar mis
 ...     'clinvar_classification',
 ...     'clinvar_condition',
 ...     'clinvar_review_status',
-...     'clinvar_genomic_annotation',
+...     'genomic_mutations',
+...     'genomic_coordinates',
 ...     'clinvar_variant_id'
 ... ])
 
@@ -435,7 +436,7 @@ Each mutation is recorded in a Mutation object that can be further explored:
 ### Additional mutation metadata
 
 Cancermuts allows to enrich the downloaded mutations with further metadata. We
-will see now how to download the REVEL pathogenicy score and the gnomAD allele
+will see now how to download the REVEL pathogenicity score and the gnomAD allele
 frequency for each specific variant.
 
 #### REVEL score from MyVariant
