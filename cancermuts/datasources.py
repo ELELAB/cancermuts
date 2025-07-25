@@ -550,14 +550,6 @@ class ClinVar(DynamicSource, object):
         description = "ClinVar mutation database"
         super(ClinVar, self).__init__(name='ClinVar', version='', description=description)
 
-    three_one_letter_annotation = {
-        'Ala': 'A', 'Arg': 'R', 'Asn': 'N', 'Asp': 'D', 'Cys': 'C', 'Gln': 'Q',
-        'Glu': 'E', 'Gly': 'G', 'His': 'H', 'Ile': 'I', 'Leu': 'L', 'Lys': 'K',
-        'Met': 'M', 'Phe': 'F', 'Pro': 'P', 'Ser': 'S', 'Thr': 'T', 'Trp': 'W',
-        'Tyr': 'Y', 'Val': 'V', 'Ter': '*'
-    }
-
-
 #----------------------------------------- utility functions -----------------------------------------------#
 
 
@@ -1433,7 +1425,10 @@ class ClinVar(DynamicSource, object):
                 three_letter_mut = "p." + match.group(1)
 
                 # Convert 3-letter to 1-letter format
-                one_letter_mut = self.mutations_convert(three_letter_mut, self.three_one_letter_annotation, print_message=True)
+                ref_aa = index_to_one(three_to_index(str.upper(three_letter_mut[2:5])))
+                pos = re.search(r"[0-9]+", three_letter_mut).group(0)
+                alt_aa = index_to_one(three_to_index(str.upper(three_letter_mut[-3:])))
+                one_letter_mut = f"{ref_aa}{pos}{alt_aa}"
 
                 # Parse one-letter mutation format
                 ref, pos, alt = one_letter_mut[0], int(one_letter_mut[1:-1]), one_letter_mut[-1]
@@ -1462,7 +1457,6 @@ class ClinVar(DynamicSource, object):
                     gm.ref if gm.is_snv else gm.substitution)
                     for gm in genomic_annotations_obj.values()
                 ]
-
 
                 # Add mutation to sequence
                 position.add_mutation(mutation)
