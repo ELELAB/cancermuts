@@ -581,9 +581,10 @@ class cBioPortal(DynamicSource, object):
 
         return mutations, out_metadata
 
+
 class COSMIC(DynamicSource, object):
     @logger_init
-    def __init__(self, database_files, database_encoding=None):
+    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, transcript_database_file, database_encoding=None):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
 
@@ -591,60 +592,102 @@ class COSMIC(DynamicSource, object):
         self._mut_prog = re.compile(self._mut_regexp)
         self._mut_snv_regexp = '^[0-9]+:g\.[0-9+][ACTG]>[ACTG]'
         self._mut_snv_prog = re.compile(self._mut_snv_regexp)
-        self._site_kwd = ['Primary site', 'Site subtype 1', 'Site subtype 2', 'Site subtype 3']
-        self._histology_kwd = ['Primary histology', 'Histology subtype 1', 'Histology subtype 2', 'Histology subtype 3']
-        self._use_cols_snp = [  'Gene name',
-                                 'Mutation AA',
-                                 'GRCh',
-                                 'Mutation genome position',
-                                 'Mutation CDS',
-                                 'Mutation strand',
-                                 'SNP',
-                                 'HGVSG' ] + self._site_kwd + self._histology_kwd
+        self._cosmic_phenotype_id_kwd = ['COSMIC_PHENOTYPE_ID']
+        self._site_kwd = ['PRIMARY_SITE', 'SITE_SUBTYPE_1', 'SITE_SUBTYPE_2', 'SITE_SUBTYPE_3']
+        self._histology_kwd = ['PRIMARY_HISTOLOGY', 'HISTOLOGY_SUBTYPE_1', 'HISTOLOGY_SUBTYPE_2', 'HISTOLOGY_SUBTYPE_3']
 
-        self._use_cols = [  'Gene name',
-                            'Mutation AA',
-                            'GRCh',
-                            'Mutation genome position',
-                            'Mutation CDS',
-                            'Mutation strand',
-                            'HGVSG' ] + self._site_kwd + self._histology_kwd
+        self._use_cols_database_files = ['GENE_SYMBOL',
+                                'TRANSCRIPT_ACCESSION',
+                                'COSMIC_PHENOTYPE_ID',
+                                 'MUTATION_AA',
+                                 'CHROMOSOME',
+                                 'GENOME_START',
+                                 'GENOME_STOP',
+                                 'MUTATION_CDS',
+                                 'STRAND',
+                                 'HGVSG']
 
-        dataframes = []
+        self._use_cols_classification_files = self._cosmic_phenotype_id_kwd + self._site_kwd + self._histology_kwd
 
-        if isinstance(database_files, str):
-            self._database_files = [database_files]
+        self._use_cols_transcript_files = ['TRANSCRIPT_ACCESSION','IS_CANONICAL']
+
+        if isinstance(targeted_database_file, str):
+            self._targeted_database_file = targeted_database_file
         else:
-            if hasattr(database_files,'__iter__') and len(database_files) > 0:
-                self._database_files = database_files
-            else:
-                self.log.error('COSMIC database_files does not have the correct format.')
-                raise TypeError('COSMIC database_files does not have the correct format.')
+            self.log.error('COSMIC targeted_database_file does not have the correct format.')
+            raise TypeError('COSMIC targeted_database_file does not have the correct format.')
 
+        if isinstance(screen_mutant_database_file, str):
+            self._screen_mutant_database_file = screen_mutant_database_file
+        else:
+            self.log.error('COSMIC screen_mutant_database_file does not have the correct format.')
+            raise TypeError('COSMIC screen_mutant_database_file does not have the correct format.')
+
+        if isinstance(classification_database_file, str):
+            self._classification_database_file = classification_database_file
+        else:
+            self.log.error('COSMIC classification_database_file does not have the correct format.')
+            raise TypeError('COSMIC classification_database_file does not have the correct format.')
+
+        if isinstance(transcript_database_file, str):
+            self._transcript_database_file = transcript_database_file
+        else:
+            self.log.error('COSMIC transcript_database_file does not have the correct format.')
+            raise TypeError('COSMIC transcript_database_file does not have the correct format.')
 
         if database_encoding is None or isinstance(database_encoding, str):
-            encodings = [ database_encoding for i in self._database_files ]
+            encoding = database_encoding
         else:
-            if len(database_encoding) != len(self._database_files):
-                raise TypeError("encoding for COSMIC database files must be None, a single string, or "
-                        "a list of strings, one per file")
-            encodings = database_encoding
+            self.log.errror('encoding for COSMIC database files must be None, or a single string that applioes to all files')
+            raise TypeError('encoding for COSMIC database files must be None, or a single string that applies to all files')
+        encoding = database_encoding
 
-        for fi, f in enumerate(self._database_files):
-            self.log.info("Parsing database file %s ..." % f)
-            try:
-                dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_snp, encoding=encodings[fi]) )
-            except ValueError:
-                try:
-                    dataframes.append( pd.read_csv(f, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols, encoding=encodings[fi]) )
-                except ValueError:
-                    self.log.error("Couldn't parse database file {}".format(fi))
-                    self._df = None
-                    return
+        self.log.info("Parsing targeted database file...")
+        try:
+            targeted_df = pd.read_csv(self._targeted_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=encoding)
+        except ValueError:
+            self.log.error("Couldn't parse targeted database file due to invalid format or missing columns.")
+            raise TypeError("Couldn't parse targeted database file due to invalid format or missing columns")
 
-        self._df = pd.concat(dataframes, ignore_index=True, sort=False)
+        self.log.info("Parsing screen mutant database file...")
+        try:
+            screenmut_df = pd.read_csv(self._screen_mutant_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=encoding)
+        except ValueError:
+            self.log.error("Couldn't parse screen mutant database file due to invalid format or missing columns")
+            raise TypeError("Couldn't parse screen mutant database file due to invalid format or missing columns")
 
-    def _parse_db_file(self, gene_id, cancer_types=None,
+        tmp_targeted_screenmut_df = pd.concat([targeted_df, screenmut_df], ignore_index=True, sort=False)
+
+        self.log.info("Parsing classification database file...")
+        try:
+            classification_df = pd.read_csv(self._classification_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_classification_files, encoding=encoding)
+        except ValueError:
+            self.log.error("Couldn't parse classification database file due to invalid format or missing columns")
+            raise TypeError("Couldn't parse classification database file due to invalid format or missing columns")
+
+        self.log.info("Parsing transcript database file...")
+        try:
+            transcript_df = pd.read_csv(self._transcript_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_transcript_files, encoding=encoding)
+        except ValueError:
+            self.log.error("Couldn't parse transcript database file due to invalid format or missing columns")
+            raise TypeError("Couldn't parse transcript database file due to invalid format or missing columns")
+
+        self.log.info("Merging database files into a dataframe...")
+        try:
+            tmp_targeted_screenmut_classification_df = tmp_targeted_screenmut_df.merge(classification_df, on = 'COSMIC_PHENOTYPE_ID')
+        except KeyError:
+            self.log.error("Couldn't merge database files due to missing or incorrectly named join columns")
+            raise TypeError("Couldn't merge database files due to missing or incorrectly named join columns")
+
+        try:
+            self._df = tmp_targeted_screenmut_classification_df.merge(transcript_df, on = 'TRANSCRIPT_ACCESSION')
+        except KeyError:
+            self.log.error("Couldn't merge database files due to missing or incorrectly named join columns")
+            raise TypeError("Couldn't merge database files due to missing or incorrectly named join columns")
+
+
+    def _parse_db_file(self, gene_id, genome_assembly_version = 'GRCh38',
+                       cancer_types=None,
                        cancer_histology_subtype_1=None,
                        cancer_histology_subtype_2=None,
                        cancer_histology_subtype_3=None,
@@ -652,7 +695,7 @@ class COSMIC(DynamicSource, object):
                        cancer_site_subtype_1=None,
                        cancer_site_subtype_2=None,
                        cancer_site_subtype_3=None,
-                       metadata=[], filter_snps=True):
+                       metadata=[]):
 
         mutations = []
 
@@ -676,59 +719,54 @@ class COSMIC(DynamicSource, object):
             out_metadata['cancer_histology'] = []
             do_histology = True
 
-        df = self._df[ self._df['Gene name'] == gene_id ]
-
-        if filter_snps:
-            if 'SNP' in df.columns:
-                df = df[ df['SNP'] != 'y' ]
-            else:
-                self.log.warning("Could not filter COSMIC for SNP as SNP column is not present")
+        df = self._df[ (self._df['GENE_SYMBOL'] == gene_id) & (self._df['IS_CANONICAL'] == 'y')]
 
         if cancer_types is not None:
-            df = df[ df['Primary histology'  ].isin(cancer_types) ]
+            df = df[ df['PRIMARY_HISTOLOGY'].isin(cancer_types) ]
         if cancer_histology_subtype_1 is not None:
-            df = df[ df['Histology subtype 1'].isin(cancer_histology_subtype_1) ]
+            df = df[ df['HISTOLOGY_SUBTYPE_1'].isin(cancer_histology_subtype_1) ]
         if cancer_histology_subtype_2 is not None:
-            df = df[ df['Histology subtype 2'].isin(cancer_histology_subtype_2) ]
+            df = df[ df['HISTOLOGY_SUBTYPE_2'].isin(cancer_histology_subtype_2) ]
         if cancer_histology_subtype_3 is not None:
-            df = df[ df['Histology subtype 3'].isin(cancer_histology_subtype_3) ]
+            df = df[ df['HISTOLOGY_SUBTYPE_3'].isin(cancer_histology_subtype_3) ]
 
         if cancer_sites is not None:
-            df = df[ df['Primary site'  ].isin(cancer_sites) ]
+            df = df[ df['PRIMARY_SITE'].isin(cancer_sites) ]
         if cancer_site_subtype_1 is not None:
-            df = df[ df['Site subtype 1'].isin(cancer_site_subtype_1) ]
+            df = df[ df['SITE_SUBTYPE_1'].isin(cancer_site_subtype_1) ]
         if cancer_site_subtype_2 is not None:
-            df = df[ df['Site subtype 2'].isin(cancer_site_subtype_2) ]
+            df = df[ df['SITE_SUBTYPE_2'].isin(cancer_site_subtype_2) ]
         if cancer_site_subtype_3 is not None:
-            df = df[ df['Site subtype 3'].isin(cancer_site_subtype_3) ]
+            df = df[ df['SITE_SUBTYPE_3'].isin(cancer_site_subtype_3) ]
 
-        df = df[ df['Mutation AA'].notna() ]
+        df = df[ df['MUTATION_AA'].notna() ]
 
-        df = df[ df.apply(lambda x: bool(self._mut_prog.match(x['Mutation AA'])), axis=1) ]
+        df = df[ df.apply(lambda x: bool(self._mut_prog.match(x['MUTATION_AA'])), axis=1) ]
 
         for r in df.iterrows():
             r = r[1]
-            mutations.append(r['Mutation AA'])
+            mutations.append(r['MUTATION_AA'])
 
             if do_cancer_type:
-                out_metadata['cancer_type'].append([r['Primary histology']])
+                out_metadata['cancer_type'].append([r['PRIMARY_HISTOLOGY']])
 
             if do_genomic_coordinates or do_genomic_mutations:
                 gd = []
-                grch = str(r['GRCh'])
-                if grch == '38':
-                    gd.append('hg38') # genome version
-                elif grch == '37' or grch == '19':
+                if not isinstance(genome_assembly_version, str):
+                    raise TypeError(f"Incorrect format for genome assembly version")
+                grch = str(genome_assembly_version)
+                if grch == 'GRCh38'or grch == 'hg38':
+                    gd.append('hg38')
+                elif grch == 'GRCh37' or grch == 'hg19':
                     gd.append('hg19')
                 else:
-                    gd = None
-                    self.log.warning("Genome assembly not specified for mutation; genomic coordinates won't be annotated")
+                    raise ValueError(f"Unsupported genome assembly version {grch}")
 
-                if gd is not None:
-                    tmp2 = r['Mutation genome position'].split(":")
-                    gd.append(tmp2[0]) # chr
-                    gd.extend(tmp2[1].split("-")) # [start, end]
-                    gd.append(r['Mutation CDS'][-3]) # ref
+
+                gd.append(r['CHROMOSOME'])
+                gd.append(r['GENOME_START'])
+                gd.append(r['GENOME_STOP'])
+                gd.append(r['MUTATION_CDS'][-3])
 
             if do_genomic_coordinates:
                 out_metadata['genomic_coordinates'].append(gd)
@@ -749,7 +787,8 @@ class COSMIC(DynamicSource, object):
 
         return mutations, out_metadata
 
-    def add_mutations(self, sequence, cancer_types=None,
+    def add_mutations(self, sequence, genome_assembly_version = 'GRCh38',
+                    cancer_types=None,
                     cancer_histology_subtype_1=None,
                     cancer_histology_subtype_2=None,
                     cancer_histology_subtype_3=None,
@@ -757,7 +796,7 @@ class COSMIC(DynamicSource, object):
                     cancer_site_subtype_1=None,
                     cancer_site_subtype_2=None,
                     cancer_site_subtype_3=None,
-                    use_alias=None, filter_snps=True, metadata=[]):
+                    use_alias=None, metadata=[]):
         _cosmic_supported_metadata = ['cancer_type', 'genomic_coordinates', 'genomic_mutations', 'cancer_site', 'cancer_histology']
 
         for md in metadata:
@@ -773,7 +812,8 @@ class COSMIC(DynamicSource, object):
         else:
             gene_id = sequence.gene_id
 
-        raw_mutations, out_metadata = self._parse_db_file(gene_id, cancer_types=cancer_types,
+        raw_mutations, out_metadata = self._parse_db_file(gene_id, genome_assembly_version = genome_assembly_version,
+                                                            cancer_types=cancer_types,
                                                             cancer_histology_subtype_1=cancer_histology_subtype_1,
                                                             cancer_histology_subtype_2=cancer_histology_subtype_2,
                                                             cancer_histology_subtype_3=cancer_histology_subtype_3,
@@ -1341,7 +1381,7 @@ class ggetELMPredictions(StaticSource, object):
         self.log.info("adding gget ELM predictions to sequence ...")
 
         data = self._get_prediction(sequence.sequence)
-        
+
         for _, r in data.iterrows():
 
             if re.match(exclude_elm_classes, r['ELMIdentifier']):
