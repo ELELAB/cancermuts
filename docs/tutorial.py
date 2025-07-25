@@ -10,6 +10,11 @@ seq = up.get_sequence('MAP1LC3B')
 # alternatively, we can specifically ask for a Uniprot ID
 seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
 
+# OPTIONAL: Use a specific UniProt isoform instead of canonical
+# seq = up.get_sequence("AMBRA1", isoform='Q9C0C7-2')
+
+aeq.aliases["refseq"] = "NP_073729"
+
 # this prints the downloaded protein sequence
 print(seq.sequence)
 
@@ -17,7 +22,7 @@ print(seq.sequence)
 seq.positions[0:3]
 
 # import data sources classes
-from cancermuts.datasources import cBioPortal, COSMIC
+from cancermuts.datasources import cBioPortal, COSMIC, ClinVar
 
 # add mutations from cBioPortal
 
@@ -55,7 +60,26 @@ print(seq.positions[64].mutations[0])
 print(seq.positions[64].mutations[0].sources)
 
 print(seq.positions[64].mutations[0].metadata)
-                                         
+
+# add mutations from ClinVar
+clinvar = ClinVar()
+clinvar.add_mutations(seq, metadata=[
+    'clinvar_classification',
+    'clinvar_condition',
+    'clinvar_review_status',
+    'clinvar_genomic_annotation',
+    'clinvar_method',
+    'clinvar_variant_id',
+    'clinvar_variant_name'
+])
+
+# Check ClinVar Variant
+print(seq.positions[14].mutations)
+print(seq.positions[14].mutations[0].sources)
+print(seq.positions[14].mutations[0].mutated_residue_type)
+print(seq.positions[14].mutations[0].metadata['clinvar_condition'][0].get_value_str())
+print(seq.positions[14].mutations[0].metadata['clinvar_classification'][0].get_value_str())
+
 # add annotations from MyVariant (REVEL)
 from cancermuts.datasources import MyVariant
 
