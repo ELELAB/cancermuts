@@ -572,7 +572,7 @@ class ClinVarCondition(Metadata):
 
     def __init__(self, source, data):
         super().__init__(source)
-        conds = data.get("GermlineClassification")
+        conds = data["GermlineClassification"]
         self.conditions = conds if isinstance(conds, list) else [conds]
 
     def get_value(self):
@@ -603,7 +603,7 @@ class ClinVarReviewStatus(Metadata):
 
     def __init__(self, source, data):
         super().__init__(source)
-        self.status = data.get("GermlineClassification")
+        self.status = data["GermlineClassification"]
         self.stars = self.stars_map.get(self.status.lower(), "0") if self.status else "0"
 
     def get_value(self):
@@ -628,7 +628,7 @@ class ClinVarClassification(Metadata):
 
     def __init__(self, source, data):
         super().__init__(source)
-        self.classification = data.get("GermlineClassification")
+        self.classification = data["GermlineClassification"]
 
     def get_value(self):
         return self.classification

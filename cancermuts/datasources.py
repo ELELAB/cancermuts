@@ -1241,7 +1241,7 @@ class ClinVar(DynamicSource, object):
 
     def add_mutations(self, sequence, metadata=[]):
         gene = sequence.gene_id
-        refseq = sequence.aliases.get("refseq")
+        refseq = sequence.aliases["refseq"]
         if not refseq:
             raise ValueError("Missing RefSeq identifier in sequence.aliases['refseq']")
 
@@ -1450,9 +1450,9 @@ class ClinVar(DynamicSource, object):
                 mutation = Mutation(position, alt, [self])
 
                 # Direct assignment to mutation.metadata using metadata classes
-                mutation.metadata["clinvar_classification"] = [ClinVarClassification(self, data.get("classifications", {}))]
-                mutation.metadata["clinvar_condition"] = [ClinVarCondition(self, data.get("conditions", {}))]
-                mutation.metadata["clinvar_review_status"] = [ClinVarReviewStatus(self, data.get("review_status", {}))]
+                mutation.metadata["clinvar_classification"] = [ClinVarClassification(self, data["classifications"])]
+                mutation.metadata["clinvar_condition"] = [ClinVarCondition(self, data["conditions"])]
+                mutation.metadata["clinvar_review_status"] = [ClinVarReviewStatus(self, data["review_status"])]
                 mutation.metadata["genomic_mutations"] = list(data["genomic_annotations_obj"].values())
                 mutation.metadata["clinvar_variant_id"] = [ClinVarVariantID(self, clinvar_id)]
                 mutation.metadata["genomic_coordinates"] = [
