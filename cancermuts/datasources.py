@@ -52,6 +52,7 @@ from bravado.client import SwaggerClient
 from bravado.requests_client import RequestsClient
 from requests.adapters import HTTPAdapter
 import gget
+from io import StringIO
 
 
 import sys
@@ -540,7 +541,7 @@ class cBioPortal(DynamicSource, object):
 
 class COSMIC(DynamicSource, object):
     @logger_init
-    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, transcript_database_file, database_encoding=None):
+    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, transcript_database_file, database_encoding=None, gene_id = None):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
 
@@ -566,7 +567,7 @@ class COSMIC(DynamicSource, object):
         self._use_cols_classification_files = self._cosmic_phenotype_id_kwd + self._site_kwd + self._histology_kwd
 
         self._use_cols_transcript_files = ['TRANSCRIPT_ACCESSION','IS_CANONICAL']
-
+        self._gene_id = gene_id
         if isinstance(targeted_database_file, str):
             self._targeted_database_file = targeted_database_file
         else:
@@ -598,20 +599,37 @@ class COSMIC(DynamicSource, object):
             raise TypeError('encoding for COSMIC database files must be None, or a single string that applies to all files')
         encoding = database_encoding
 
+        if self._gene_id is None:
+            filtered_targeted_database_file = self._targeted_database_file
+            filtered_screenmut_database_file = self._screen_mutant_database_file
+        elif isinstance(self._gene_id, str):
+            filtered_lines_t = []
+            filtered_lines_s = []
+            with open(self._targeted_database_file, "r", encoding=encoding) as t, open(self._screen_mutant_database_file, "r", encoding=encoding) as s:
+
+                filtered_lines_t.append(t.readline())
+                filtered_lines_s.append(s.readline())
+                filtered_lines_t += [line for line in t if line.startswith(self._gene_id)]
+                filtered_lines_s += [line for line in s if line.startswith(self._gene_id)]
+
+            filtered_targeted_database_file = StringIO("".join(filtered_lines_t))
+            filtered_screenmut_database_file = StringIO("".join(filtered_lines_s))
+        else:
+            raise TypeError(f"gene_id must be a string or None")
+
         self.log.info("Parsing targeted database file...")
         try:
-            targeted_df = pd.read_csv(self._targeted_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=encoding)
+            targeted_df = pd.read_csv(filtered_targeted_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=encoding)
         except ValueError:
             self.log.error("Couldn't parse targeted database file due to invalid format or missing columns.")
             raise TypeError("Couldn't parse targeted database file due to invalid format or missing columns")
 
         self.log.info("Parsing screen mutant database file...")
         try:
-            screenmut_df = pd.read_csv(self._screen_mutant_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=encoding)
+            screenmut_df = pd.read_csv(filtered_screenmut_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=encoding)
         except ValueError:
             self.log.error("Couldn't parse screen mutant database file due to invalid format or missing columns")
             raise TypeError("Couldn't parse screen mutant database file due to invalid format or missing columns")
-
         tmp_targeted_screenmut_df = pd.concat([targeted_df, screenmut_df], ignore_index=True, sort=False)
 
         self.log.info("Parsing classification database file...")
@@ -630,17 +648,16 @@ class COSMIC(DynamicSource, object):
 
         self.log.info("Merging database files into a dataframe...")
         try:
-            tmp_targeted_screenmut_classification_df = tmp_targeted_screenmut_df.merge(classification_df, on = 'COSMIC_PHENOTYPE_ID')
+            tmp_targeted_screenmut_classification_df = tmp_targeted_screenmut_df.merge(classification_df, on = 'COSMIC_PHENOTYPE_ID', sort=False)
         except KeyError:
             self.log.error("Couldn't merge database files due to missing or incorrectly named join columns")
             raise TypeError("Couldn't merge database files due to missing or incorrectly named join columns")
 
         try:
-            self._df = tmp_targeted_screenmut_classification_df.merge(transcript_df, on = 'TRANSCRIPT_ACCESSION')
+            self._df = tmp_targeted_screenmut_classification_df.merge(transcript_df, on = 'TRANSCRIPT_ACCESSION',sort=False)
         except KeyError:
             self.log.error("Couldn't merge database files due to missing or incorrectly named join columns")
             raise TypeError("Couldn't merge database files due to missing or incorrectly named join columns")
-
 
     def _parse_db_file(self, gene_id, genome_assembly_version = 'GRCh38',
                        cancer_types=None,
