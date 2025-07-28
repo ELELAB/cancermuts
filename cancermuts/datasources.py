@@ -932,6 +932,10 @@ class MyVariant(DynamicSource, object):
 
 
     def add_metadata(self, sequence, md_type=['revel_score']):
+        
+        if not sequence.is_canonical:
+            raise UnexpectedIsoformError("MyVariant REVEL annotation only supports canonical isoforms. Please use a Sequence object for the canonical isoform.")
+    
         if type(md_type) is str:
             md_types = [md_type]
         else:
