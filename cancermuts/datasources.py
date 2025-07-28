@@ -545,6 +545,16 @@ class cBioPortal(DynamicSource, object):
 
 class ClinVar(DynamicSource, object):
 
+    # ClinVar Metadata
+    _clinvar_supported_metadata = [
+        'clinvar_classification',
+        'clinvar_condition',
+        'clinvar_review_status',
+        'genomic_mutations',
+        'clinvar_variant_id',
+        'genomic_coordinates'
+    ]
+
     @logger_init
     def __init__(self):
         description = "ClinVar mutation database"
@@ -1134,18 +1144,8 @@ class ClinVar(DynamicSource, object):
         if not refseq:
             raise ValueError("Missing RefSeq identifier in sequence.aliases['refseq']")
 
-        # Metadata check
-        _clinvar_supported_metadata = [
-            'clinvar_classification',
-            'clinvar_condition',
-            'clinvar_review_status',
-            'genomic_mutations',
-            'clinvar_variant_id',
-            'genomic_coordinates'
-        ]
-
         for md in metadata:
-            if md not in _clinvar_supported_metadata:
+            if md not in self._clinvar_supported_metadata:
                 self.log.error(f'{md} is not a valid metadata. Supported metadata are: {_clinvar_supported_metadata}')
                 raise ValueError(f'{md} is not a valid metadata. Supported metadata are: {_clinvar_supported_metadata}')
 
@@ -1165,9 +1165,8 @@ class ClinVar(DynamicSource, object):
         try:
             clinvar_ids, out_gene = self._filtered_variants_extractor(filter_missense_variants, gene, refseq, mutation_type)
         except RuntimeError as e:
-            print(e)
-            exit(1)
-
+            raise RuntimeError(f"ClinVar mutation extraction failed: {e}")
+        
         if not clinvar_ids:
             not_found_gene.append(out_gene)
             return
@@ -1208,8 +1207,7 @@ class ClinVar(DynamicSource, object):
             try:
                 parse_VCV = self._VCV_summary_retriever(clinvar_id)
             except (RuntimeError, KeyError) as e:
-                print(e)
-                exit(1)
+                raise RuntimeError(f"Failed to retrieve VCV summary for ClinVar ID {clinvar_id}: {e}")
 
             hgvss_coding, hgvss_genomic = self._coding_region_variants_extractor(parse_VCV, clinvar_id)
 
@@ -1334,8 +1332,10 @@ class ClinVar(DynamicSource, object):
                 position = sequence.positions[site_idx]
 
                 if position.wt_residue_type != ref:
-                    print(f"Error with ClinVar ID  {clinvar_id}:Ref AA mismatch at position {pos} (expected {ref}, found {position.wt_residue_type})")
-                    exit(1)
+                    raise ValueError(
+                        f"Error with ClinVar ID {clinvar_id}: Ref AA mismatch at position {pos} "
+                        f"(expected {ref}, found {position.wt_residue_type})"
+                    )
 
                 # Create mutation
                 mutation = Mutation(position, alt, [self])
