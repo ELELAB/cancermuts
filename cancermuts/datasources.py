@@ -607,7 +607,7 @@ class ClinVar(DynamicSource, object):
                     variant_features = variant_information+classification_check
                     output_list.append(variant_features)
                 else:
-                    print(f"No information for {classification} associated to the clinvar id {clinvar_id}")
+                    self.log.info(f"No information for {classification} associated to the clinvar id {clinvar_id}")
 
         return output_list
 
@@ -636,7 +636,7 @@ class ClinVar(DynamicSource, object):
             try:
                 response = rq.get(URL)
             except:
-                print(f"WARNING: An error occurred during the ClinVar databse query."
+                self.log.warning(f"An error occurred during the ClinVar databse query."
                       f" Will try again in {delay} seconds (attempt {attempts+1}/{max_retries})")
                 attempts +=1
                 time.sleep(delay)
@@ -644,13 +644,13 @@ class ClinVar(DynamicSource, object):
             if response and response.status_code == 200:
                 return response
             elif response:
-                print(f"WARNING: The query to the ClinVar database to access {error_message}"\
+                self.log.warning(f"The query to the ClinVar database to access {error_message}"\
                       f" returned {response.status_code} as response."\
                       f" Will try again in {delay} seconds (attempt {attempts+1}/{max_retries})")
                 attempts +=1
                 time.sleep(delay)
             else:
-                print("WARNING: No response received. Retrying...")
+                self.log.warning("No response received. Retrying...")
                 attempts += 1
                 time.sleep(delay)
             
@@ -743,14 +743,14 @@ class ClinVar(DynamicSource, object):
                 parse_search=xmltodict.parse(self._URL_response_check(filtered_URL,error_message,"_filtered_variants_extractor").content)
                 clinvar_ids = self._variant_ids_extractors(parse_search)
 
-                print("Gene "+gene+" has " +str(tot_variant)+" "+mutation_type+" variants.")
+                self.log.info("Gene "+gene+" has " +str(tot_variant)+" "+mutation_type+" variants.")
 
             return clinvar_ids,""
                         
         # if no variants are annotated in Clinvar Database the script return a WARNING message
         else:
             if "missense" in URL_filter and "clinvar_id" not in mutation_type:
-                print("No missense variants are annotated in Clinvar Database for "+gene+" "+\
+                self.log.info("No missense variants are annotated in Clinvar Database for "+gene+" "+\
                       "gene, the variants provided as input will be annotated in entry_not_found.csv file.")
 
             return None,gene
@@ -784,7 +784,7 @@ class ClinVar(DynamicSource, object):
                                                      ['ClassifiedRecord']\
                                                      ['SimpleAllele']
         except KeyError:
-            print("Error with 'SimpleAllele' key: the clinvar_id "+clinvar_code+ " could have a different annotation structure. It will be annotated in variants_to_check.csv")
+            self.log.error("Error with 'SimpleAllele' key: the clinvar_id "+clinvar_code+ " could have a different annotation structure. It will be annotated in variants_to_check.csv")
             simple_allele_accession={}
             
         if "HGVSlist" in simple_allele_accession.keys():
@@ -796,7 +796,7 @@ class ClinVar(DynamicSource, object):
                                                 ["HGVSlist"]\
                                                 ["HGVS"]
             except KeyError:
-                print("Error with 'HGVS' key: the clinvar_id "+clinvar_code+ " could have a different annotation structure for the mutations. It will be annotated in variants_to_check.csv")
+                self.log.error("Error with 'HGVS' key: the clinvar_id "+clinvar_code+ " could have a different annotation structure for the mutations. It will be annotated in variants_to_check.csv")
                 return list(),list()
 
             try:
@@ -807,10 +807,10 @@ class ClinVar(DynamicSource, object):
                 # new key
 
             except KeyError:
-                print("Error with '@Type' key: the clinvar_id "+clinvar_code+ " could have a different annotation structure for the mutations. It will be annotated in variants_to_check.csv")
+                self.log.error("Error with '@Type' key: the clinvar_id "+clinvar_code+ " could have a different annotation structure for the mutations. It will be annotated in variants_to_check.csv")
                 return list(),list()
             except TypeError:
-                print("the  following clinvar_id "+clinvar_code+ " is not associated with a missense mutation in a protein coding region")
+                self.log.error("the  following clinvar_id "+clinvar_code+ " is not associated with a missense mutation in a protein coding region")
                 return list(),list()
 
         else:
@@ -862,7 +862,7 @@ class ClinVar(DynamicSource, object):
                     return correct_variant
 
                 else:
-                    print(f"{identifier} associated to the variant_id {clinvar_id}"\
+                    self.log.info(f"{identifier} associated to the variant_id {clinvar_id}"\
                             f" is an alternative isoform of {gene} gene, only the mutations"\
                             f" belonging to the {isoform_to_check} isoform will be considered")
         return "wrong isoform"
@@ -1007,7 +1007,7 @@ class ClinVar(DynamicSource, object):
                 condition_out[classification_type] = condition_value
 
             except:
-                print(f"No condition associated to {classification_type} classification for variant {clinvar_id}")
+                self.log.info(f"No condition associated to {classification_type} classification for variant {clinvar_id}")
 
         return condition_out
 
@@ -1047,7 +1047,7 @@ class ClinVar(DynamicSource, object):
 
                 classifications[classification_type] = classification
             except:
-               print(f"No {classification_type} classification for variant {clinvar_id}")
+               self.log.info(f"No {classification_type} classification for variant {clinvar_id}")
         return classifications
 
     # add Review status information
@@ -1088,7 +1088,7 @@ class ClinVar(DynamicSource, object):
             try:
                 review_status[classification_type] = clinical_assertions[classification_type]['ReviewStatus']
             except:
-                print(f"no review status associated to {classification_type} classification for variant {clinvar_id}")
+                self.log.info(f"no review status associated to {classification_type} classification for variant {clinvar_id}")
 
         return review_status
 
@@ -1135,7 +1135,7 @@ class ClinVar(DynamicSource, object):
                 genomic_mutations[genome_build] = gm
 
             except Exception as e:
-                self.log.warning(f"Could not parse annotation: {ann} → {e}")
+                self.log.error(f"Could not parse annotation: {ann} → {e}")
         return genomic_mutations
 
     def _get_available_muts_and_md(self, sequence, gene, refseq, clinvar_ids):
@@ -1166,7 +1166,7 @@ class ClinVar(DynamicSource, object):
             try:
                 clinvar_ids_class, out_gene = self._filtered_variants_extractor(URL, gene, refseq, classification)
             except RuntimeError as e:
-                print(e)
+                self.log.error(e)
                 continue
             if clinvar_ids_class:
                 filter_ids[classification] = [clinvar_ids_class, [gene], [refseq]]
@@ -1181,7 +1181,7 @@ class ClinVar(DynamicSource, object):
             correct_variant = ""
             counter += 1
 
-            print(f"Processing information for {clinvar_id} clinvar id from ClinVar. Progress --> {counter}/{len(missense_variants)}")
+            self.log.info(f"Processing information for {clinvar_id} clinvar id from ClinVar. Progress --> {counter}/{len(missense_variants)}")
 
             try:
                 parse_VCV = self._VCV_summary_retriever(clinvar_id)
@@ -1201,7 +1201,7 @@ class ClinVar(DynamicSource, object):
             correct_variant = self._missense_variants_extractor(hgvss_coding, gene, clinvar_id, isoform_to_check)
 
             if correct_variant is None:
-                print(f"The clinvar_id {clinvar_id} has a different annotation structure. It will be annotated in variants_to_check.csv")
+                self.log.warning(f"The clinvar_id {clinvar_id} has a different annotation structure. It will be annotated in variants_to_check.csv")
                 uncanonical_annotation += 1
                 clinvar_id_features = {}
                 clinvar_id_features["variant"] = "to check"
@@ -1220,7 +1220,7 @@ class ClinVar(DynamicSource, object):
             genomic_annotations_obj = self._parse_genomic_annotations(genomic_annotations)
 
             if correct_variant == "wrong isoform":
-                print(f"The {clinvar_id} clinvar id for {gene} gene does not contain any mutation in the isoform provided as input. The entry will be added to entry_not_found.csv")
+                self.log.warning(f"The {clinvar_id} clinvar id for {gene} gene does not contain any mutation in the isoform provided as input. The entry will be added to entry_not_found.csv")
                 var_other_iso += 1
                 not_found_var.append(clinvar_id)
                 not_found_gene.append(gene)
@@ -1245,7 +1245,7 @@ class ClinVar(DynamicSource, object):
                 uncanonical_annotation += 1
                 key_to_remove.append(clinvar_id)
 
-        print(f"{var_right_iso}/{len(missense_variants)} missense mutations belong to the input isoform of which {var_right_iso - uncanonical_annotation} with the canonical annotation and {uncanonical_annotation} with a different annotation, {var_other_iso}/{len(missense_variants)} missense mutations do not belong to the input isoform")
+        self.log.info(f"{var_right_iso}/{len(missense_variants)} missense mutations belong to the input isoform of which {var_right_iso - uncanonical_annotation} with the canonical annotation and {uncanonical_annotation} with a different annotation, {var_other_iso}/{len(missense_variants)} missense mutations do not belong to the input isoform")
 
         for i in key_to_remove:
             missense_variants.pop(i)
@@ -1262,8 +1262,9 @@ class ClinVar(DynamicSource, object):
                 try:
                     parse_VCV = self._VCV_summary_retriever(clinvar_id)
                 except (RuntimeError,KeyError) as e:
-                    print(e)
-                    exit(1)
+                    self.log.error(f"Failed to retrieve VCV summary for ClinVar ID {clinvar_id}: {e}")
+                    raise RuntimeError(f"Failed to retrieve VCV summary for ClinVar ID {clinvar_id}: {e}")
+
 
                 hgvss_coding,hgvss_genomic = self._coding_region_variants_extractor(parse_VCV,clinvar_id)
                 if hgvss_coding and re.search("p.[A-Z][a-z][a-z][0-9]+[A-Z][a-z][a-z]",str(correct_variant)) and "Ter" not in correct_variant:
@@ -1287,9 +1288,9 @@ class ClinVar(DynamicSource, object):
         for classification,mut_annotations in misannotated.items():
             if mut_annotations:
                 for clinvar_id in mut_annotations:
-                    print(f"annotation inconsistency detected for {clinvar_id[0]} clinvar id in {clinvar_id[1]} gene")
+                    self.log.warning(f"annotation inconsistency detected for {clinvar_id[0]} clinvar id in {clinvar_id[1]} gene")
             else:
-                print(f"{classification} mutations passed the consistency check")
+                self.log.info(f"{classification} mutations passed the consistency check")
 
         mutations = []
         for clinvar_id, data in missense_variants.items():
@@ -1340,7 +1341,7 @@ class ClinVar(DynamicSource, object):
                 mutations.append(mutation)
 
             except Exception as e:
-                print(f"[ClinVar] Failed to process mutation for {clinvar_id}: {e}")
+                self.log.error(f"[ClinVar] Failed to process mutation for {clinvar_id}: {e}")
 
         # Create auxiliary dataframes:
         df_strange = pd.DataFrame()
