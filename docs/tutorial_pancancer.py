@@ -31,9 +31,7 @@ print(seq.positions[64].mutations)
 print(seq.positions[122].mutations)
 
 print(seq.positions[64].mutations[0].sources)
-
 print(seq.positions[64].mutations[0].mutated_residue_type)
-
 print(seq.positions[38].mutations[0].metadata)
 
 
