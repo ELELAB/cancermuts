@@ -1165,27 +1165,158 @@ class MyVariant(DynamicSource, object):
             self.log.debug(f"Downloaded revel score: {revel_scores}")
             return [ DbnsfpRevel(source=self, score=r) for r in revel_scores ]
 
+class RevelLocal(DynamicSource, object):
+    @logger_init
+    def __init__(self, database_dir, database_files=None):
+        description = "Local REVEL score annotation using Ensembl transcript ID"
+        super(RevelLocal, self).__init__(name='RevelLocal', version='1.0', description=description)
 
-class ELMDatabase(DynamicSource, object):
-    def __init__(self):
-        description = "ELM Database"
-        super(MyVariant, self).__init__(name='ELM', version='1.0', description=description)
+        self._database_dir = database_dir
 
-        self._requests_url = "http://elm.eu.org/elms/"
-        self._get_elm_classes()
+        if database_files is None:
+            self._database_files = {
+                'revel': os.path.join(self._database_dir, 'revel_with_transcript_ids')
+            }
+        else:
+            self._database_files = database_files
 
-    def _get_elm_classes(self):
-        self._elm_classes = {}
+        self._supported_metadata = {'revel_score': self._get_revel}
 
-        response = rq.get(self._requests_url+'/elms_index.tsv').text
-        tmp = response.split("\n")
-        for line in tmp:
-            if line.startswith('"ELME'):
-                tmp2 = line.strip().split()
-                self._elm_classes[tmp2[0]] = tmp2[1:3]
+    def add_metadata(self, sequence, md_type=['revel_score']):
+        if not sequence.uniprot_ac:
+            self.log.error("Sequence is missing UniProt accession; skipping.")
+            return
 
-    def _get_annotations(self, gene_name):
-        pass
+        if type(md_type) is str:
+            md_types = [md_type]
+        else:
+            md_types = md_type
+
+        metadata_functions = []
+        for md in md_types:
+            try:
+                metadata_functions.append(self._supported_metadata[md])
+            except KeyError:
+                self.log.warning("RevelLocal doesn't support metadata type %s" % md)
+
+        try:
+            transcript_id = self._get_transcript_id(sequence)
+        except Exception as e:
+            self.log.error(f"Failed to retrieve transcript ID for {sequence}: {e}")
+            return
+
+        for pos in sequence.positions:
+            for mut in pos.mutations:
+                for add_md in metadata_functions:
+                    add_md(mut, transcript_id)
+
+    def _get_transcript_id(self, sequence):
+
+        if sequence.is_canonical:
+            this_upac = sequence.uniprot_ac
+        else:
+            if not sequence.isoform:
+                raise UnexpectedIsoformError("Sequence is non-canonical but has no isoform ID.")
+            this_upac = sequence.isoform
+
+        url = f"https://rest.uniprot.org/uniprotkb/{this_upac}.json"
+        self.log.debug(f"Querying UniProt for {this_upac} at {url}")
+        response = rq.get(url)
+
+        if response.status_code != 200:
+            raise ConnectionError(f"Failed to fetch UniProt JSON for {this_upac}: status {response.status_code}")
+
+        data = response.json()
+
+        xrefs = data.get('uniProtKBCrossReferences', [])
+        for xref in xrefs:
+            if xref.get('database') == 'Ensembl':
+                transcript_id = xref.get('id')
+                if transcript_id:
+                    transcript_id = transcript_id.split('.')[0]
+                    print(f"[REVEL] Transcript ID for {this_upac}: {transcript_id}")
+                    self.log.info(f"Using Ensembl transcript ID: {transcript_id} for {this_upac}")
+                    return transcript_id
+
+        raise KeyError(f"No Ensembl transcript ID found in UniProt entry for {this_upac}")
+
+    def _get_revel(self, mutation, transcript_id):
+
+        mutation.metadata['revel_score'] = []
+
+        aaref = mutation.sequence_position.wt_residue_type
+        aaalt = mutation.mutated_residue_type
+
+        gcs = mutation.metadata.get('genomic_coordinates', [])
+        gms = mutation.metadata.get('genomic_mutations', [])
+
+        if (not gcs or gcs == []) and (not gms or gms == []):
+            self.log.warning(f"[REVEL] No genomic data available for {mutation}")
+            return
+
+        if not gcs:
+            gcs = [None] * len(gms)
+        if not gms:
+            gms = [None] * len(gcs)
+
+        for gc, gm in zip(gcs, gms):
+            genome_version, chrom, pos = None, None, None
+
+            if gm and hasattr(gm, 'genome_build') and hasattr(gm, 'chr') and hasattr(gm, 'get_coord'):
+                # gm is a GenomicMutation object
+                genome_version = gm.genome_build
+                chrom = gm.chr
+                pos = str(gm.get_coord())
+            elif gc and hasattr(gc, 'genome_build') and hasattr(gc, 'chr') and hasattr(gc, 'coord_start'):
+                # gc is a GenomicCoordinate object
+                genome_version = gc.genome_build
+                chrom = gc.chr
+                pos = str(gc.coord_start)
+
+            if not all([genome_version, chrom, pos]):
+                self.log.warning(f"[REVEL] Skipping: missing genomic data for {mutation}")
+                continue
+
+            coord_index = 2 if genome_version == 'hg38' else 1 if genome_version == 'hg19' else None
+            if coord_index is None:
+                self.log.warning(f"[REVEL] Unknown genome version '{genome_version}' for {mutation}")
+                continue
+
+            key = f"{aaref}{pos}{aaalt}"
+            self.log.debug(f"[REVEL] Searching REVEL DB for key={key} in genome={genome_version}, transcript={transcript_id}")
+
+            file_path = self._database_files['revel']
+            try:
+                with open(file_path, 'r') as f:
+                    for line_num, line in enumerate(f, start=2):
+                        if transcript_id not in line:
+                            continue
+                        parts = line.strip().split(",")
+                        if len(parts) != 9:
+                            continue
+                        file_pos = parts[coord_index]
+                        file_aaref = parts[5]
+                        file_aaalt = parts[6]
+                        revel_score = parts[7]
+                        transcripts = parts[8].split(";")
+                        if (
+                            transcript_id in transcripts and
+                            file_pos == pos and
+                            file_aaref == aaref and
+                            file_aaalt == aaalt
+                        ):
+                            try:
+                                score = float(revel_score)
+                                mutation.metadata['revel_score'].append(DbnsfpRevel(source=self, score=score))
+                                self.log.info(f"[REVEL] Match found in line {line_num}: REVEL score = {score}")
+                            except Exception as e:
+                                self.log.warning(f"[REVEL] Could not parse REVEL score on line {line_num}: {e}")
+                            break
+                        
+            except FileNotFoundError:
+                self.log.error(f"[REVEL] File not found: {file_path}")
+            except Exception as e:
+                self.log.error(f"[REVEL] Error reading REVEL file: {e}")
 
 class ELMPredictions(DynamicSource, object):
 
