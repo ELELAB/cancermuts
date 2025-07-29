@@ -1318,6 +1318,27 @@ class RevelLocal(DynamicSource, object):
             except Exception as e:
                 self.log.error(f"[REVEL] Error reading REVEL file: {e}")
 
+class ELMDatabase(DynamicSource, object):
+    def __init__(self):
+        description = "ELM Database"
+        super(MyVariant, self).__init__(name='ELM', version='1.0', description=description)
+
+        self._requests_url = "http://elm.eu.org/elms/"
+        self._get_elm_classes()
+
+    def _get_elm_classes(self):
+        self._elm_classes = {}
+
+        response = rq.get(self._requests_url+'/elms_index.tsv').text
+        tmp = response.split("\n")
+        for line in tmp:
+            if line.startswith('"ELME'):
+                tmp2 = line.strip().split()
+                self._elm_classes[tmp2[0]] = tmp2[1:3]
+
+    def _get_annotations(self, gene_name):
+        pass
+
 class ELMPredictions(DynamicSource, object):
 
     @logger_init
