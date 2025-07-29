@@ -1,5 +1,6 @@
 # core.py - core classes for the cancermuts package
 # (c) 2018 Matteo Tiberti <matteo.tiberti@gmail.com>
+# (c) 2025 Pablo Sanchez-Izquierdo
 # This file is part of cancermuts
 #
 # cancermuts is free software: you can redistribute it and/or modify
@@ -7,13 +8,13 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# Nome-Programma is distributed in the hope that it will be useful,
+# cancermuts is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with Nome-Programma.  If not, see <http://www.gnu.org/licenses/>.
+# along with cancermuts.  If not, see <http://www.gnu.org/licenses/>.
 
 
 """
@@ -70,12 +71,23 @@ class Sequence(object):
     """
 
     @logger_init
-    def __init__(self, gene_id, sequence, source, aliases=None):
+    def __init__(self, gene_id, uniprot_ac, sequence, source, isoform=None, is_canonical=False, aliases=None):
         self.gene_id = gene_id
+        self.uniprot_ac = uniprot_ac
+        self.isoform = isoform
+        self.is_canonical = is_canonical
+
         if aliases is None:
             self.aliases = {}
         else:
+            if "uniprot_acc" in aliases and aliases["uniprot_acc"] != uniprot_ac:
+                raise TypeError(
+                    f"Mismatch between provided uniprot_ac ('{uniprot_ac}') "
+                    f"and aliases['uniprot_acc'] ('{aliases['uniprot_acc']}')"
+                )
             self.aliases = aliases
+        
+        self.aliases["uniprot_acc"] = self.uniprot_ac
         self.source = source
         self.sequence = sequence
         self.positions = []
@@ -124,7 +136,7 @@ class Sequence(object):
         return iter(self.positions)
 
     def __repr__(self):
-        return "<Sequence of %s from %s, %d positions>" % (self.gene_id, self.source.name, len(self.positions))
+        return f"<Sequence gene_id={self.gene_id}, uniprot_ac={self.uniprot_ac}, isoform={self.isoform}, is_canonical={self.is_canonical}, source={self.source.name}, {len(self.positions)} positions>"
 
     def add_property(self, prop):
         """

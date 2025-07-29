@@ -11,6 +11,9 @@ seq = up.get_sequence('MAP1LC3B')
 # alternatively, we can specifically ask for a Uniprot ID
 seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
 
+# OPTIONAL: Load a specific UniProt isoform instead of canonical
+# seq = up.get_sequence("AMBRA1", isoform='Q9C0C7-2')
+
 seq.aliases["refseq"] = "NP_073729"
 
 # this prints the downloaded protein sequence
@@ -34,9 +37,7 @@ print(seq.positions[64].mutations)
 print(seq.positions[122].mutations)
 
 print(seq.positions[64].mutations[0].sources)
-
 print(seq.positions[64].mutations[0].mutated_residue_type)
-
 print(seq.positions[38].mutations[0].metadata)
 
 # add mutations from COSMIC
