@@ -1288,7 +1288,8 @@ class RevelLocal(DynamicSource, object):
             file_path = self._database_files['revel']
             try:
                 with open(file_path, 'r') as f:
-                    for line_num, line in enumerate(f, start=2):
+                    for line_num, line in enumerate(f,start=2):
+                        next(f)
                         if transcript_id not in line:
                             continue
                         parts = line.strip().split(",")
