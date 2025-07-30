@@ -207,6 +207,12 @@ class UniProt(DynamicSource, object):
         else:
             aliases = {'uniprot'     : this_upid,
                        'uniprot_acc' : this_upac }
+        
+        tid = isoform if isoform is not None else this_upac
+        ensembl_transcript = self._get_transcript_id(tid)
+        
+        if ensembl_transcript:
+            aliases['ensembl_transcript_id'] = ensembl_transcript
 
         self.log.info("final aliases: %s" % aliases)      
         
@@ -252,6 +258,29 @@ class UniProt(DynamicSource, object):
             self.log.warning(f"Multiple FASTA sequences for {upid} found; the first one will be used")
 
         return str(sequences[0].seq)
+    
+    def _get_transcript_id(self, tid):
+        url = f"https://rest.uniprot.org/uniprotkb/{tid}.json"
+        self.log.debug(f"Querying UniProt for {tid} at {url}")
+        try:
+            response = rq.get(url)
+            if not response.ok:
+                self.log.warning(f"Failed to fetch UniProt JSON for {tid}: status {response.status_code}")
+                return None
+            data = response.json()
+        except Exception as e:
+            self.log.warning(f"Could not fetch or parse UniProt JSON for {tid}: {e}")
+            return None
+
+        for xref in data.get('uniProtKBCrossReferences', []):
+            if xref.get('database') == 'Ensembl':
+                transcript_id = xref.get('id')
+                if transcript_id:
+                    transcript_id = transcript_id.split('.')[0]
+                    self.log.info(f"Resolved Ensembl transcript ID for {tid}: {transcript_id}")
+                    return transcript_id
+        self.log.warning(f"No Ensembl transcript ID found for {tid}")
+        return None
 
     def _get_aliases(self, gene_id, to, fr='UniProtKB_AC-ID'):
 
@@ -286,7 +315,6 @@ class UniProt(DynamicSource, object):
                 out[t] = results['to'][t_keyword]
             else:
                 out[t] = results['to']
-
 
         return out
 
@@ -1199,10 +1227,10 @@ class RevelLocal(DynamicSource, object):
             except KeyError:
                 self.log.warning("RevelLocal doesn't support metadata type %s" % md)
 
-        try:
-            transcript_id = self._get_transcript_id(sequence)
-        except Exception as e:
-            self.log.error(f"Failed to retrieve transcript ID for {sequence}: {e}")
+        transcript_id = sequence.aliases.get('ensembl_transcript_id')
+        
+        if not transcript_id:
+            self.log.warning(f"No Ensembl transcript ID available for {sequence}")
             return
 
         for pos in sequence.positions:
@@ -1210,38 +1238,7 @@ class RevelLocal(DynamicSource, object):
                 for add_md in metadata_functions:
                     add_md(mut, transcript_id)
 
-    def _get_transcript_id(self, sequence):
-
-        if sequence.is_canonical:
-            this_upac = sequence.uniprot_ac
-        else:
-            if not sequence.isoform:
-                raise UnexpectedIsoformError("Sequence is non-canonical but has no isoform ID.")
-            this_upac = sequence.isoform
-
-        url = f"https://rest.uniprot.org/uniprotkb/{this_upac}.json"
-        self.log.debug(f"Querying UniProt for {this_upac} at {url}")
-        response = rq.get(url)
-
-        if response.status_code != 200:
-            raise ConnectionError(f"Failed to fetch UniProt JSON for {this_upac}: status {response.status_code}")
-
-        data = response.json()
-
-        xrefs = data.get('uniProtKBCrossReferences', [])
-        for xref in xrefs:
-            if xref.get('database') == 'Ensembl':
-                transcript_id = xref.get('id')
-                if transcript_id:
-                    transcript_id = transcript_id.split('.')[0]
-                    print(f"[REVEL] Transcript ID for {this_upac}: {transcript_id}")
-                    self.log.info(f"Using Ensembl transcript ID: {transcript_id} for {this_upac}")
-                    return transcript_id
-
-        raise KeyError(f"No Ensembl transcript ID found in UniProt entry for {this_upac}")
-
     def _get_revel(self, mutation, transcript_id):
-
         mutation.metadata['revel_score'] = []
 
         aaref = mutation.sequence_position.wt_residue_type
@@ -1288,8 +1285,8 @@ class RevelLocal(DynamicSource, object):
             file_path = self._database_files['revel']
             try:
                 with open(file_path, 'r') as f:
+                    next(f)
                     for line_num, line in enumerate(f,start=2):
-                        next(f)
                         if transcript_id not in line:
                             continue
                         parts = line.strip().split(",")
