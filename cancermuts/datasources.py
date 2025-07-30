@@ -634,7 +634,7 @@ class ClinVar(DynamicSource, object):
         classifications = ['GermlineClassification',
                            'SomaticClinicalImpact',
                            'OncogenicityClassification']
-        
+
         normalized_annotation = {}
         for clinvar_id in variants_annotation:
             if isinstance(variants_annotation[clinvar_id],list):
