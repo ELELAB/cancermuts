@@ -605,9 +605,7 @@ class ClinVar(DynamicSource, object):
         super(ClinVar, self).__init__(name='ClinVar', version='', description=description)
 
     def _melting_dictionary(self,variants_annotation, add_method = False):
-
         '''
-
         Count the number of keys in the second element of variants annotation values
         dictionary, create as many lists as the number of counted keys, inserting in each list
         the corresponding value of the key and populate the output list.
@@ -632,14 +630,12 @@ class ClinVar(DynamicSource, object):
         output_lists: list of lists
             List of lists from the variants_annotation dictionary.
         '''
-
         output_list = []
         classifications = ['GermlineClassification',
                            'SomaticClinicalImpact',
                            'OncogenicityClassification']
-
+        
         normalized_annotation = {}
-
         for clinvar_id in variants_annotation:
             if isinstance(variants_annotation[clinvar_id],list):
                 normalized_annotation[clinvar_id] = variants_annotation[clinvar_id]
@@ -670,8 +666,8 @@ class ClinVar(DynamicSource, object):
         return output_list
 
     def _URL_response_check(self,URL, error_message):
-
-        ''' check the response from the queried URL
+        ''' 
+        Check the response from the queried URL
 
         The function tries to access to the given URL. if it succeeds, 
         it will return the response, 
@@ -748,7 +744,6 @@ class ClinVar(DynamicSource, object):
         return parse_VCV
 
     def _filtered_variants_extractor(self,URL_filter,mutation_type,gene=False):
-
         '''
         Retrieve all the variant IDs belonging to certain ClinVar classes (e.g., missense,
         pathogenic, likely pathogenic, likely benign, or benign classifications) from an XML file
@@ -1025,8 +1020,8 @@ class ClinVar(DynamicSource, object):
             return ["not provided"],clinvar_VCV_xml
 
     def _conditions_extractor(self,clinvar_VCV_xml,clinvar_id):
-
-        ''' retrive all the condition reported in the xml file associated to a
+        ''' 
+        Retrieve all the condition reported in the xml file associated to a
         specific clinvar id from ClinVar database 
 
         The function takes as input a VCV xml file from a ClinVar variant id and 
@@ -1365,7 +1360,6 @@ class ClinVar(DynamicSource, object):
             else:
                 self.log.info(f"{classification} mutations passed the consistency check")
 
-        mutation_lookup = {}
         mutations = []
         for clinvar_id, data in missense_variants.items():
             try:
