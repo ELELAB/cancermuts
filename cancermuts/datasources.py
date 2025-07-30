@@ -1206,10 +1206,6 @@ class RevelDatabase(StaticSource, object):
         self._supported_metadata = {'revel_score': self._get_revel}
 
     def add_metadata(self, sequence, md_type=['revel_score']):
-        if not sequence.uniprot_ac:
-            self.log.error("Sequence is missing UniProt accession; skipping.")
-            return
-
         if type(md_type) is str:
             md_types = [md_type]
         else:
@@ -1278,7 +1274,7 @@ class RevelDatabase(StaticSource, object):
             self.log.debug(f"[REVEL] Searching REVEL DB for key={key} in genome={genome_version}, transcript={transcript_id}")
 
             file_path = self._revel_file
-            
+
             try:
                 with open(file_path, 'r') as f:
                     next(f)
