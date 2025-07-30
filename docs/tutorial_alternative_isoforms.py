@@ -39,7 +39,7 @@ mutation.metadata['genomic_mutations'] = [gm]
 position.add_mutation(mutation)
 
 # annotate with REVEL using local database
-rl = RevelDatabase("/data/databases/REVEL/")
+rl = RevelDatabase("/data/databases/REVEL/revel_with_transcript_ids")
 rl.add_metadata(seq)
 
 # print annotated mutation and REVEL score

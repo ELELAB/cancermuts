@@ -1195,19 +1195,14 @@ class MyVariant(DynamicSource, object):
 
 class RevelDatabase(StaticSource, object):
     @logger_init
-    def __init__(self, database_dir, database_files=None):
+    def __init__(self, revel_file):
         description = "Local REVEL score annotation using Ensembl transcript ID"
         super(RevelDatabase, self).__init__(name='RevelLocal', version='1.0', description=description)
 
-        self._database_dir = database_dir
+        if not os.path.exists(revel_file):
+            raise FileNotFoundError(f"REVEL file does not exist: {revel_file}")
 
-        if database_files is None:
-            self._database_files = {
-                'revel': os.path.join(self._database_dir, 'revel_with_transcript_ids')
-            }
-        else:
-            self._database_files = database_files
-
+        self._revel_file = revel_file
         self._supported_metadata = {'revel_score': self._get_revel}
 
     def add_metadata(self, sequence, md_type=['revel_score']):
@@ -1282,7 +1277,8 @@ class RevelDatabase(StaticSource, object):
             key = f"{aaref}{pos}{aaalt}"
             self.log.debug(f"[REVEL] Searching REVEL DB for key={key} in genome={genome_version}, transcript={transcript_id}")
 
-            file_path = self._database_files['revel']
+            file_path = self._revel_file
+            
             try:
                 with open(file_path, 'r') as f:
                     next(f)
