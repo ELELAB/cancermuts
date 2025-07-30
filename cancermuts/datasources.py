@@ -605,7 +605,9 @@ class ClinVar(DynamicSource, object):
         super(ClinVar, self).__init__(name='ClinVar', version='', description=description)
 
     def _melting_dictionary(self,variants_annotation, add_method = False):
+
         '''
+
         Count the number of keys in the second element of variants annotation values
         dictionary, create as many lists as the number of counted keys, inserting in each list
         the corresponding value of the key and populate the output list.
@@ -630,32 +632,44 @@ class ClinVar(DynamicSource, object):
         output_lists: list of lists
             List of lists from the variants_annotation dictionary.
         '''
+
         output_list = []
         classifications = ['GermlineClassification',
                            'SomaticClinicalImpact',
                            'OncogenicityClassification']
 
-        for clinvar_id in variants_annotation.keys():
-            variant_information = [clinvar_id,variants_annotation[clinvar_id]["variant"],variants_annotation[clinvar_id]["genomic_annotations"],variants_annotation[clinvar_id]["gene"]]
-            for classification in classifications:
-                classification_check = []
-                if classification in variants_annotation[clinvar_id]["classifications"].keys():
-                    classification_check.append(variants_annotation[clinvar_id]["classifications"][classification])
-                if classification in variants_annotation[clinvar_id]["conditions"].keys():
-                    classification_check.append(variants_annotation[clinvar_id]["conditions"][classification])
-                if classification in variants_annotation[clinvar_id]["review_status"].keys():
-                    classification_check.append(variants_annotation[clinvar_id]["review_status"][classification])
-                if add_method:
-                    classification_check.append(variants_annotation[clinvar_id]["methods"])
-                if len(classification_check) == 3 or len(classification_check) == 4:
-                    variant_features = variant_information+classification_check
-                    output_list.append(variant_features)
-                else:
-                    self.log.info(f"No information for {classification} associated to the clinvar id {clinvar_id}")
+        normalized_annotation = {}
+
+        for clinvar_id in variants_annotation:
+            if isinstance(variants_annotation[clinvar_id],list):
+                normalized_annotation[clinvar_id] = variants_annotation[clinvar_id]
+            else:
+                normalized_annotation[clinvar_id] = [variants_annotation[clinvar_id]]
+
+        for clinvar_id in normalized_annotation.keys():
+
+            for gene_information_set in normalized_annotation[clinvar_id]:
+                variant_information = [clinvar_id,gene_information_set["variant"],gene_information_set["genomic_annotations"],gene_information_set["gene"]]
+                for classification in classifications:
+                    classification_check = []
+                    if classification in gene_information_set["classifications"].keys():
+                        classification_check.append(gene_information_set["classifications"][classification])
+                    if classification in gene_information_set["conditions"].keys():
+                        classification_check.append(gene_information_set["conditions"][classification])
+                    if classification in gene_information_set["review_status"].keys():
+                        classification_check.append(gene_information_set["review_status"][classification])
+                    if add_method:
+                        classification_check.append(gene_information_set["methods"])
+                    if len(classification_check) == 3 or len(classification_check) == 4:
+                        variant_features = variant_information+classification_check
+                        output_list.append(variant_features)
+
+                    else:
+                        self.log.info(f"No information for {classification} associated to the clinvar id {clinvar_id}")
 
         return output_list
 
-    def _URL_response_check(self,URL, error_message, function):
+    def _URL_response_check(self,URL, error_message):
 
         ''' check the response from the queried URL
 
@@ -680,7 +694,7 @@ class ClinVar(DynamicSource, object):
             try:
                 response = rq.get(URL)
             except:
-                self.log.warning(f"An error occurred during the ClinVar databse query."
+                self.log.warning(f"An error occurred during the ClinVar database query."
                       f" Will try again in {delay} seconds (attempt {attempts+1}/{max_retries})")
                 attempts +=1
                 time.sleep(delay)
@@ -688,7 +702,7 @@ class ClinVar(DynamicSource, object):
             if response and response.status_code == 200:
                 return response
             elif response:
-                self.log.warning(f"The query to the ClinVar database to access {error_message}"\
+                self.log.warning(f"The query to access to the {error_message}"\
                       f" returned {response.status_code} as response."\
                       f" Will try again in {delay} seconds (attempt {attempts+1}/{max_retries})")
                 attempts +=1
@@ -720,8 +734,8 @@ class ClinVar(DynamicSource, object):
             XML summary output associated with the VCV code provided as input.
         '''
         URL_summary="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id="+clinvar_id
-        error_message=f"summary xml file for the variant_id {clinvar_id}"
-        parse_summary=xmltodict.parse(self._URL_response_check(URL_summary,error_message,"_VCV_summary_retriever").content)
+        error_message=f"summary xml file for the variant_id {clinvar_id} in the ClinVar database"
+        parse_summary=xmltodict.parse(self._URL_response_check(URL_summary,error_message).content)
         try:
             VCV=(parse_summary['eSummaryResult']\
                               ["DocumentSummarySet"]\
@@ -729,12 +743,11 @@ class ClinVar(DynamicSource, object):
         except KeyError:
             raise KeyError("Error in parsing the summary XML file. Check the ClinVar summary XML structure. Exiting...")
         URL_VCV="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=clinvar&rettype=vcv&id="+VCV
-        error_message=f"the XML for the following VCV accession: {VCV}"
-        parse_VCV=xmltodict.parse(self._URL_response_check(URL_VCV,error_message,"_VCV_summary_retriever").content)
-
+        error_message=f"XML file in the ClinVar database for the following VCV accession: {VCV}"
+        parse_VCV=xmltodict.parse(self._URL_response_check(URL_VCV,error_message).content)
         return parse_VCV
 
-    def _filtered_variants_extractor(self,URL_filter,gene,isoform,mutation_type):
+    def _filtered_variants_extractor(self,URL_filter,mutation_type,gene=False):
 
         '''
         Retrieve all the variant IDs belonging to certain ClinVar classes (e.g., missense,
@@ -762,16 +775,19 @@ class ClinVar(DynamicSource, object):
             Dictionary in which the keys are the classifications from ClinVar database and
             the values are lists of variant IDs belonging to missense mutations.
         '''
-    
+        
         URL="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=clinvar&term="+URL_filter
-        error_message=f"the XML file with the total number of {mutation_type} mutations for {gene} gene"
-        if "clinvar id" in mutation_type:
-            error_message=f"the XML file with the total number of missense mutation in {gene} gene"
+        if gene:
+            error_message=f"XML file with the total number of {mutation_type} mutations for {gene} gene in the ClinVar database"
+            if "clinvar id" in mutation_type:
+                error_message=f"XML file with the total number of missense mutation in {gene} gene in the ClinVar database"
+        if not gene:
+            error_message=f"XML file with the total number of {mutation_type} mutations in the ClinVar database"
 
-        first_search=xmltodict.parse(self._URL_response_check(URL,error_message,"_filtered_variants_extractor").content)
+        first_search=xmltodict.parse(self._URL_response_check(URL,error_message).content)
 
+       # Return clinvar_id if there are variants associated to the query:
 
-        # return clinvar_id if there are variants associated to the query
         try:
             first_search["eSearchResult"]["Count"]
         except KeyError:
@@ -782,22 +798,31 @@ class ClinVar(DynamicSource, object):
                 clinvar_ids = self._variant_ids_extractors(first_search)
             else:
                 tot_variant=first_search["eSearchResult"]["Count"]
-                error_message=f"the number of missense variants for {gene} gene"
+                if gene:
+                    error_message=f"number of missense variants for {gene} gene in the ClinVar database"
+                else:
+                    error_message=f"number of variants with {mutation_type} classification in the ClinVar database"
                 filtered_URL="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=clinvar&term="+URL_filter+"&retmax="+str(tot_variant)
-                parse_search=xmltodict.parse(self._URL_response_check(filtered_URL,error_message,"_filtered_variants_extractor").content)
+                parse_search=xmltodict.parse(self._URL_response_check(filtered_URL,error_message).content)
                 clinvar_ids = self._variant_ids_extractors(parse_search)
 
-                self.log.info("Gene "+gene+" has " +str(tot_variant)+" "+mutation_type+" variants.")
+                if gene:
+                    self.log.info("Gene "+gene+" has " +str(tot_variant)+" "+mutation_type+" variants.")
+                else:
+                    self.log.info("There are"+ " "+ str(tot_variant)+" variants with "+mutation_type+" classification.")
+
 
             return clinvar_ids,""
                         
-        # if no variants are annotated in Clinvar Database the script return a WARNING message
+        # if no variants are annotated in Clinvar Database the script return a WARNING message:
         else:
-            if "missense" in URL_filter and "clinvar_id" not in mutation_type:
-                self.log.info("No missense variants are annotated in Clinvar Database for "+gene+" "+\
+            if gene and "missense" in URL_filter and "clinvar_id" not in mutation_type:
+                self.log.warning("No missense variants are annotated in Clinvar Database for "+gene+" "+\
                       "gene, the variants provided as input will be annotated in entry_not_found.csv file.")
+            if not gene:
+                self.log.info("No variants are annotated in Clinvar Database for "+clinvar_id+"property.")
 
-            return None,gene
+        return None,gene
 
     def _coding_region_variants_extractor(self,clinvar_VCV_xml,clinvar_code):
         '''
@@ -1121,12 +1146,16 @@ class ClinVar(DynamicSource, object):
                                              ['Classifications']
 
 
-        clinvar_id = clinvar_VCV_xml['ClinVarResult-Set']\
-                                    ['VariationArchive']\
-                                    ['ClassifiedRecord']\
-                                    ['SimpleAllele']\
-                                    ['@VariationID']
-                                             
+        try:
+            clinvar_id = clinvar_VCV_xml['ClinVarResult-Set']\
+                                        ['VariationArchive']\
+                                        ['ClassifiedRecord']\
+                                        ['SimpleAllele']\
+                                        ['@VariationID']
+        except KeyError:
+            self.log.error(clinvar_VCV_xml['ClinVarResult-Set']\
+                                        ['VariationArchive']\
+                                        ['ClassifiedRecord'])
 
         for classification_type in clinical_assertions:
             try:
@@ -1208,7 +1237,7 @@ class ClinVar(DynamicSource, object):
 
         for classification, URL in zip(classifications, filters_on_classification):
             try:
-                clinvar_ids_class, out_gene = self._filtered_variants_extractor(URL, gene, refseq, classification)
+                clinvar_ids_class, out_gene = self._filtered_variants_extractor(URL,classification,gene)
             except RuntimeError as e:
                 self.log.error(e)
                 continue
@@ -1311,9 +1340,9 @@ class ClinVar(DynamicSource, object):
 
 
                 hgvss_coding,hgvss_genomic = self._coding_region_variants_extractor(parse_VCV,clinvar_id)
-                if hgvss_coding and re.search("p.[A-Z][a-z][a-z][0-9]+[A-Z][a-z][a-z]",str(correct_variant)) and "Ter" not in correct_variant:
+                if hgvss_coding:
                     correct_variant = self._missense_variants_extractor(hgvss_coding, ids[1][0], clinvar_id, ids[2][0])
-                    if not clinvar_id in missense_variants.keys():
+                    if not clinvar_id in missense_variants.keys() and re.search("p.[A-Z][a-z][a-z][0-9]+[A-Z][a-z][a-z]",str(correct_variant)) or re.search("p.\\w+delins\\w+",str(correct_variant)):
                         variants.append([clinvar_id,ids[1][0]])
                         classifications = self._classifications_extractor(parse_VCV,clinvar_id)
                         conditions = self._conditions_extractor(parse_VCV,clinvar_id)
@@ -1336,6 +1365,7 @@ class ClinVar(DynamicSource, object):
             else:
                 self.log.info(f"{classification} mutations passed the consistency check")
 
+        mutation_lookup = {}
         mutations = []
         for clinvar_id, data in missense_variants.items():
             try:
@@ -1422,7 +1452,7 @@ class ClinVar(DynamicSource, object):
         # Entry not found:
         if len(not_found_gene) != 0:
             if len(not_found_var) != 0:
-                df_not_found = pd.DataFrame(list(zip(not_found_gene, not_found_var)), columns=['gene_name', "variant_name"])
+                df_nost_found = pd.DataFrame(list(zip(not_found_gene, not_found_var)), columns=['gene_name', "variant_name"])
             else:
                 df_not_found = pd.DataFrame(list(not_found_gene), columns=['gene_name'])
 
@@ -1448,7 +1478,7 @@ class ClinVar(DynamicSource, object):
         mutation_type = "missense"
 
         try:
-            clinvar_ids, out_gene = self._filtered_variants_extractor(filter_missense_variants, gene, refseq, mutation_type)
+            clinvar_ids, out_gene = self._filtered_variants_extractor(filter_missense_variants,mutation_type,gene)
         except RuntimeError as e:
             raise RuntimeError(f"ClinVar mutation extraction failed: {e}")
         

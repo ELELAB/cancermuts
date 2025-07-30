@@ -547,7 +547,6 @@ class CancerHistology(Metadata):
     def __hash__(self):
         return hash((self.source, self.histology))
 
-
 class ClinVarVariantID(Metadata):
     description = "ClinVar variant ID"
     header = "clinvar_variant_id"
@@ -565,7 +564,6 @@ class ClinVarVariantID(Metadata):
     def __repr__(self):
         return f"<ClinVarVariantID {self.variant_id} from {self.source.name}>"
 
-
 class ClinVarCondition(Metadata):
     description = "ClinVar condition"
     header = "clinvar_condition"
@@ -574,13 +572,12 @@ class ClinVarCondition(Metadata):
         super().__init__(source)
         conds = data["GermlineClassification"]
         self.conditions = conds if isinstance(conds, list) else [conds]
-
+        
     def get_value(self):
         return self.conditions
 
     def get_value_str(self):
         return ", ".join(self.conditions)
-
 
 class ClinVarReviewStatus(Metadata):
     description = "ClinVar review status"
@@ -620,7 +617,6 @@ class ClinVarReviewStatus(Metadata):
 
     def __repr__(self):
         return f"<ClinVarReviewStatus {self.stars} (from: {self.status}) from {self.source.name}>"
-
 
 class ClinVarClassification(Metadata):
     description = "ClinVar classification"
