@@ -1203,6 +1203,7 @@ class RevelDatabase(StaticSource, object):
             raise FileNotFoundError(f"REVEL file does not exist: {revel_file}")
 
         self._revel_file = revel_file
+        self._revel_df = pd.read_csv(revel_file)
         self._supported_metadata = {'revel_score': self._get_revel}
 
     def add_metadata(self, sequence, md_type=['revel_score']):
@@ -1219,94 +1220,80 @@ class RevelDatabase(StaticSource, object):
                 self.log.warning("RevelLocal doesn't support metadata type %s" % md)
 
         transcript_id = sequence.aliases.get('ensembl_transcript_id')
-        
         if not transcript_id:
             self.log.warning(f"No Ensembl transcript ID available for {sequence}")
             return
 
+        mutations = []
         for pos in sequence.positions:
             for mut in pos.mutations:
-                for add_md in metadata_functions:
-                    add_md(mut, transcript_id)
+                gms = mut.metadata.get('genomic_mutations', [])
+                if not gms:
+                    self.log.debug(f"[REVEL] No genomic mutation available for {mut}; skipping.")
+                    continue
+                mutations.append((mut, gms, transcript_id))
 
-    def _get_revel(self, mutation, transcript_id):
-        mutation.metadata['revel_score'] = []
+        self._get_revel(mutations)
 
-        aaref = mutation.sequence_position.wt_residue_type
-        aaalt = mutation.mutated_residue_type
+    def _get_revel(self, mutation_entries):
+        df = self._revel_df
 
-        gcs = mutation.metadata.get('genomic_coordinates', [])
-        gms = mutation.metadata.get('genomic_mutations', [])
+        for mutation, gms, transcript_id in mutation_entries:
+            mutation.metadata['revel_score'] = []
 
-        if (not gcs or gcs == []) and (not gms or gms == []):
-            self.log.warning(f"[REVEL] No genomic data available for {mutation}")
-            return
+            aaref = mutation.sequence_position.wt_residue_type
+            aaalt = mutation.mutated_residue_type
 
-        if not gcs:
-            gcs = [None] * len(gms)
-        if not gms:
-            gms = [None] * len(gcs)
+            for gm in gms:
+                if not hasattr(gm, 'genome_build') or not hasattr(gm, 'chr') or not hasattr(gm, 'get_coord') or not hasattr(gm, 'ref') or not hasattr(gm, 'alt'):
+                    self.log.warning(f"[REVEL] Skipping invalid genomic mutation object: {gm}")
+                    continue
 
-        for gc, gm in zip(gcs, gms):
-            genome_version, chrom, pos = None, None, None
-
-            if gm and hasattr(gm, 'genome_build') and hasattr(gm, 'chr') and hasattr(gm, 'get_coord'):
-                # gm is a GenomicMutation object
                 genome_version = gm.genome_build
-                chrom = gm.chr
+                chrom = str(gm.chr)
                 pos = str(gm.get_coord())
-            elif gc and hasattr(gc, 'genome_build') and hasattr(gc, 'chr') and hasattr(gc, 'coord_start'):
-                # gc is a GenomicCoordinate object
-                genome_version = gc.genome_build
-                chrom = gc.chr
-                pos = str(gc.coord_start)
+                ref = gm.ref
+                alt = gm.alt
 
-            if not all([genome_version, chrom, pos]):
-                self.log.warning(f"[REVEL] Skipping: missing genomic data for {mutation}")
-                continue
+                coord_col = "grch38_pos" if genome_version == "hg38" else "hg19_pos" if genome_version == "hg19" else None
+                if coord_col is None:
+                    self.log.warning(f"[REVEL] Unknown genome version '{genome_version}' for {mutation}")
+                    continue
 
-            coord_index = 2 if genome_version == 'hg38' else 1 if genome_version == 'hg19' else None
-            if coord_index is None:
-                self.log.warning(f"[REVEL] Unknown genome version '{genome_version}' for {mutation}")
-                continue
+                df_filtered = df[
+                    (df["chr"].astype(str) == chrom) &
+                    (df[coord_col].astype(str) == pos)
+                ]
 
-            key = f"{aaref}{pos}{aaalt}"
-            self.log.debug(f"[REVEL] Searching REVEL DB for key={key} in genome={genome_version}, transcript={transcript_id}")
+                if df_filtered.empty:
+                    self.log.debug(f"[REVEL] No position match for {mutation} at chr {chrom}, pos {pos}")
+                    continue
 
-            file_path = self._revel_file
+                for _, row in df_filtered.iterrows():
+                    if (
+                        row["ref"] != ref or
+                        row["alt"] != alt or
+                        row["aaref"] != aaref or
+                        row["aaalt"] != aaalt
+                    ):
+                        continue
 
-            try:
-                with open(file_path, 'r') as f:
-                    next(f)
-                    for line_num, line in enumerate(f,start=2):
-                        if transcript_id not in line:
-                            continue
-                        parts = line.strip().split(",")
-                        if len(parts) != 9:
-                            continue
-                        file_pos = parts[coord_index]
-                        file_aaref = parts[5]
-                        file_aaalt = parts[6]
-                        revel_score = parts[7]
-                        transcripts = parts[8].split(";")
-                        if (
-                            transcript_id in transcripts and
-                            file_pos == pos and
-                            file_aaref == aaref and
-                            file_aaalt == aaalt
-                        ):
-                            try:
-                                score = float(revel_score)
-                                mutation.metadata['revel_score'].append(DbnsfpRevel(source=self, score=score))
-                                self.log.info(f"[REVEL] Match found in line {line_num}: REVEL score = {score}")
-                            except Exception as e:
-                                self.log.warning(f"[REVEL] Could not parse REVEL score on line {line_num}: {e}")
-                            break
-                        
-            except FileNotFoundError:
-                self.log.error(f"[REVEL] File not found: {file_path}")
-            except Exception as e:
-                self.log.error(f"[REVEL] Error reading REVEL file: {e}")
+                    if transcript_id not in row["Ensembl_transcriptid"].split(";"):
+                        continue
+
+                    score_str = row["REVEL"]
+                    if score_str in [".", "NA"]:
+                        continue
+
+                    try:
+                        score = float(score_str)
+                        mutation.metadata['revel_score'].append(DbnsfpRevel(source=self, score=score))
+                        self.log.info(
+                            f"[REVEL] Match for {mutation}: chr={chrom}, pos={pos}, ref={ref}, alt={alt}, "
+                            f"aaref={aaref}, aaalt={aaalt}, transcript={transcript_id}, score={score}"
+                        )
+                    except Exception as e:
+                        self.log.warning(f"[REVEL] Could not parse REVEL score '{score_str}' for {mutation}: {e}")
 
 class ELMDatabase(DynamicSource, object):
     def __init__(self):
