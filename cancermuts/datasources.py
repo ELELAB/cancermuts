@@ -1193,11 +1193,11 @@ class MyVariant(DynamicSource, object):
             self.log.debug(f"Downloaded revel score: {revel_scores}")
             return [ DbnsfpRevel(source=self, score=r) for r in revel_scores ]
 
-class RevelLocal(DynamicSource, object):
+class RevelDatabase(StaticSource, object):
     @logger_init
     def __init__(self, database_dir, database_files=None):
         description = "Local REVEL score annotation using Ensembl transcript ID"
-        super(RevelLocal, self).__init__(name='RevelLocal', version='1.0', description=description)
+        super(RevelDatabase, self).__init__(name='RevelLocal', version='1.0', description=description)
 
         self._database_dir = database_dir
 

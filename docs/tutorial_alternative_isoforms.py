@@ -1,5 +1,5 @@
 # import the UniProt data source class
-from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, MobiDB, MyVariant, RevelLocal
+from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, MobiDB, MyVariant, RevelDatabase
 from cancermuts.exceptions import *
 from cancermuts.core import Mutation
 from cancermuts.metadata import GenomicMutation
@@ -39,7 +39,7 @@ mutation.metadata['genomic_mutations'] = [gm]
 position.add_mutation(mutation)
 
 # annotate with REVEL using local database
-rl = RevelLocal("/data/databases/REVEL/")
+rl = RevelDatabase("/data/databases/REVEL/")
 rl.add_metadata(seq)
 
 # print annotated mutation and REVEL score
