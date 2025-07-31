@@ -208,8 +208,8 @@ class UniProt(DynamicSource, object):
             aliases = {'uniprot'     : this_upid,
                        'uniprot_acc' : this_upac }
         
-        tid = isoform if isoform is not None else this_upac
-        ensembl_transcript = self._get_transcript_id(tid)
+        transcript_lookup_id = isoform if isoform is not None else this_upac
+        ensembl_transcript = self._get_transcript_id(transcript_lookup_id)
         
         if ensembl_transcript:
             aliases['ensembl_transcript_id'] = ensembl_transcript
@@ -259,17 +259,17 @@ class UniProt(DynamicSource, object):
 
         return str(sequences[0].seq)
     
-    def _get_transcript_id(self, tid):
-        url = f"https://rest.uniprot.org/uniprotkb/{tid}.json"
-        self.log.debug(f"Querying UniProt for {tid} at {url}")
+    def _get_transcript_id(self, transcript_lookup_id):
+        url = f"https://rest.uniprot.org/uniprotkb/{transcript_lookup_id}.json"
+        self.log.debug(f"Querying UniProt for {transcript_lookup_id} at {url}")
         try:
             response = rq.get(url)
             if not response.ok:
-                self.log.warning(f"Failed to fetch UniProt JSON for {tid}: status {response.status_code}")
+                self.log.warning(f"Failed to fetch UniProt JSON for {transcript_lookup_id}: status {response.status_code}")
                 return None
             data = response.json()
         except Exception as e:
-            self.log.warning(f"Could not fetch or parse UniProt JSON for {tid}: {e}")
+            self.log.warning(f"Could not fetch or parse UniProt JSON for {transcript_lookup_id}: {e}")
             return None
 
         for xref in data.get('uniProtKBCrossReferences', []):
@@ -277,9 +277,10 @@ class UniProt(DynamicSource, object):
                 transcript_id = xref.get('id')
                 if transcript_id:
                     transcript_id = transcript_id.split('.')[0]
-                    self.log.info(f"Resolved Ensembl transcript ID for {tid}: {transcript_id}")
+                    self.log.info(f"Resolved Ensembl transcript ID for {transcript_lookup_id}: {transcript_id}")
                     return transcript_id
-        self.log.warning(f"No Ensembl transcript ID found for {tid}")
+                
+        self.log.warning(f"No Ensembl transcript ID found for {transcript_lookup_id}")
         return None
 
     def _get_aliases(self, gene_id, to, fr='UniProtKB_AC-ID'):
@@ -1194,13 +1195,14 @@ class MyVariant(DynamicSource, object):
             return [ DbnsfpRevel(source=self, score=r) for r in revel_scores ]
 
 class RevelDatabase(StaticSource, object):
+
     @logger_init
     def __init__(self, revel_file):
         description = "Local REVEL score annotation using Ensembl transcript ID"
-        super(RevelDatabase, self).__init__(name='RevelLocal', version='1.0', description=description)
+        super(RevelDatabase, self).__init__(name='RevelDatabase', version='1.0', description=description)
 
         if not os.path.exists(revel_file):
-            raise FileNotFoundError(f"REVEL file does not exist: {revel_file}")
+            raise FileNotFoundError(f"REVEL database file does not exist: {revel_file}")
 
         self._revel_file = revel_file
         self._revel_df = pd.read_csv(revel_file)
