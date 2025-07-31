@@ -1366,26 +1366,22 @@ class ClinVar(DynamicSource, object):
 
                 # Convert 3-letter to 1-letter format:
                 ref_aa = index_to_one(three_to_index(str.upper(three_letter_mut[2:5])))
-                pos = re.search(r"[0-9]+", three_letter_mut).group(0)
+                pos = int(re.search(r"[0-9]+", three_letter_mut).group(0))
                 alt_aa = index_to_one(three_to_index(str.upper(three_letter_mut[-3:])))
                 one_letter_mut = f"{ref_aa}{pos}{alt_aa}"
-
-                # Parse one-letter mutation format:
-                ref, pos, alt = one_letter_mut[0], int(one_letter_mut[1:-1]), one_letter_mut[-1]
 
                 # Find position in sequence:
                 site_idx = sequence.seq2index(pos)
                 position = sequence.positions[site_idx]
 
-                if position.wt_residue_type != ref:
+                if position.wt_residue_type != ref_aa:
                     raise ValueError(
                         f"Error with ClinVar ID {clinvar_id}: Ref AA mismatch at position {pos} "
-                        f"(expected {ref}, found {position.wt_residue_type})"
+                        f"(expected {ref_aa}, found {position.wt_residue_type})"
                     )
 
                 # Create mutation:
-                mutation = Mutation(position, alt, [self])
-                mutation.position = position
+                mutation = Mutation(position, alt_aa, [self])
 
                 # Direct assignment to mutation.metadata using metadata classes:
                 mutation.metadata["clinvar_classification"] = [ClinVarClassification(self, data["classifications"])]
@@ -1477,7 +1473,7 @@ class ClinVar(DynamicSource, object):
 
         results = self._get_available_muts_and_md(sequence, gene, refseq, clinvar_ids)
         for mutation in results["mutations"]:
-            mutation.position.add_mutation(mutation)
+            mutation.sequence_position.add_mutation(mutation)
 
         # Store DataFrames for external access if needed
         self.df_variants_to_check = results["variants_to_check"]
