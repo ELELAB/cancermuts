@@ -123,14 +123,14 @@ identifier, to the isoform argument, as in the following example. If this is not
 the canonical UniProt isoform will be used. Notice that, currently, only some
 data sources support alternative isoform; those that do not support them will
 raise exceptions if a Sequence object containing an alternative isoform is provided to them.
-In this case we provide an example which use a non-canonical isoform as input in the 
-`tutorial_alternative_isoforms.py` file. It's run in the same way as with the other 
+In this case we provide an example which use a non-canonical isoform as input in the
+`tutorial_alternative_isoforms.py` file. It's run in the same way as with the other
 tutorial script:
 
 ```
 $ python tutorial_alternative_isoforms.py
 ```
-It loads a specific AMBRA1 isoform (since LC3B lacks characterized non-canonical isoforms) and 
+It loads a specific AMBRA1 isoform (since LC3B lacks characterized non-canonical isoforms) and
 ends after successfully downloading and displaying the isoform sequence.
 
 ## Tutorial steps
@@ -325,11 +325,10 @@ cosmic = COSMIC(targeted_database_files ='/data/databases/cosmic-v102/Cosmic_Com
 screen_mutant_database_files = '/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
 classification_database_files = '/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
 transcript_database_file = '/data/databases/cosmic-v102/Cosmic_Transcripts_v102_GRCh38.tsv',
-database_encoding=['latin1'])
+database_encoding=['latin1'], lazy_load_db = True)
 ```
 
-here the `targeted_database_files`, `screen_mutant_database_files`, `classification_database_files`, `transcript_database_file` argument are strings. If the user wants to use
-more than one file for each type, these should be provided as a list of strings.
+here the `targeted_database_files`, `screen_mutant_database_files`, `classification_database_files`, `transcript_database_file` argument are strings.
 Usually, the argument for this file would be the COSMIC files  that
 was downloaded as detailed in the Install section.
 
@@ -337,32 +336,9 @@ Similarly, `database_encoding` defines the
 text file encoding for every file (it is `latin1` for COSMIC version 102).
 
 {% hint style='danger' %}
-As the default database files are rather large, we recommend running this step on
-a computer with at least 32 GB of free memory. Otherwise, it is possible to
-filter the database files first, for instnace keeping only the rows that
-contain the gene name of interest. In bash this can be done by running:
-
-```
-$ head -n 1 Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv > header.txt
-$ grep MAP1LC3B Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv > content.txt
-$ cat header.txt content.txt > COSMIC_map1lc3b_CompleteTargetedScreenMutant.csv
-$ rm header.txt content.txt
-```
-The same procedure can be done for the file Cosmic_GenomeScreensMutant_v102_GRCh38.tsv.
-
-To map the COSMIC_PHENOTYPE_ID for the selected gene of interest in the  Cosmic_Classification_v102_GRCh38.tsv- run the following commands, parsing the COSMIC_PHENOTYPE_ID column number (6th column):
-
-```
-$ ( cut -d$'\t' -f6 COSMIC_map1lc3b_v102_TARGETED.csv; cut -d$'\t' -f6 COSMIC_map1lc3b_v102_SCREENMUT.csv; ) | sort -u > cosmic_phenotype_ids.txt
-$ grep -Fwf cosmic_phenotype_ids.txt Cosmic_Classification_v102_GRCh38.tsv > COSMIC_map1lc3b_Classification_v102_GRCh38.csv
-$ rm cosmic_phenotype_ids.txt
-```
-To map the TRANSCRIPT_ACESSION for the selected gene of interest in the Cosmic_Transcripts_v102_GRCh38.tsv- run the following commands, parsing the TRANSCRIPT_ACESSION column number (3th column)
-```
-$ (cut -d$'\t' -f3 COSMIC_map1lc3b_v102_TARGETED.csv; cut -d$'\t' -f3 COSMIC_map1lc3b_v102_SCREENMUT.csv;) | sort -u > transcript_accession_ids.txt
-$ grep -Fwf transcript_accession_ids.txt Cosmic_Transcripts_v102_GRCh38.tsv > COSMIC_map1lc3b_Transcript_v102_GRCh38.csv
-$ rm transcript_accession_ids.txt
-```
+As the default database files are rather large, we recommend creating the COSMIC data source object with `lazy_load_db = True`
+which will load the database files for the `gene_id` specified when the `add_mutation()` function is called.
+If it is necessary to load the complete database, set lazy_load_db = False.
 
 {% endhint %}
 

@@ -148,12 +148,12 @@ class UniProt(DynamicSource, object):
                 self.log.info("will use Uniprot ID %s" % this_upid)
 
             this_upac = self._get_aliases(this_upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
-        
+
         if upid is None:
             this_upid = self._get_aliases(this_upac, ['UniProtKB_uniProtkbId'])['UniProtKB_uniProtkbId']
         else:
             this_upid = upid
-        
+
         if isoform is not None:
             self.log.info(f"Isoform requested: {isoform}")
 
@@ -165,14 +165,14 @@ class UniProt(DynamicSource, object):
                 data = response.json()
             except Exception as e:
                 raise ValueError(f"Invalid JSON response from UniProt for {this_upac}: {str(e)}")
-            
+
             if "comments" not in data:
                 raise ValueError(f"No 'comments' section found in UniProt entry for {this_upac}")
-            
-            alt_prods = [x for x in data["comments"] if x["commentType"] == "ALTERNATIVE PRODUCTS"] 
+
+            alt_prods = [x for x in data["comments"] if x["commentType"] == "ALTERNATIVE PRODUCTS"]
             if not alt_prods:
                 raise ValueError(f"No alternative products found in UniProt entry for {this_upac}. Cannot resolve isoform '{isoform}'.")
-            
+
             is_canonical = False
             isoform_found = False
             try:
@@ -191,7 +191,7 @@ class UniProt(DynamicSource, object):
 
             if not isoform_found:
                 raise ValueError(f"Isoform {isoform} not listed in UniProt entry {this_upac}")
-            
+
             fasta_id = isoform
         else:
             fasta_id = this_upac
@@ -209,8 +209,8 @@ class UniProt(DynamicSource, object):
             aliases = {'uniprot'     : this_upid,
                        'uniprot_acc' : this_upac }
 
-        self.log.info("final aliases: %s" % aliases)      
-        
+        self.log.info("final aliases: %s" % aliases)
+
         self.log.info("retrieving sequence for UniProt sequence for Uniprot ID %s, Uniprot AC %s, gene %s" % (this_upid, fasta_id, gene_id))
 
         try:
@@ -585,7 +585,7 @@ class cBioPortal(DynamicSource, object):
 
 class COSMIC(DynamicSource, object):
     @logger_init
-    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, transcript_database_file, database_encoding=None, gene_id = None):
+    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, transcript_database_file, database_encoding=None, lazy_load_db = True):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
 
@@ -611,7 +611,9 @@ class COSMIC(DynamicSource, object):
         self._use_cols_classification_files = self._cosmic_phenotype_id_kwd + self._site_kwd + self._histology_kwd
 
         self._use_cols_transcript_files = ['TRANSCRIPT_ACCESSION','IS_CANONICAL']
-        self._gene_id = gene_id
+
+        self._lazy_load_db = lazy_load_db
+
         if isinstance(targeted_database_file, str):
             self._targeted_database_file = targeted_database_file
         else:
@@ -637,40 +639,47 @@ class COSMIC(DynamicSource, object):
             raise TypeError('COSMIC transcript_database_file does not have the correct format.')
 
         if database_encoding is None or isinstance(database_encoding, str):
-            encoding = database_encoding
+            self._encoding = database_encoding
         else:
             self.log.errror('encoding for COSMIC database files must be None, or a single string that applioes to all files')
             raise TypeError('encoding for COSMIC database files must be None, or a single string that applies to all files')
-        encoding = database_encoding
 
-        if self._gene_id is None:
-            filtered_targeted_database_file = self._targeted_database_file
-            filtered_screenmut_database_file = self._screen_mutant_database_file
-        elif isinstance(self._gene_id, str):
-            filtered_lines_t = []
-            filtered_lines_s = []
-            with open(self._targeted_database_file, "r", encoding=encoding) as t, open(self._screen_mutant_database_file, "r", encoding=encoding) as s:
+        try:
+            f = open(targeted_database_file, 'r')
+            f.close()
+        except Exception as e:
+            self.log.error(f'Error in reading database file {e}')
+        try:
+            f = open(screen_mutant_database_file, 'r')
+            f.close()
+        except Exception as e:
+            self.log.error(f'Error in reading database file {e}')
+        try:
+            f = open(classification_database_file, 'r')
+            f.close()
+        except Exception as e:
+            self.log.error(f'Error in reading database file {e}')
+        try:
+            f = open(transcript_database_file, 'r')
+            f.close()
+        except Exception as e:
+            self.log.error(f'Error in reading database file {e}')
 
-                filtered_lines_t.append(t.readline())
-                filtered_lines_s.append(s.readline())
-                filtered_lines_t += [line for line in t if line.startswith(self._gene_id)]
-                filtered_lines_s += [line for line in s if line.startswith(self._gene_id)]
+        if not self._lazy_load_db:
+            self._df = self._load_db_files(self._targeted_database_file, self._screen_mutant_database_file)
 
-            filtered_targeted_database_file = StringIO("".join(filtered_lines_t))
-            filtered_screenmut_database_file = StringIO("".join(filtered_lines_s))
-        else:
-            raise TypeError(f"gene_id must be a string or None")
+    def _load_db_files(self, targeted_db_file, screenmut_db_file):
 
         self.log.info("Parsing targeted database file...")
         try:
-            targeted_df = pd.read_csv(filtered_targeted_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=encoding)
+            targeted_df = pd.read_csv(targeted_db_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=self._encoding)
         except ValueError:
             self.log.error("Couldn't parse targeted database file due to invalid format or missing columns.")
             raise TypeError("Couldn't parse targeted database file due to invalid format or missing columns")
 
         self.log.info("Parsing screen mutant database file...")
         try:
-            screenmut_df = pd.read_csv(filtered_screenmut_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=encoding)
+            screenmut_df = pd.read_csv(screenmut_db_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=self._encoding)
         except ValueError:
             self.log.error("Couldn't parse screen mutant database file due to invalid format or missing columns")
             raise TypeError("Couldn't parse screen mutant database file due to invalid format or missing columns")
@@ -678,14 +687,14 @@ class COSMIC(DynamicSource, object):
 
         self.log.info("Parsing classification database file...")
         try:
-            classification_df = pd.read_csv(self._classification_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_classification_files, encoding=encoding)
+            classification_df = pd.read_csv(self._classification_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_classification_files, encoding=self._encoding)
         except ValueError:
             self.log.error("Couldn't parse classification database file due to invalid format or missing columns")
             raise TypeError("Couldn't parse classification database file due to invalid format or missing columns")
 
         self.log.info("Parsing transcript database file...")
         try:
-            transcript_df = pd.read_csv(self._transcript_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_transcript_files, encoding=encoding)
+            transcript_df = pd.read_csv(self._transcript_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_transcript_files, encoding=self._encoding)
         except ValueError:
             self.log.error("Couldn't parse transcript database file due to invalid format or missing columns")
             raise TypeError("Couldn't parse transcript database file due to invalid format or missing columns")
@@ -698,10 +707,12 @@ class COSMIC(DynamicSource, object):
             raise TypeError("Couldn't merge database files due to missing or incorrectly named join columns")
 
         try:
-            self._df = tmp_targeted_screenmut_classification_df.merge(transcript_df, on = 'TRANSCRIPT_ACCESSION',sort=False)
+            df = tmp_targeted_screenmut_classification_df.merge(transcript_df, on = 'TRANSCRIPT_ACCESSION',sort=False)
         except KeyError:
             self.log.error("Couldn't merge database files due to missing or incorrectly named join columns")
             raise TypeError("Couldn't merge database files due to missing or incorrectly named join columns")
+
+        return df
 
     def _parse_db_file(self, gene_id, genome_assembly_version = 'GRCh38',
                        cancer_types=None,
@@ -736,7 +747,28 @@ class COSMIC(DynamicSource, object):
             out_metadata['cancer_histology'] = []
             do_histology = True
 
-        df = self._df[ (self._df['GENE_SYMBOL'] == gene_id) & (self._df['IS_CANONICAL'] == 'y')]
+
+        if not self._lazy_load_db:
+            df = self._df[ (self._df['GENE_SYMBOL'] == gene_id) & (self._df['IS_CANONICAL'] == 'y') ]
+        else:
+            filtered_lines_t = []
+            filtered_lines_s = []
+            with open(self._targeted_database_file, "r", encoding=self._encoding) as t, open(self._screen_mutant_database_file, "r", encoding=self._encoding) as s:
+
+                filtered_lines_t.append(t.readline())
+                filtered_lines_s.append(s.readline())
+                filtered_lines_t += [ line for line in t if line.startswith(gene_id) ]
+                filtered_lines_s += [ line for line in s if line.startswith(gene_id) ]
+
+            if len(filtered_lines_s) == 1 and len(filtered_lines_t) == 1:
+                raise ValueError(f"The given gene_id {gene_id} is not present in the database files")
+
+            filtered_targeted_database_file = StringIO("".join(filtered_lines_t))
+            filtered_screenmut_database_file = StringIO("".join(filtered_lines_s))
+
+            df = self._load_db_files(filtered_targeted_database_file, filtered_screenmut_database_file)
+
+            df = df[ (df['IS_CANONICAL'] == 'y') ]
 
         if cancer_types is not None:
             df = df[ df['PRIMARY_HISTOLOGY'].isin(cancer_types) ]
@@ -803,6 +835,8 @@ class COSMIC(DynamicSource, object):
                 out_metadata['cancer_histology'].append([r.__getitem__(a) for a in self._histology_kwd])
 
         return mutations, out_metadata
+
+
 
     def add_mutations(self, sequence, genome_assembly_version = 'GRCh38',
                     cancer_types=None,

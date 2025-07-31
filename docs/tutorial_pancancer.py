@@ -40,7 +40,7 @@ cosmic = COSMIC(targeted_database_files ='/data/databases/cosmic-v102/Cosmic_Com
 				screen_mutant_database_files = '/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
 				classification_database_files = '/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
                 transcript_database_file = '/data/databases/cosmic-v102/Cosmic_Transcripts_v102_GRCh38.tsv',
-				database_encoding=['latin1'])
+				database_encoding=['latin1'], lazy_load_db = True)
 cosmic.add_mutations(seq,
 					 genome_assembly_version = 'GRCh38'
 					 metadata=['genomic_coordinates', 'genomic_mutations',
