@@ -28,7 +28,6 @@ Classes to interrogate data sources and annotate various data
 """
 
 import time
-#import requests
 import requests as rq
 from bioservices.uniprot import UniProt as bsUniProt
 from Bio.PDB.Polypeptide import three_to_index, index_to_one
@@ -57,9 +56,6 @@ from requests.adapters import HTTPAdapter
 import gget
 import xmltodict
 import time
-
-
-
 import sys
 if sys.version_info[0] >= 3:
     unicode = str
@@ -293,7 +289,6 @@ class UniProt(DynamicSource, object):
 
 
         return out
-
 
 
 class cBioPortal(DynamicSource, object):
