@@ -280,13 +280,13 @@ class GenomicMutation(Metadata):
     def __hash__(self):
         return hash((self.source, self.definition))
 
-class DbnsfpRevel(Metadata):
+class Revel(Metadata):
 
     description = "Revel score"
     header = "REVEL_score"
 
     def __init__(self, source, score):
-        super(DbnsfpRevel, self).__init__(source)
+        super(Revel, self).__init__(source)
         self.source = source
         self.score = score
 
@@ -297,7 +297,7 @@ class DbnsfpRevel(Metadata):
         return "%.3f" % self.score
 
     def __repr__(self):
-        return "<DbnsfpRevel, %.3f>" % self.score
+        return "<Revel, %.3f>" % self.score
 
     def __str__(self):
         return self.__repr__()
@@ -552,7 +552,7 @@ metadata_classes = {
                      'cancer_study'                : CancerStudy,
                      'genomic_coordinates'         : GenomicCoordinates,
                      'genomic_mutations'           : GenomicMutation,
-                     'revel_score'                 : DbnsfpRevel,
+                     'revel_score'                 : Revel,
                      'gnomad_genome_allele_frequency' : gnomADGenomeAlleleFrequency,
                      'gnomad_exome_allele_frequency' : gnomADExomeAlleleFrequency,
                      'gnomad_popmax_genome_allele_frequency' : gnomADPopmaxGenomeAlleleFrequency,
