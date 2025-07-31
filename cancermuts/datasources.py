@@ -1205,9 +1205,31 @@ class RevelDatabase(StaticSource, object):
             raise FileNotFoundError(f"REVEL database file does not exist: {revel_file}")
 
         self._revel_file = revel_file
-        self._revel_df = pd.read_csv(revel_file)
         self._supported_metadata = {'revel_score': self._get_revel}
         self._revel_filtered_df = None
+
+    def _filter_revel_by_transcript(self, transcript_id):
+
+        filtered_lines = []
+        file_path = self._revel_file
+
+        with open(file_path, 'r') as f:
+            header = next(f)  
+            for line_num, line in enumerate(f, start=2):
+                if transcript_id not in line:
+                    continue
+                filtered_lines.append(line)
+
+        if not filtered_lines:
+            self.log.warning(f"[REVEL] No entries found for transcript {transcript_id}")
+            return pd.DataFrame(columns=header.strip().split(','))
+
+        buffer = StringIO()
+        buffer.write(header)
+        buffer.writelines(filtered_lines)
+        buffer.seek(0)
+
+        return pd.read_csv(buffer)
 
     def add_metadata(self, sequence, md_type=['revel_score']):
         if type(md_type) is str:
@@ -1228,8 +1250,7 @@ class RevelDatabase(StaticSource, object):
             return
         
         if self._revel_filtered_df is None:
-            self._revel_filtered_df = self._revel_df[
-            self._revel_df['Ensembl_transcriptid'].str.contains(transcript_id)]
+            self._revel_filtered_df = self._filter_revel_by_transcript(transcript_id)
 
         mutations = []
         for pos in sequence.positions:
@@ -1241,7 +1262,7 @@ class RevelDatabase(StaticSource, object):
                 mutations.append((mut, gms, transcript_id))
 
         self._get_revel(mutations)
-
+    
     def _get_revel(self, mutation_entries):
         df = self._revel_filtered_df  
 
