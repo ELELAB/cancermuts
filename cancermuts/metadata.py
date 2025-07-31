@@ -577,7 +577,7 @@ class ClinVarCondition(Metadata):
         return self.conditions
 
     def get_value_str(self):
-        return ", ".join(self.conditions)
+        return ";".join(self.conditions)
 
 class ClinVarReviewStatus(Metadata):
     description = "ClinVar review status"
