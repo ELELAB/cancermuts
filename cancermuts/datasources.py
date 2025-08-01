@@ -585,7 +585,7 @@ class cBioPortal(DynamicSource, object):
 
 class COSMIC(DynamicSource, object):
     @logger_init
-    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, transcript_database_file, database_encoding=None, lazy_load_db = True):
+    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, transcript_database_file, database_encoding=None, lazy_load_db=True):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
 
@@ -612,92 +612,66 @@ class COSMIC(DynamicSource, object):
 
         self._use_cols_transcript_files = ['TRANSCRIPT_ACCESSION','IS_CANONICAL']
 
-        self._lazy_load_db = lazy_load_db
 
-        if isinstance(targeted_database_file, str):
-            self._targeted_database_file = targeted_database_file
-        else:
-            self.log.error('COSMIC targeted_database_file does not have the correct format.')
-            raise TypeError('COSMIC targeted_database_file does not have the correct format.')
+        database_files = [targeted_database_file,screen_mutant_database_file,
+                          classification_database_file,transcript_database_file]
+        for file in database_files:
+            if not isinstance(file, str):
+                self.log.error('COSMIC database file must be a string.')
+                raise TypeError('COSMIC database file  must be a string.')
 
-        if isinstance(screen_mutant_database_file, str):
-            self._screen_mutant_database_file = screen_mutant_database_file
-        else:
-            self.log.error('COSMIC screen_mutant_database_file does not have the correct format.')
-            raise TypeError('COSMIC screen_mutant_database_file does not have the correct format.')
-
-        if isinstance(classification_database_file, str):
-            self._classification_database_file = classification_database_file
-        else:
-            self.log.error('COSMIC classification_database_file does not have the correct format.')
-            raise TypeError('COSMIC classification_database_file does not have the correct format.')
-
-        if isinstance(transcript_database_file, str):
-            self._transcript_database_file = transcript_database_file
-        else:
-            self.log.error('COSMIC transcript_database_file does not have the correct format.')
-            raise TypeError('COSMIC transcript_database_file does not have the correct format.')
+        self._targeted_database_file = targeted_database_file
+        self._screen_mutant_database_file = screen_mutant_database_file
+        self._classification_database_file = classification_database_file
+        self._transcript_database_file = transcript_database_file
 
         if database_encoding is None or isinstance(database_encoding, str):
             self._encoding = database_encoding
         else:
-            self.log.errror('encoding for COSMIC database files must be None, or a single string that applioes to all files')
+            self.log.errror('encoding for COSMIC database files must be None, or a single string that applies to all files')
             raise TypeError('encoding for COSMIC database files must be None, or a single string that applies to all files')
 
-        try:
-            f = open(targeted_database_file, 'r')
-            f.close()
-        except Exception as e:
-            self.log.error(f'Error in reading database file {e}')
-        try:
-            f = open(screen_mutant_database_file, 'r')
-            f.close()
-        except Exception as e:
-            self.log.error(f'Error in reading database file {e}')
-        try:
-            f = open(classification_database_file, 'r')
-            f.close()
-        except Exception as e:
-            self.log.error(f'Error in reading database file {e}')
-        try:
-            f = open(transcript_database_file, 'r')
-            f.close()
-        except Exception as e:
-            self.log.error(f'Error in reading database file {e}')
+        for file in database_files:
+            try:
+                file = open(file, 'r')
+                file.close()
+            except Exception as e:
+                self.log.error(f'Error in reading database file {e}')
 
-        if not self._lazy_load_db:
+        if not lazy_load_db:
             self._df = self._load_db_files(self._targeted_database_file, self._screen_mutant_database_file)
+        else:
+            self._df = None
 
     def _load_db_files(self, targeted_db_file, screenmut_db_file):
 
-        self.log.info("Parsing targeted database file...")
-        try:
-            targeted_df = pd.read_csv(targeted_db_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=self._encoding)
-        except ValueError:
-            self.log.error("Couldn't parse targeted database file due to invalid format or missing columns.")
-            raise TypeError("Couldn't parse targeted database file due to invalid format or missing columns")
+        targeted_screenmut__db_files = [targeted_db_file, screenmut_db_file]
 
-        self.log.info("Parsing screen mutant database file...")
-        try:
-            screenmut_df = pd.read_csv(screenmut_db_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=self._encoding)
-        except ValueError:
-            self.log.error("Couldn't parse screen mutant database file due to invalid format or missing columns")
-            raise TypeError("Couldn't parse screen mutant database file due to invalid format or missing columns")
-        tmp_targeted_screenmut_df = pd.concat([targeted_df, screenmut_df], ignore_index=True, sort=False)
+        targeted_screenmut_dataframes = []
+        for fi, file in enumerate(targeted_screenmut__db_files):
+            self.log.info(f"Parsing database file {fi+1}...")
+            try:
+                targeted_screenmut_dataframes.append(pd.read_csv(file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=self._encoding))
+            except:
+                self.log.error(f"Couldn't parse database file {fi+1}")
+                raise TypeError(f"Couldn't parse database file {fi+1}")
 
-        self.log.info("Parsing classification database file...")
+        tmp_targeted_screenmut_df = pd.concat(targeted_screenmut_dataframes, ignore_index=True, sort=False)
+
+        self.log.info(f"Parsing database file {len(targeted_screenmut__db_files)+1}...")
         try:
             classification_df = pd.read_csv(self._classification_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_classification_files, encoding=self._encoding)
         except ValueError:
-            self.log.error("Couldn't parse classification database file due to invalid format or missing columns")
-            raise TypeError("Couldn't parse classification database file due to invalid format or missing columns")
+            self.log.error(f"Couldn't parse database file {len(targeted_screenmut__db_files)+1}")
+            raise TypeError(f"Couldn't parse database file {len(targeted_screenmut__db_files)+1}")
 
-        self.log.info("Parsing transcript database file...")
+        self.log.info(f"Parsing database file {len(targeted_screenmut__db_files)+2}...")
         try:
             transcript_df = pd.read_csv(self._transcript_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_transcript_files, encoding=self._encoding)
         except ValueError:
-            self.log.error("Couldn't parse transcript database file due to invalid format or missing columns")
-            raise TypeError("Couldn't parse transcript database file due to invalid format or missing columns")
+            self.log.error(f"Couldn't parse database file {len(targeted_screenmut__db_files)+2}")
+            raise TypeError(f"Couldn't parse database file {len(targeted_screenmut__db_files)+2}")
+
 
         self.log.info("Merging database files into a dataframe...")
         try:
@@ -714,7 +688,7 @@ class COSMIC(DynamicSource, object):
 
         return df
 
-    def _parse_db_file(self, gene_id, genome_assembly_version = 'GRCh38',
+    def _parse_db_files(self, gene_id, genome_assembly_version = 'GRCh38',
                        cancer_types=None,
                        cancer_histology_subtype_1=None,
                        cancer_histology_subtype_2=None,
@@ -748,7 +722,7 @@ class COSMIC(DynamicSource, object):
             do_histology = True
 
 
-        if not self._lazy_load_db:
+        if self._df is not None:
             df = self._df[ (self._df['GENE_SYMBOL'] == gene_id) & (self._df['IS_CANONICAL'] == 'y') ]
         else:
             filtered_lines_t = []
@@ -757,8 +731,8 @@ class COSMIC(DynamicSource, object):
 
                 filtered_lines_t.append(t.readline())
                 filtered_lines_s.append(s.readline())
-                filtered_lines_t += [ line for line in t if line.startswith(gene_id) ]
-                filtered_lines_s += [ line for line in s if line.startswith(gene_id) ]
+                filtered_lines_t += [ line for line in t if gene_id in line.split() ]
+                filtered_lines_s += [ line for line in s if gene_id in line.split() ]
 
             if len(filtered_lines_s) == 1 and len(filtered_lines_t) == 1:
                 raise ValueError(f"The given gene_id {gene_id} is not present in the database files")
@@ -838,7 +812,7 @@ class COSMIC(DynamicSource, object):
 
 
 
-    def add_mutations(self, sequence, genome_assembly_version = 'GRCh38',
+    def add_mutations(self, sequence, genome_assembly_version='GRCh38',
                     cancer_types=None,
                     cancer_histology_subtype_1=None,
                     cancer_histology_subtype_2=None,
@@ -863,7 +837,7 @@ class COSMIC(DynamicSource, object):
         else:
             gene_id = sequence.gene_id
 
-        raw_mutations, out_metadata = self._parse_db_file(gene_id, genome_assembly_version = genome_assembly_version,
+        raw_mutations, out_metadata = self._parse_db_files(gene_id, genome_assembly_version = genome_assembly_version,
                                                             cancer_types=cancer_types,
                                                             cancer_histology_subtype_1=cancer_histology_subtype_1,
                                                             cancer_histology_subtype_2=cancer_histology_subtype_2,
