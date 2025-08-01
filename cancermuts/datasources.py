@@ -1359,19 +1359,16 @@ class ClinVar(DynamicSource, object):
         out_metadata = {md: [] for md in metadata}
 
         for clinvar_id, data in missense_variants.items():
+            full_variant = data["variant"]
             try:
-                full_variant = data["variant"]
-                
                 # Extract "p.Met88Thr" from the full variant string:
                 match = re.search(r"\(p\.([A-Z][a-z][a-z][0-9]+[A-Z][a-z][a-z])\)", full_variant)
                 three_letter_mut = "p." + match.group(1)
-
                 # Convert 3-letter to 1-letter format:
                 ref_aa = index_to_one(three_to_index(str.upper(three_letter_mut[2:5])))
                 pos = int(re.search(r"[0-9]+", three_letter_mut).group(0))
                 alt_aa = index_to_one(three_to_index(str.upper(three_letter_mut[-3:])))
                 one_letter_mut = f"{ref_aa}{pos}{alt_aa}"
-            
             except Exception as e:
                 self.log.error(f"[ClinVar] Variant parsing failed for {clinvar_id}: {e}")
 
