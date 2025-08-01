@@ -1201,7 +1201,7 @@ class ClinVar(DynamicSource, object):
                 self.log.error(f"Could not parse annotation: {ann} → {e}")
         return genomic_mutations
 
-    def _get_available_muts_and_md(self, sequence, gene, refseq, clinvar_ids):
+    def _get_available_muts_and_md(self, sequence, gene, refseq, clinvar_ids, metadata=[]):
 
         # Initial object assignment:
         missense_variants = {}
@@ -1356,6 +1356,8 @@ class ClinVar(DynamicSource, object):
                 self.log.info(f"{classification} mutations passed the consistency check")
 
         mutations = []
+        out_metadata = {md: [] for md in metadata}
+
         for clinvar_id, data in missense_variants.items():
             try:
                 full_variant = data["variant"]
@@ -1369,38 +1371,48 @@ class ClinVar(DynamicSource, object):
                 pos = int(re.search(r"[0-9]+", three_letter_mut).group(0))
                 alt_aa = index_to_one(three_to_index(str.upper(three_letter_mut[-3:])))
                 one_letter_mut = f"{ref_aa}{pos}{alt_aa}"
-
-                # Find position in sequence:
-                site_idx = sequence.seq2index(pos)
-                position = sequence.positions[site_idx]
-
-                if position.wt_residue_type != ref_aa:
-                    raise ValueError(
-                        f"Error with ClinVar ID {clinvar_id}: Ref AA mismatch at position {pos} "
-                        f"(expected {ref_aa}, found {position.wt_residue_type})"
-                    )
-
-                # Create mutation:
-                mutation = Mutation(position, alt_aa, [self])
-
-                # Direct assignment to mutation.metadata using metadata classes:
-                mutation.metadata["clinvar_classification"] = [ClinVarClassification(self, data["classifications"])]
-                mutation.metadata["clinvar_condition"] = [ClinVarCondition(self, data["conditions"])]
-                mutation.metadata["clinvar_review_status"] = [ClinVarReviewStatus(self, data["review_status"])]
-                mutation.metadata["genomic_mutations"] = list(data["genomic_annotations_obj"].values())
-                mutation.metadata["clinvar_variant_id"] = [ClinVarVariantID(self, clinvar_id)]
-                mutation.metadata["genomic_coordinates"] = [
-                    GenomicCoordinates(self, gm.genome_build, gm.chr,
-                    gm.coord if gm.is_snv else gm.coord_start,
-                    gm.coord if gm.is_snv else gm.coord_end,
-                    gm.ref if gm.is_snv else gm.substitution)
-                    for gm in genomic_annotations_obj.values()
-                ]
-
-                mutations.append(mutation)
-
+            
             except Exception as e:
-                self.log.error(f"[ClinVar] Failed to process mutation for {clinvar_id}: {e}")
+                self.log.error(f"[ClinVar] Variant parsing failed for {clinvar_id}: {e}")
+
+            # Find position in sequence:
+            try:
+                site_idx = sequence.seq2index(pos)
+            except:
+                self.log.warning(f"mutation {one_letter_mut} is outside the protein sequence; it will be skipped")
+                continue
+            
+            position = sequence.positions[site_idx] 
+            if position.wt_residue_type != ref_aa:
+                self.log.warning(
+                    f"Error with ClinVar ID {clinvar_id}: Ref AA mismatch at position {pos} "
+                    f"(expected {ref_aa}, found {position.wt_residue_type})"
+                )
+
+            # Create mutation:
+            mutation = Mutation(position, alt_aa, [self])
+
+            # Store metadata:
+            if "clinvar_classification" in metadata:
+                out_metadata["clinvar_classification"].append(data["classifications"])
+            if "clinvar_condition" in metadata:
+                out_metadata["clinvar_condition"].append(data["conditions"])
+            if "clinvar_review_status" in metadata:
+                out_metadata["clinvar_review_status"].append(data["review_status"])
+            if "genomic_mutations" in metadata:
+                out_metadata["genomic_mutations"].append(list(data["genomic_annotations_obj"].values()))
+            if "genomic_coordinates" in metadata:
+                out_metadata["genomic_coordinates"].append([
+                [gm.genome_build, gm.chr,
+                 gm.coord if gm.is_snv else gm.coord_start,
+                 gm.coord if gm.is_snv else gm.coord_end,
+                 gm.ref if gm.is_snv else gm.substitution]
+                 for gm in data["genomic_annotations_obj"].values()
+                ])
+            if "clinvar_variant_id" in metadata:
+                out_metadata["clinvar_variant_id"].append(clinvar_id)
+
+            mutations.append(mutation)
 
         # Create auxiliary dataframes:
         df_strange = pd.DataFrame()
@@ -1437,28 +1449,15 @@ class ClinVar(DynamicSource, object):
         # Entry not found:
         if len(not_found_gene) != 0:
             if len(not_found_var) != 0:
-                df_nost_found = pd.DataFrame(list(zip(not_found_gene, not_found_var)), columns=['gene_name', "variant_name"])
+                df_not_found = pd.DataFrame(list(zip(not_found_gene, not_found_var)), columns=['gene_name', "variant_name"])
             else:
                 df_not_found = pd.DataFrame(list(not_found_gene), columns=['gene_name'])
 
-        return {
-                "mutations": mutations,  
-                "variants_to_check": df_strange,
-                "entry_not_found": df_not_found,
-                "inconsistency_annotations": df2
-        }
+        return mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene
 
     def add_mutations(self, sequence, metadata=[]):
         gene = sequence.gene_id
         refseq = sequence.aliases["refseq"]
-        if not refseq:
-            raise ValueError("Missing RefSeq identifier in sequence.aliases['refseq']")
-
-        for md in metadata:
-            if md not in self._clinvar_supported_metadata:
-                self.log.error(f'{md} is not a valid metadata. Supported metadata are: {_clinvar_supported_metadata}')
-                raise ValueError(f'{md} is not a valid metadata. Supported metadata are: {_clinvar_supported_metadata}')
-
         filter_missense_variants = f'({gene}[gene] AND ("missense variant"[molecular consequence] OR "SO:0001583"[molecular consequence]))'
         mutation_type = "missense"
 
@@ -1466,21 +1465,36 @@ class ClinVar(DynamicSource, object):
             clinvar_ids, out_gene = self._filtered_variants_extractor(filter_missense_variants,mutation_type,gene)
         except RuntimeError as e:
             raise RuntimeError(f"ClinVar mutation extraction failed: {e}")
-        
+
+        mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene = self._get_available_muts_and_md(sequence, gene, refseq, clinvar_ids, metadata)
+
         if not clinvar_ids:
             not_found_gene.append(out_gene)
             return
 
-        results = self._get_available_muts_and_md(sequence, gene, refseq, clinvar_ids)
-        for mutation in results["mutations"]:
+        for mutation_idx, mutation in enumerate(mutations):
+            for md in metadata:
+                if md not in self._clinvar_supported_metadata:
+                    self.log.error(f'{md} is not a valid metadata. Supported metadata are: {self._clinvar_supported_metadata}')
+                    raise ValueError(f'{md} is not a valid metadata. Supported metadata are: {self._clinvar_supported_metadata}')
+
+                value = out_metadata[md][mutation_idx]
+                if value is not None:
+                    if md == "genomic_coordinates":
+                        mutation.metadata[md] = [GenomicCoordinates(self, *coord) for coord in value]
+                    elif md == "genomic_mutations":
+                        mutation.metadata[md] = value
+                    else:
+                        mutation.metadata[md] = [metadata_classes[md](self, value)]
+            
+            self.log.debug("adding mutation %s" % str(mutation))
             mutation.sequence_position.add_mutation(mutation)
 
-        # Store DataFrames for external access if needed
-        self.df_variants_to_check = results["variants_to_check"]
-        self.df_entry_not_found = results["entry_not_found"]
-        self.df_inconsistency_annotations = results["inconsistency_annotations"]
-
-        return results
+        return {
+            "variants_to_check": df_strange,
+            "entry_not_found": df_not_found,
+            "inconsistency_annotations": df2
+        }
 
 class COSMIC(DynamicSource, object):
     @logger_init
