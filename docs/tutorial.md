@@ -321,14 +321,14 @@ In this cases, Cancermuts tries its best to infer it from the study name.
 As before, we first create a COSMIC data source object:
 
 ```py
-cosmic = COSMIC(targeted_database_files ='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
-screen_mutant_database_files = '/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
-classification_database_files = '/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
-transcript_database_file = '/data/databases/cosmic-v102/Cosmic_Transcripts_v102_GRCh38.tsv',
-database_encoding=['latin1'], lazy_load_db = True)
+cosmic = COSMIC(targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
+screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
+classification_database_fil='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
+transcript_database_file='/data/databases/cosmic-v102/Cosmic_Transcripts_v102_GRCh38.tsv',
+database_encoding='latin1', lazy_load_db= rue)
 ```
 
-here the `targeted_database_files`, `screen_mutant_database_files`, `classification_database_files`, `transcript_database_file` argument are strings.
+here the `targeted_database_file`, `screen_mutant_database_file`, `classification_database_file`, `transcript_database_file` argument are strings.
 Usually, the argument for this file would be the COSMIC files  that
 was downloaded as detailed in the Install section.
 
@@ -346,7 +346,7 @@ We can then add mutations from the COSMIC data source:
 
 ```py
 cosmic.add_mutations(seq,
-                     genome_assembly_version = 'GRCh38',
+                     genome_assembly_version='GRCh38',
 					 cancer_sites=['large_intestine'],
 					 cancer_site_subtype_1=['colon'],
 					 cancer_types=['carcinoma'],

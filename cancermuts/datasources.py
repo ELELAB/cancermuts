@@ -628,7 +628,7 @@ class COSMIC(DynamicSource, object):
         if database_encoding is None or isinstance(database_encoding, str):
             self._encoding = database_encoding
         else:
-            self.log.errror('encoding for COSMIC database files must be None, or a single string that applies to all files')
+            self.log.error('encoding for COSMIC database files must be None, or a single string that applies to all files')
             raise TypeError('encoding for COSMIC database files must be None, or a single string that applies to all files')
 
         for file in database_files:
