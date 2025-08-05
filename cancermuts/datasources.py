@@ -610,7 +610,7 @@ class COSMIC(DynamicSource, object):
 
         self._use_cols_classification_files = self._cosmic_phenotype_id_kwd + self._site_kwd + self._histology_kwd
 
-        self._use_cols_transcript_files = ['TRANSCRIPT_ACCESSION','IS_CANONICAL']
+        self._use_cols_transcript_files = ['TRANSCRIPT_ACCESSION', 'IS_CANONICAL']
 
 
         database_files = [targeted_database_file,screen_mutant_database_file,
@@ -636,7 +636,8 @@ class COSMIC(DynamicSource, object):
                 file = open(file, 'r')
                 file.close()
             except Exception as e:
-                self.log.error(f'Error in reading database file {e}')
+                self.log.error(f"Couldn't open database file {e}")
+                raise
 
         if not lazy_load_db:
             self._df = self._load_db_files(self._targeted_database_file, self._screen_mutant_database_file)
@@ -645,33 +646,35 @@ class COSMIC(DynamicSource, object):
 
     def _load_db_files(self, targeted_db_file, screenmut_db_file):
 
-        targeted_screenmut__db_files = [targeted_db_file, screenmut_db_file]
+        targeted_screenmut_db_files = [targeted_db_file, screenmut_db_file]
+        targeted_screenmut_db_filenames = [os.path.basename(self._targeted_database_file), os.path.basename(self._screen_mutant_database_file)]
 
         targeted_screenmut_dataframes = []
-        for fi, file in enumerate(targeted_screenmut__db_files):
-            self.log.info(f"Parsing database file {fi+1}...")
+        for fi, file in enumerate(targeted_screenmut_db_files):
+            self.log.info(f"Parsing database file {targeted_screenmut_db_filenames[fi]}...")
             try:
                 targeted_screenmut_dataframes.append(pd.read_csv(file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=self._encoding))
             except:
-                self.log.error(f"Couldn't parse database file {fi+1}")
-                raise TypeError(f"Couldn't parse database file {fi+1}")
+                self.log.error(f"Couldn't parse database file {targeted_screenmut_db_filenames[fi]}")
+                raise TypeError(f"Couldn't parse database file {targeted_screenmut_db_filenames[fi]}")
 
         tmp_targeted_screenmut_df = pd.concat(targeted_screenmut_dataframes, ignore_index=True, sort=False)
 
-        self.log.info(f"Parsing database file {len(targeted_screenmut__db_files)+1}...")
+        classification_db_filename = os.path.basename(self._classification_database_file)
+        self.log.info(f"Parsing database file {classification_db_filename}...")
         try:
             classification_df = pd.read_csv(self._classification_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_classification_files, encoding=self._encoding)
         except ValueError:
-            self.log.error(f"Couldn't parse database file {len(targeted_screenmut__db_files)+1}")
-            raise TypeError(f"Couldn't parse database file {len(targeted_screenmut__db_files)+1}")
+            self.log.error(f"Couldn't parse database file {classification_db_filename}")
+            raise TypeError(f"Couldn't parse database file {classification_db_filename}")
 
-        self.log.info(f"Parsing database file {len(targeted_screenmut__db_files)+2}...")
+        transcript_db_filename = os.path.basename(self._transcript_database_file)
+        self.log.info(f"Parsing database file {transcript_db_filename}...")
         try:
             transcript_df = pd.read_csv(self._transcript_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_transcript_files, encoding=self._encoding)
         except ValueError:
-            self.log.error(f"Couldn't parse database file {len(targeted_screenmut__db_files)+2}")
-            raise TypeError(f"Couldn't parse database file {len(targeted_screenmut__db_files)+2}")
-
+            self.log.error(f"Couldn't parse database file {transcript_db_filename}")
+            raise TypeError(f"Couldn't parse database file {transcript_db_filename}")
 
         self.log.info("Merging database files into a dataframe...")
         try:
@@ -731,8 +734,8 @@ class COSMIC(DynamicSource, object):
 
                 filtered_lines_t.append(t.readline())
                 filtered_lines_s.append(s.readline())
-                filtered_lines_t += [ line for line in t if gene_id in line.split() ]
-                filtered_lines_s += [ line for line in s if gene_id in line.split() ]
+                filtered_lines_t += [ line for line in t if line.startswith(f'{gene_id}\t') ]
+                filtered_lines_s += [ line for line in s if line.startswith(f'{gene_id}\t') ]
 
             if len(filtered_lines_s) == 1 and len(filtered_lines_t) == 1:
                 raise ValueError(f"The given gene_id {gene_id} is not present in the database files")
