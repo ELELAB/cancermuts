@@ -724,7 +724,6 @@ class COSMIC(DynamicSource, object):
             out_metadata['cancer_histology'] = []
             do_histology = True
 
-
         if self._df is not None:
             df = self._df[ (self._df['GENE_SYMBOL'] == gene_id) & (self._df['IS_CANONICAL'] == 'y') ]
         else:
@@ -788,7 +787,6 @@ class COSMIC(DynamicSource, object):
                 else:
                     raise ValueError(f"Unsupported genome assembly version {grch}")
 
-
                 gd.append(r['CHROMOSOME'])
                 gd.append(r['GENOME_START'])
                 gd.append(r['GENOME_STOP'])
@@ -813,8 +811,6 @@ class COSMIC(DynamicSource, object):
 
         return mutations, out_metadata
 
-
-
     def add_mutations(self, sequence, genome_assembly_version='GRCh38',
                     cancer_types=None,
                     cancer_histology_subtype_1=None,
@@ -825,6 +821,11 @@ class COSMIC(DynamicSource, object):
                     cancer_site_subtype_2=None,
                     cancer_site_subtype_3=None,
                     use_alias=None, metadata=[]):
+
+        if not sequence.is_canonical:
+            raise UnexpectedIsoformError(
+                "COSMIC supports canonical isoforms. Please use a Sequence object for a canonical isoform")
+
         _cosmic_supported_metadata = ['cancer_type', 'genomic_coordinates', 'genomic_mutations', 'cancer_site', 'cancer_histology']
 
         for md in metadata:
