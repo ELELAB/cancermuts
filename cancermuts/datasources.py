@@ -1369,6 +1369,7 @@ class ClinVar(DynamicSource, object):
                     f"Error with ClinVar ID {clinvar_id}: Ref AA mismatch at position {pos} "
                     f"(expected {ref_aa}, found {position.wt_residue_type})"
                 )
+                continue
 
             # Create mutation:
             mutation = Mutation(position, alt_aa, [self])
