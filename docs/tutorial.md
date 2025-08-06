@@ -5,7 +5,7 @@ well-known autophagy marker protein, MAP1LC3B (or more simply, LC3B).
 
 We will download associated cancer mutations from both cBioPortal and COSMIC
 and annotate proteins and mutations with all the data sources available in
-Cancermuts. 
+Cancermuts.
 
 ## Preliminary operations
 
@@ -14,10 +14,14 @@ is available to be imported. If you have followed the recommended installation
 procedure and installed Cancermuts in a Python environment you need to activate
 it first, as detailed in point 3 of the installation.
 
-You also need to have downloaded the COSMIC mutation export file, as detailed in 
-the installation section.
+You also need to have downloaded the following COSMIC files:
+- Cosmic_CompleteTargetedScreensMutant_Tsv_v102_GRCh38.tar
+- Cosmic_GenomeScreensMutant_Tsv_v102_GRCh38.tar
+- Cosmic_Classification_Tsv_v102_GRCh38.tar
+- Cosmic_Transcripts_Tsv_v102_GRCh38.tar
+as detailed in the installation section.
 
-Finally, you can decide to perform this tutorial either interactively (i.e. 
+Finally, you can decide to perform this tutorial either interactively (i.e.
 running line by line in a Python command line) or as a script (i.e. saving
 the lines you need in a script and running it). The two options are equvalent
 from the point of view of the result. If you're going for the first
@@ -119,21 +123,21 @@ identifier, to the isoform argument, as in the following example. If this is not
 the canonical UniProt isoform will be used. Notice that, currently, only some
 data sources support alternative isoform; those that do not support them will
 raise exceptions if a Sequence object containing an alternative isoform is provided to them.
-In this case we provide an example which use a non-canonical isoform as input in the 
-`tutorial_alternative_isoforms.py` file. It's run in the same way as with the other 
+In this case we provide an example which use a non-canonical isoform as input in the
+`tutorial_alternative_isoforms.py` file. It's run in the same way as with the other
 tutorial script:
 
 ```
 $ python tutorial_alternative_isoforms.py
 ```
-It loads a specific AMBRA1 isoform (since LC3B lacks characterized non-canonical isoforms) and 
+It loads a specific AMBRA1 isoform (since LC3B lacks characterized non-canonical isoforms) and
 ends after successfully downloading and displaying the isoform sequence.
 
 ## Tutorial steps
 
 ### The Sequence object
 
-Cancermuts works 
+Cancermuts works
 The first operation to be performed when starting to work with Cancermuts is creating
 a Sequence object. This object represents the protein sequence we want to consider for
 the analysis and links together all the information we are going to collect. In order to
@@ -199,15 +203,15 @@ We first import the required datasource classes for them:
 For cBioPortal, we first create the respective source object:
 
 ```py
->>> cb = cBioPortal(cancer_studies=['coadread_dfci_2016', 
+>>> cb = cBioPortal(cancer_studies=['coadread_dfci_2016',
 	                            'coadread_genentech',
 	                            'coadread_tcga_pan_can_atlas_2018'])
 ```
 
-For this tutorial, we specify a list of cancer studies Cancermuts should 
+For this tutorial, we specify a list of cancer studies Cancermuts should
 use, which correspond to a few colorectal cancer studies. This is especially
 useful if we are interested in e.g. a certain cancer type or some other
-specific studies. Studies can be referred to using their cBioPortal 
+specific studies. Studies can be referred to using their cBioPortal
 study identifier.
 
 {% hint style='info' %}
@@ -223,7 +227,7 @@ and can be manipulated as such, including saved to csv files or similar.
 Alternatively, one can visit the [cBioPortal datasets page](https://www.cbioportal.org/datasets)
 which contains a list of all the available studies. While this list doesn't
 contain a column with study IDs, the web links that link the studies in the
-"Name" column do contain the IDs. For instance, the study named 
+"Name" column do contain the IDs. For instance, the study named
 "Breast Invasive Carcinoma (Broad, Nature 2012)" links the page
 `https://www.cbioportal.org/study?id=brca_broad` - meaning the corresponding
 study ID is `brca_broad`.
@@ -317,55 +321,50 @@ In this cases, Cancermuts tries its best to infer it from the study name.
 As before, we first create a COSMIC data source object:
 
 ```py
-cosmic = COSMIC(database_files='/data/databases/cosmic-v95/CosmicMutantExport.tsv',
-	            database_encoding=['latin1'])
+cosmic = COSMIC(targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
+screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
+classification_database_fil='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
+transcript_database_file='/data/databases/cosmic-v102/Cosmic_Transcripts_v102_GRCh38.tsv',
+database_encoding='latin1', lazy_load_db= rue)
 ```
 
-here the `database_files` argument is a string. If the user wants to use
-more than one database file, these should be provided as a list of strings.
-Usually, the argument for this file would be the COSMIC database file  that 
+here the `targeted_database_file`, `screen_mutant_database_file`, `classification_database_file`, `transcript_database_file` argument are strings.
+Usually, the argument for this file would be the COSMIC files  that
 was downloaded as detailed in the Install section.
 
 Similarly, `database_encoding` defines the
-text file encoding for every file (it is `latin1` for COSMIC version 95).
+text file encoding for every file (it is `latin1` for COSMIC version 102).
 
 {% hint style='danger' %}
-As the default database file is rather large, we recommend running this step on
-a computer with at least 32 GB of free memory. Otherwise, it is possible to
-filter the database file first, for instnace keeping only the rows that
-contain the gene name of interest. In bash this can be done by running:
+As the default database files are rather large, we recommend creating the COSMIC data source object with `lazy_load_db = True`
+which will load the database files for the `gene_id` specified when the `add_mutation()` function is called.
+If it is necessary to load the complete database, set lazy_load_db = False.
 
-```
-$ head -n 1 CosmicMutantExport.tsv > header.txt
-$ grep MAP1LC3B CosmicMutantExport.tsv > content.txt
-$ cat header.txt content.txt > COSMIC_map1lc3b.csv
-$ rm header.txt content.txt
-```
-
-and then using the resulting file as the database file
 {% endhint %}
 
 We can then add mutations from the COSMIC data source:
 
 ```py
-cosmic.add_mutations(seq, 
+cosmic.add_mutations(seq,
+                     genome_assembly_version='GRCh38',
 					 cancer_sites=['large_intestine'],
 					 cancer_site_subtype_1=['colon'],
 					 cancer_types=['carcinoma'],
-					 cancer_histology_subtype_1=['adenocarcinoma'], 
+					 cancer_histology_subtype_1=['adenocarcinoma'],
 					 metadata=['genomic_coordinates', 'genomic_mutations',
 					 		   'cancer_site', 'cancer_histology'])
 ```
 
 Here we restrict the search to those mutations that are involved in colorectal
-adenocarcinoma. 
+adenocarcinoma.
 
 {% hint style='info' %}
 It is also possible to search in any available cancer type or site as well (i.e. pancancer),
 by not specifying cancer types or sites in the `add_mutations` call, for instance:
 
 ```py
-cosmic.add_mutations(seq, metadata=['genomic_coordinates', 'genomic_mutations', 
+cosmic.add_mutations(seq,genome_assembly_version = 'GRCh38',
+                     metadata=['genomic_coordinates', 'genomic_mutations',
                                        'cancer_site', 'cancer_histology'])
 ```
 {% endhint %}
@@ -385,7 +384,7 @@ Furthermore, similarly to cBioPortal, we retain some metadata:
     of the corresponding genomic mutation
 
 In this case, filtering the database allows to add only a single mutation,
-which is K65E. It should be noted that the same amino acid substitution 
+which is K65E. It should be noted that the same amino acid substitution
 was already identified by cBioPortal. This means that the mutation object
 corresponding to this aminoacid substitution is annotated with metadata for
 this newfound mutation. We see now that the details obtained by both cBioPortal
@@ -449,7 +448,7 @@ the two scores we are able to gather have the same value.
 
 Similarly, we annotate mutations with their exome or genome allele frequencies
 as found in the [gnomAD database](https://www.gnomad.org). It is also possible to
-annotate with the highest allele frequency found in non-bottlenecked 
+annotate with the highest allele frequency found in non-bottlenecked
 populations (referred to as popmax). This works as you would expect by now:
 
 ```py
@@ -462,19 +461,19 @@ populations (referred to as popmax). This works as you would expect by now:
 	                              'gnomad_popmax_genome_allele_frequency'])
 ```
 
-here, we specify the `version` argument to specify the version of gnomAD to be 
+here, we specify the `version` argument to specify the version of gnomAD to be
 considered. Please refer to the API documentation for all the available versions.
 
 The `md_type` keyword allows to select which metadata type(s) to annotate, i.e.
-choose between exome or genome allele frequency (or both as in the example) and whether 
-to annotate the popmax as well. Note, that they can all be chosen independently 
+choose between exome or genome allele frequency (or both as in the example) and whether
+to annotate the popmax as well. Note, that they can all be chosen independently
 of each other.
 
 We calculate the allele frequency as the ratio between the total allele count over
-the allele number as found in gnomAD, if the entry for the corresponding variant 
+the allele number as found in gnomAD, if the entry for the corresponding variant
 is available.
 
-The popmax allele frequency is found by calculating the exome and/or genome allele frequency from 
+The popmax allele frequency is found by calculating the exome and/or genome allele frequency from
 all supported non-bottlenecked populations and then finding the maximum frequency of those.
 
 Finally we can check the downloaded metadata:
@@ -534,12 +533,12 @@ argument of the `add_position_properties` (see below).
 
 Once the object is created we can add the position properties to our sequence
 object. If no `properties` is supplied, all of them will be considered. Otherwise,
-the `properties` object should be a list of the keywords corresponding to the PTMs 
+the `properties` object should be a list of the keywords corresponding to the PTMs
 that we want to be annotated, as follows:
 
 | Keyword | Description |
 | ------- | ----------- |
-| `acetylation` | Acetylation | 
+| `acetylation` | Acetylation |
 | `methylation` | Methylation |
 | `O-GalNAc` | O-linked β-N-acetylglucosamine |
 | `O-GlcNAc` | O-linked α-N-acetylgalactosamine |
@@ -550,7 +549,7 @@ that we want to be annotated, as follows:
 So, for instance:
 
 ```py
->>> ps.add_position_properties(seq, 
+>>> ps.add_position_properties(seq,
 	                           properties=['phosphorylation', 'ubiquitination'])
 ```
 
@@ -600,7 +599,7 @@ There are four types of annotations, here listed in order of priority.
 * Disordered, predicted
     * Based on predictions
 
-If none of these data are available for the consensus, the residue will not be annotated. 
+If none of these data are available for the consensus, the residue will not be annotated.
 For more information about the types of evidence, please see the [MobiDB vocabulary](https://mobidb.bio.unipd.it/about/vocabulary)
 
 ### Sequence properties
@@ -677,8 +676,8 @@ information. The file should have the following columns, separated by `;`:
 
 | Column | Description |
 | ------ | ----------- |
-| `name` | name that is given to this feature. It can be any string. | 
-| `site` | position of this feature; see below | 
+| `name` | name that is given to this feature. It can be any string. |
+| `site` | position of this feature; see below |
 | `type` | type of this feature; see below |
 | `function` | function description of this feature or functional annotation; see below |
 | `reference` | reference to the literature for this feature (if any) |
@@ -700,7 +699,7 @@ The column format changes depending on the `type`:
     `genomic_mutations` metadata should also be specified when calling `ManualAnnotation.add_mutations`
     See the examples below.
 
-* If we want to annotate a post-translational modification, then 
+* If we want to annotate a post-translational modification, then
     * `type` should be one of `ptm_phosphorylation`,
 `ptm_ubiquitination`, `ptm_acetylation`, `ptm_sumoylation`, `ptm_nitrosylation`,
 `ptm_methylation`
@@ -710,7 +709,7 @@ The column format changes depending on the `type`:
     * `function` can be any string
     * `reference` can be any string
 
-* If we want to annotate a novel short linear motif, then 
+* If we want to annotate a novel short linear motif, then
 	* `type` should be `linear_motif`
 	* `site` should be a dash-separated residue range, i.e. `10-25` to signify
 	from residue 10 to 25 in the aminoacid sequence, 1-based, including extremities
@@ -831,4 +830,3 @@ are generated. The argument is the number of desired positions
 changed by using argument `mutation_elms_only=False`
 * option `figsize` accepts a tuple of number (width and height) and allows to
 change size and proportion of the output figure (e.g. `figsize=(4,5)`)
-

@@ -1,5 +1,5 @@
 # import the UniProt data source class
-from cancermuts.datasources import UniProt 
+from cancermuts.datasources import UniProt
 
 # create the corresponding uniprot object
 up = UniProt()
@@ -36,11 +36,14 @@ print(seq.positions[38].mutations[0].metadata)
 
 
 # add mutations from COSMIC
-cosmic = COSMIC(database_files=['/data/databases/cosmic-v96/CosmicMutantExport.tsv'],
-                database_encoding=['latin1'])
-
-cosmic.add_mutations(seq, 
-					 metadata=['genomic_coordinates', 'genomic_mutations', 
+cosmic = COSMIC(targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
+				screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
+				classification_database_file='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
+                transcript_database_file='/data/databases/cosmic-v102/Cosmic_Transcripts_v102_GRCh38.tsv',
+				database_encoding='latin1', lazy_load_db=True)
+cosmic.add_mutations(seq,
+					 genome_assembly_version='GRCh38',
+					 metadata=['genomic_coordinates', 'genomic_mutations',
 					 			'cancer_site', 'cancer_histology'])
 
 
@@ -50,7 +53,7 @@ print(seq.positions[64].mutations[0])
 print(seq.positions[64].mutations[0].sources)
 
 print(seq.positions[64].mutations[0].metadata)
-                                         
+
 # add annotations from MyVariant (REVEL)
 from cancermuts.datasources import MyVariant
 
