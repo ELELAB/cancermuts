@@ -1207,8 +1207,8 @@ class ClinVar(DynamicSource, object):
         missense_variants = {}
         strange_variant_annotation = {}
         key_to_remove = []
-        not_found_gene = []
         not_found_var = []
+        not_found_gene = []
         var_right_iso = 0
         var_other_iso = 0
         uncanonical_annotation = 0
@@ -1456,17 +1456,22 @@ class ClinVar(DynamicSource, object):
         refseq = sequence.aliases["refseq"]
         filter_missense_variants = f'({gene}[gene] AND ("missense variant"[molecular consequence] OR "SO:0001583"[molecular consequence]))'
         mutation_type = "missense"
+        not_found_gene = []
 
         try:
             clinvar_ids, out_gene = self._filtered_variants_extractor(filter_missense_variants,mutation_type,gene)
         except RuntimeError as e:
             raise RuntimeError(f"ClinVar mutation extraction failed: {e}")
-
-        mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene = self._get_available_muts_and_md(sequence, gene, refseq, clinvar_ids, metadata)
-
         if not clinvar_ids:
             not_found_gene.append(out_gene)
-            return
+            self.log.warning(f"No ClinVar {mutation_type} variants are available for gene {out_gene}. No ClinVar mutation will be added to the sequence.")
+            return {
+                    "variants_to_check": pd.DataFrame(),
+                    "entry_not_found": pd.DataFrame(not_found_gene, columns=["gene_name"]),
+                    "inconsistency_annotations": pd.DataFrame()
+            }
+
+        mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene = self._get_available_muts_and_md(sequence, gene, refseq, clinvar_ids, metadata)
 
         for mutation_idx, mutation in enumerate(mutations):
             for md in metadata:
