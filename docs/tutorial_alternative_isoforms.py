@@ -1,5 +1,5 @@
 # import the UniProt data source class
-from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, COSMIC. MobiDB
+from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, COSMIC, MobiDB
 from cancermuts.exceptions import *
 
 # create the UniProt object
