@@ -54,6 +54,7 @@ from bravado.client import SwaggerClient
 from bravado.requests_client import RequestsClient
 from requests.adapters import HTTPAdapter
 import gget
+from io import StringIO
 import xmltodict
 
 
@@ -585,20 +586,14 @@ class ClinVar(DynamicSource, object):
 
     # ClinVar Metadata
     _clinvar_supported_metadata = [
-        'clinvar_classification',
-        'clinvar_condition',
-        'clinvar_review_status',
-        'genomic_mutations',
-        'clinvar_variant_id',
-        'genomic_coordinates'
-    ]
+        'clinvar_classification', 'clinvar_condition', 'clinvar_review_status', 'genomic_mutations', 'clinvar_variant_id', 'genomic_coordinates']
 
     @logger_init
     def __init__(self):
         description = "ClinVar mutation database"
         super(ClinVar, self).__init__(name='ClinVar', version='', description=description)
 
-    def _melting_dictionary(self,variants_annotation, add_method = False):
+    def _melting_dictionary(self, variants_annotation, add_method=False):
         '''
         Count the number of keys in the second element of variants annotation values
         dictionary, create as many lists as the number of counted keys, inserting in each list
@@ -625,9 +620,7 @@ class ClinVar(DynamicSource, object):
             List of lists from the variants_annotation dictionary.
         '''
         output_list = []
-        classifications = ['GermlineClassification',
-                           'SomaticClinicalImpact',
-                           'OncogenicityClassification']
+        classifications = ['GermlineClassification', 'SomaticClinicalImpact', 'OncogenicityClassification']
 
         normalized_annotation = {}
         for clinvar_id in variants_annotation:
@@ -659,7 +652,7 @@ class ClinVar(DynamicSource, object):
 
         return output_list
 
-    def _URL_response_check(self,URL, error_message):
+    def _URL_response_check(self, URL, error_message):
         ''' 
         Check the response from the queried URL
 
@@ -704,7 +697,7 @@ class ClinVar(DynamicSource, object):
             
         raise RuntimeError("ERROR: request failed after 200 attempts; exiting...")
 
-    def _VCV_summary_retriever(self,clinvar_id):
+    def _VCV_summary_retriever(self, clinvar_id):
         '''
         Retrieve the XML summary file associated with a specific ClinVar ID.
 
@@ -725,7 +718,7 @@ class ClinVar(DynamicSource, object):
         '''
         URL_summary="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id="+clinvar_id
         error_message=f"summary xml file for the variant_id {clinvar_id} in the ClinVar database"
-        parse_summary=xmltodict.parse(self._URL_response_check(URL_summary,error_message).content)
+        parse_summary=xmltodict.parse(self._URL_response_check(URL_summary, error_message).content)
         try:
             VCV=(parse_summary['eSummaryResult']\
                               ["DocumentSummarySet"]\
@@ -734,10 +727,10 @@ class ClinVar(DynamicSource, object):
             raise KeyError("Error in parsing the summary XML file. Check the ClinVar summary XML structure. Exiting...")
         URL_VCV="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=clinvar&rettype=vcv&id="+VCV
         error_message=f"XML file in the ClinVar database for the following VCV accession: {VCV}"
-        parse_VCV=xmltodict.parse(self._URL_response_check(URL_VCV,error_message).content)
+        parse_VCV=xmltodict.parse(self._URL_response_check(URL_VCV, error_message).content)
         return parse_VCV
 
-    def _filtered_variants_extractor(self,URL_filter,mutation_type,gene=False):
+    def _filtered_variants_extractor(self, URL_filter, mutation_type, gene=False):
         '''
         Retrieve all the variant IDs belonging to certain ClinVar classes (e.g., missense,
         pathogenic, likely pathogenic, likely benign, or benign classifications) from an XML file
@@ -773,7 +766,7 @@ class ClinVar(DynamicSource, object):
         if not gene:
             error_message=f"XML file with the total number of {mutation_type} mutations in the ClinVar database"
 
-        first_search=xmltodict.parse(self._URL_response_check(URL,error_message).content)
+        first_search=xmltodict.parse(self._URL_response_check(URL, error_message).content)
 
        # Return clinvar_id if there are variants associated to the query:
 
@@ -813,7 +806,7 @@ class ClinVar(DynamicSource, object):
 
         return None,gene
 
-    def _coding_region_variants_extractor(self,clinvar_VCV_xml,clinvar_code):
+    def _coding_region_variants_extractor(self, clinvar_VCV_xml, clinvar_code):
         '''
         Retrieve the HGVS annotations for a given VCV XML file associated with a 
         ClinVar variant ID.
@@ -878,7 +871,7 @@ class ClinVar(DynamicSource, object):
 
         return hgvss_coding,hgvss_genomic
 
-    def _missense_variants_extractor(self,hgvss, gene, clinvar_id, isoform_to_check):
+    def _missense_variants_extractor(self, hgvss, gene, clinvar_id, isoform_to_check):
         '''
         Given an HGVS list from a VCV XML file associated with a ClinVar variant ID, 
         returns the coding mutations in HGVS format.
@@ -925,7 +918,7 @@ class ClinVar(DynamicSource, object):
                             f" belonging to the {isoform_to_check} isoform will be considered")
         return "wrong isoform"
 
-    def _genomic_annotation_extractor(self,hgvss):
+    def _genomic_annotation_extractor(self, hgvss):
         '''
         Given an HGVS list from a VCV XML file associated with a ClinVar variant ID, 
         returns the genomic coordinate in GRCh38 and GRCh37 assemblies of the mutation.
@@ -945,7 +938,7 @@ class ClinVar(DynamicSource, object):
             genomic_coordinates.append(",".join([key['@Assembly'],key['NucleotideExpression']['Expression']]))
         return " ".join(genomic_coordinates)
 
-    def _variant_ids_extractors(self,clinvar_VCV_xml):
+    def _variant_ids_extractors(self, clinvar_VCV_xml):
         '''
         Retrieve all the variant IDs from an XML file associated with a specific query on ClinVar.
 
@@ -976,7 +969,7 @@ class ClinVar(DynamicSource, object):
         else:
             return [ids]
 
-    def _classification_methods_extractor(self,clinvar_VCV_xml,clinvar_id):
+    def _classification_methods_extractor(self, clinvar_VCV_xml, clinvar_id):
         '''
         Retrieve all the methods used for the variants classification
         reported in the XML file associated with a specific ClinVar ID
@@ -1013,7 +1006,7 @@ class ClinVar(DynamicSource, object):
         except:
             return ["not provided"],clinvar_VCV_xml
 
-    def _conditions_extractor(self,clinvar_VCV_xml,clinvar_id):
+    def _conditions_extractor(self, clinvar_VCV_xml, clinvar_id):
         ''' 
         Retrieve all the condition reported in the xml file associated to a
         specific clinvar id from ClinVar database 
@@ -1031,9 +1024,7 @@ class ClinVar(DynamicSource, object):
         conditions: dictionary 
            dictionary of conditions associated to a specific variant id
         '''
-        classification_types = ['GermlineClassification',
-                                'SomaticClinicalImpact',
-                                'OncogenicityClassification']
+        classification_types = ['GermlineClassification', 'SomaticClinicalImpact', 'OncogenicityClassification']
         condition_out = {}
         condition_value =[]
 
@@ -1069,7 +1060,7 @@ class ClinVar(DynamicSource, object):
 
         return condition_out
 
-    def _classifications_extractor(self,clinvar_VCV_xml,clinvar_id):
+    def _classifications_extractor(self, clinvar_VCV_xml, clinvar_id):
         '''
         Retrieve all the ClinVar classifications reported in the XML file 
         associated with a specific ClinVar ID from the ClinVar database.
@@ -1086,13 +1077,8 @@ class ClinVar(DynamicSource, object):
         -------
         classifications: dictionary 
            dictionary of classifications associated with a specific ClinVar variant ID.
-        '''
-
-        ########################### Add description, review status and condition to the dictionary #####################
-        # Description adding 
-        classification_types = ['GermlineClassification',
-                                'SomaticClinicalImpact',
-                                'OncogenicityClassification']
+        ''' 
+        classification_types = ['GermlineClassification', 'SomaticClinicalImpact', 'OncogenicityClassification']
         classifications = {}
 
         for classification_type in classification_types:
@@ -1110,7 +1096,7 @@ class ClinVar(DynamicSource, object):
 
     # add Review status information
 
-    def _review_status_extractor(self,clinvar_VCV_xml,clinvar_id):
+    def _review_status_extractor(self, clinvar_VCV_xml, clinvar_id):
         ''' retrive the ClinVar review_status in the input xml file
         associated to a specific clinvar id from ClinVar database
 
@@ -1226,7 +1212,7 @@ class ClinVar(DynamicSource, object):
 
         for classification, URL in zip(classifications, filters_on_classification):
             try:
-                clinvar_ids_class, out_gene = self._filtered_variants_extractor(URL,classification,gene)
+                clinvar_ids_class, out_gene = self._filtered_variants_extractor(URL, classification, gene)
             except RuntimeError as e:
                 self.log.error(e)
                 continue
@@ -1234,7 +1220,7 @@ class ClinVar(DynamicSource, object):
                 filter_ids[classification] = [clinvar_ids_class, [gene], [refseq]]
 
         for clinvar_id in clinvar_ids:
-            missense_variants[clinvar_id] = {"gene": gene, "isoform": refseq}
+            missense_variants[clinvar_id] = {"gene":gene, "isoform":refseq}
 
         counter = 0
         for clinvar_id in missense_variants:
@@ -1272,12 +1258,12 @@ class ClinVar(DynamicSource, object):
                 key_to_remove.append(clinvar_id)
                 continue
 
-            classifications = self._classifications_extractor(parse_VCV,clinvar_id)
-            conditions = self._conditions_extractor(parse_VCV,clinvar_id)
-            methods = self._classification_methods_extractor(parse_VCV,clinvar_id)
+            classifications = self._classifications_extractor(parse_VCV, clinvar_id)
+            conditions = self._conditions_extractor(parse_VCV, clinvar_id)
+            methods = self._classification_methods_extractor(parse_VCV, clinvar_id)
             if isinstance(methods, tuple):
                 methods = methods[0]
-            review_status = self._review_status_extractor(parse_VCV,clinvar_id)
+            review_status = self._review_status_extractor(parse_VCV, clinvar_id)
             genomic_annotations = self._genomic_annotation_extractor(hgvss_genomic)
             genomic_annotations_obj = self._parse_genomic_annotations(genomic_annotations)
 
@@ -1328,20 +1314,20 @@ class ClinVar(DynamicSource, object):
                     raise RuntimeError(f"Failed to retrieve VCV summary for ClinVar ID {clinvar_id}: {e}")
 
 
-                hgvss_coding,hgvss_genomic = self._coding_region_variants_extractor(parse_VCV,clinvar_id)
+                hgvss_coding,hgvss_genomic = self._coding_region_variants_extractor(parse_VCV, clinvar_id)
                 if hgvss_coding:
                     correct_variant = self._missense_variants_extractor(hgvss_coding, ids[1][0], clinvar_id, ids[2][0])
                     if not clinvar_id in missense_variants.keys() and re.search("p.[A-Z][a-z][a-z][0-9]+[A-Z][a-z][a-z]",str(correct_variant)) or re.search("p.\\w+delins\\w+",str(correct_variant)):
-                        variants.append([clinvar_id,ids[1][0]])
-                        classifications = self._classifications_extractor(parse_VCV,clinvar_id)
-                        conditions = self._conditions_extractor(parse_VCV,clinvar_id)
-                        methods = self._classification_methods_extractor(parse_VCV,clinvar_id)
+                        variants.append([clinvar_id, ids[1][0]])
+                        classifications = self._classifications_extractor(parse_VCV, clinvar_id)
+                        conditions = self._conditions_extractor(parse_VCV, clinvar_id)
+                        methods = self._classification_methods_extractor(parse_VCV, clinvar_id)
                         genomic_annotations = self._genomic_annotation_extractor(hgvss_genomic)
                         if isinstance(methods,tuple):
                             methods = methods[0]
-                        review_status = self._review_status_extractor(parse_VCV,clinvar_id)
+                        review_status = self._review_status_extractor(parse_VCV, clinvar_id)
                         value = {"variant":correct_variant,"gene":ids[1][0]}
-                        for feature,key_name in zip([classifications,conditions,review_status,methods,genomic_annotations],["classifications","conditions","review_status","methods","genomic_annotations"]):
+                        for feature,key_name in zip([classifications, conditions, review_status, methods, genomic_annotations],["classifications", "conditions", "review_status", "methods", "genomic_annotations"]):
                                 value[key_name] = feature
                         inconsistent_annotations[clinvar_id] = value
 
@@ -1419,15 +1405,7 @@ class ClinVar(DynamicSource, object):
 
             # Inconsistency annotations:
             if inconsistent_annotations:
-                columns = ['variant_id',
-                            'variant_name',
-                            'genomic_annotation',
-                            'gene_name', 
-                            'interpretation', 
-                            'condition',
-                            'review_status',
-                            'methods']
-                    
+                columns = ['variant_id', 'variant_name', 'genomic_annotation', 'gene_name', 'interpretation', 'condition', 'review_status', 'methods']
                 inconsistency_output_list = self._melting_dictionary(inconsistent_annotations, add_method=True)
                 df2 = pd.DataFrame(inconsistency_output_list, columns=columns)
 
@@ -1438,7 +1416,7 @@ class ClinVar(DynamicSource, object):
                 data_strange[clinvar_id] = [information["variant"], information["gene"]]
             df_strange = pd.DataFrame.from_dict(data_strange, 
                                                 orient="index",
-                                                columns=['variant_name','gene_name'])
+                                                columns=['variant_name', 'gene_name'])
             df_strange.index.name = 'clinvar_id'
 
         # Entry not found:
@@ -1458,7 +1436,7 @@ class ClinVar(DynamicSource, object):
         not_found_gene = []
 
         try:
-            clinvar_ids, out_gene = self._filtered_variants_extractor(filter_missense_variants,mutation_type,gene)
+            clinvar_ids, out_gene = self._filtered_variants_extractor(filter_missense_variants, mutation_type, gene)
         except RuntimeError as e:
             raise RuntimeError(f"ClinVar mutation extraction failed: {e}")
         if not clinvar_ids:
