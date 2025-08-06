@@ -47,7 +47,7 @@ available on their [website](https://docs.conda.io/en/latest/miniconda.html)
 
 The following instructions are meant for Mac OS or a Linux-based operating
  system. Cancermuts should also run on Windows, even though
-it hasn't been tested on it and we currently don't support it. If you want to 
+it hasn't been tested on it and we currently don't support it. If you want to
 use Cancermuts on Windows, we recommend doing so through the [Windows Subsystem
 for Linux](https://docs.microsoft.com/en-us/windows/wsl/install) or by means
 of a container (e.g. [Docker](https://www.docker.com))
@@ -137,22 +137,25 @@ for the COSMIC Mutant Export, which contains a list of cancer mutations.
 
 In order to obtain it:
 
-1. head to the [COSMIC website](https://cancer.sanger.ac.uk/cosmic), 
+1. head to the [COSMIC website](https://cancer.sanger.ac.uk/cosmic),
     register and log in
 
 2. head to the Data menu at the top and select the Downloads option
+3. head to "Targeted Screens Mutants" section and download the corresponding
+    Whole file (Cosmic_CompleteTargetedScreensMutant_Tsv_v102_GRCh38.tar)
+3. head to the "Genome Screen Mutant" section and downlaod the corresponding
+    Whole file (Cosmic_GenomeScreensMutant_Tsv_v102_GRCh38.tar)
+4. head to the "Classification" section and downlaod the corresponding
+    Whole file (Cosmic_Classification_Tsv_v102_GRCh38.tar)
 
-3. head to the "COSMIC Mutation Data" section and downlaod the corresponding
-    Whole file (CosmicMutantExport.tsv.gz)
-
-4. decompress the file, e.g. using `gzip`:
+5. decompress the file, e.g. using `tar xf `:
 
     ```
-    gunzip -d CosmicMutantExport.tsv.gz
+    tar xf Cosmic_GenomeScreensMutant_Tsv_v102_GRCh38.tar
     ```
 
 {% hint style='warning' %}
-The downloaded file will take a significant amount of disk space, at least 15GB.
+The downloaded files will take a significant amount of disk space, at least 20GB.
 {% endhint %}
 
 {% hint style='tip' %}
@@ -162,7 +165,7 @@ Make note of the location of this file as it will come handy in the Tutorial
 ### PhosphositePlus
 
 If you intend to use PhosphoSite Plus as a resource to annotate post-translational
-modifications you should download its data files so they can be used by 
+modifications you should download its data files so they can be used by
 Cancermuts, using the following steps:
 
 1. head to the [PhosphoSite Plus website download page](https://www.phosphosite.org/staticDownloads)
@@ -172,7 +175,7 @@ Cancermuts, using the following steps:
 3. download the files containing the post-translational mutation data in a
     folder of your choice. Depending on which PTM you're interested it, you
     might need either (one or more, possibly all):
-    * Acetylation_site_dataset.gz   
+    * Acetylation_site_dataset.gz
     * Methylation_site_dataset.gz
     * O-GalNAc_site_dataset.gz
     * O-GlcNAc_site_dataset.gz
@@ -185,4 +188,3 @@ Cancermuts, using the following steps:
     ```
 
 5. Keep note of the location of this directory as it will come handy in the tutorial
-
