@@ -1357,7 +1357,6 @@ class ClinVar(DynamicSource, object):
 
         mutations = []
         out_metadata = {md: [] for md in metadata}
-
         for clinvar_id, data in missense_variants.items():
             full_variant = data["variant"]
             try:
