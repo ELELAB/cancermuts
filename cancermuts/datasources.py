@@ -1210,34 +1210,34 @@ class RevelDatabase(StaticSource, object):
 
     def _filter_revel_by_chromosomes(self, chrom_set):
         file_path = self._revel_file
+
         with open(file_path, "r") as f:
-            header = next(f).strip().split(",")
+            header_line = next(f).rstrip("\n")
+            header = header_line.split(",")
+
             cols = [
                 "chr","hg19_pos","grch38_pos","ref","alt",
-                "aaref","aaalt","REVEL","Ensembl_transcriptid"
-            ]
+                "aaref","aaalt","REVEL","Ensembl_transcriptid"]
             missing = [c for c in cols if c not in header]
             if missing:
                 raise ValueError(f"[REVEL] Missing columns in file: {missing}")
 
-            chr_idx = header.index("chr")
+            prefixes = tuple(f"{c}," for c in chrom_set)
 
             filtered_lines = []
             for line in f:
-                parts = line.split(",")
-                if parts[chr_idx] in chrom_set:
+                if line.startswith(prefixes):
                     filtered_lines.append(line)
 
         if not filtered_lines:
-            self.log.warning(
-                f"[REVEL] No entries found for chromosomes {sorted(chrom_set)}"
-            )
-            return pd.DataFrame(columns=header)
+            self.log.warning(f"[REVEL] No entries found for chromosomes {sorted(chrom_set)}")
+            return pd.DataFrame(columns=cols)
 
         buffer = StringIO()
-        buffer.write(",".join(header) + "\n")
+        buffer.write(header_line + "\n")
         buffer.writelines(filtered_lines)
         buffer.seek(0)
+
         return pd.read_csv(buffer, dtype=str)
 
     def add_metadata(self, sequence, md_type=['revel_score']):
