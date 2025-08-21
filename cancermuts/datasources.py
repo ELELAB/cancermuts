@@ -1237,12 +1237,9 @@ class RevelDatabase(StaticSource, object):
         else:
             md_types = md_type
 
-        metadata_functions = []
         for md in md_types:
-            try:
-                metadata_functions.append(self._supported_metadata[md])
-            except KeyError:
-                self.log.warning("RevelLocal doesn't support metadata type %s" % md)
+            if md not in self._supported_metadata:
+                raise ValueError(f"Unsupported metadata type requested: {md}")
 
         transcript_id = sequence.aliases.get('ensembl_transcript_id')
         if not transcript_id:
