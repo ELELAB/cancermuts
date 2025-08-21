@@ -1281,6 +1281,7 @@ class RevelDatabase(StaticSource, object):
                     continue
 
                 df_filtered = df[
+                    (df["Ensembl_transcriptid"] == str(transcript_id)) &
                     (df["chr"].astype(str) == str(gm.chr)) &
                     (df[coord_col].astype(str) == str(gm.get_coord())) &
                     (df["alt"] == gm.alt)]
@@ -1308,7 +1309,13 @@ class RevelDatabase(StaticSource, object):
                 if df_final.empty:
                     self.log.warning(f"[REVEL] No match with expected alt amino acid {mutation.mutated_residue_type} "
                         f"for {mutation} at chr={gm.chr}, pos={gm.get_coord()}")
-
+                    
+                if df_final["REVEL"].nunique(dropna=True) > 1:
+                    self.log.warning(
+                        f"[REVEL] Multiple REVEL scores found for {mutation} at chr={gm.chr}, "
+                        f"pos={gm.get_coord()}, transcript={transcript_id}: {df_final['REVEL'].unique().tolist()}"
+                    )
+                    
                 for score_str in df_final["REVEL"].dropna():
                     if score_str in [".", "NA"]:
                         continue
