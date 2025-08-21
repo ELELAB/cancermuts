@@ -1246,8 +1246,8 @@ class RevelDatabase(StaticSource, object):
 
         transcript_id = sequence.aliases.get('ensembl_transcript_id')
         if not transcript_id:
-            self.log.warning(f"No Ensembl transcript ID available for {sequence}")
-            return
+               raise ValueError(f"[REVEL] No Ensembl transcript ID available for sequence {sequence}. "
+        "REVEL annotation cannot proceed.")
         
         if self._revel_filtered_df is None:
             self._revel_filtered_df = self._filter_revel_by_transcript(transcript_id)
