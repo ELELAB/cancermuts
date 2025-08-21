@@ -1274,8 +1274,8 @@ class RevelDatabase(StaticSource, object):
                 coord_col = (
                     "grch38_pos" if gm.genome_build == "hg38"
                     else "hg19_pos" if gm.genome_build == "hg19"
-                    else None
-                )
+                    else None)
+                
                 if coord_col is None:
                     self.log.warning(f"[REVEL] Unsupported genome version '{gm.genome_build}' for {mutation}")
                     continue
@@ -1283,35 +1283,30 @@ class RevelDatabase(StaticSource, object):
                 df_filtered = df[
                     (df["chr"].astype(str) == str(gm.chr)) &
                     (df[coord_col].astype(str) == str(gm.get_coord())) &
-                    (df["alt"] == gm.alt)
-                ]
+                    (df["alt"] == gm.alt)]
 
                 if df_filtered.empty:
-                    self.log.debug(
-                        f"[REVEL] No REVEL match at chr={gm.chr}, pos={gm.get_coord()}, alt={gm.alt}, "
+                    self.log.warning(f"[REVEL] No REVEL match at chr={gm.chr}, pos={gm.get_coord()}, alt={gm.alt}, "
                         f"transcript={transcript_id}")
                     continue
 
                 ref_mismatches = df_filtered[df_filtered["ref"] != gm.ref]
                 if not ref_mismatches.empty:
-                    self.log.warning(
-                        f"[REVEL] Reference base mismatch for {mutation}: expected {gm.ref}, "
+                    self.log.warning(f"[REVEL] Reference base mismatch for {mutation}: expected {gm.ref}, "
                         f"got {set(ref_mismatches['ref'])} at chr={gm.chr}, pos={gm.get_coord()} "
                         f"(transcript {transcript_id})")
                     continue
 
                 aa_mismatches = df_filtered[df_filtered["aaref"] != mutation.sequence_position.wt_residue_type]
                 if not aa_mismatches.empty:
-                    self.log.warning(
-                        f"[REVEL] Amino acid reference mismatch for {mutation}: expected "
+                    self.log.warning(f"[REVEL] Amino acid reference mismatch for {mutation}: expected "
                         f"{mutation.sequence_position.wt_residue_type}, got {set(aa_mismatches['aaref'])} "
                         f"at chr={gm.chr}, pos={gm.get_coord()} (transcript {transcript_id})")
                     continue
 
                 df_final = df_filtered[df_filtered["aaalt"] == mutation.mutated_residue_type]
                 if df_final.empty:
-                    self.log.warning(
-                        f"[REVEL] No match with expected alt amino acid {mutation.mutated_residue_type} "
+                    self.log.warning(f"[REVEL] No match with expected alt amino acid {mutation.mutated_residue_type} "
                         f"for {mutation} at chr={gm.chr}, pos={gm.get_coord()}")
 
                 for score_str in df_final["REVEL"].dropna():
