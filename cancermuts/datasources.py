@@ -1274,7 +1274,7 @@ class RevelDatabase(StaticSource, object):
 
             for gm in gms:
                 if not all(hasattr(gm, attr) for attr in ['genome_build', 'chr', 'get_coord', 'ref', 'alt']):
-                    self.log.warning(f"[REVEL] Skipping invalid genomic mutation object: {gm}")
+                    self.log.warning(f"[REVEL] Skipping genomic mutation without complete coordinate information: {gm}")
                     continue
 
                 genome_version = gm.genome_build
