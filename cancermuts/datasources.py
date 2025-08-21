@@ -1285,7 +1285,7 @@ class RevelDatabase(StaticSource, object):
                     else None)
                 
                 if coord_col is None:
-                    self.log.warning(f"[REVEL] Unknown genome version '{genome_version}' for {mutation}")
+                    self.log.warning(f"[REVEL] Unsuported genome version '{genome_version}' for {mutation}")
                     continue
 
                 df_filtered = df[(df["chr"].astype(str) == chrom) &
