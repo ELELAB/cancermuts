@@ -1208,28 +1208,37 @@ class RevelDatabase(StaticSource, object):
         self._supported_metadata = {'revel_score': self._get_revel}
         self._revel_filtered_df = None
 
-    def _filter_revel_by_transcript(self, transcript_id):
-
-        filtered_lines = []
+    def _filter_revel_by_chromosomes(self, chrom_set):
         file_path = self._revel_file
+        with open(file_path, "r") as f:
+            header = next(f).strip().split(",")
+            cols = [
+                "chr","hg19_pos","grch38_pos","ref","alt",
+                "aaref","aaalt","REVEL","Ensembl_transcriptid"
+            ]
+            missing = [c for c in cols if c not in header]
+            if missing:
+                raise ValueError(f"[REVEL] Missing columns in file: {missing}")
 
-        with open(file_path, 'r') as f:
-            header = next(f)  
-            for line_num, line in enumerate(f, start=2):
-                if transcript_id not in line:
-                    continue
-                filtered_lines.append(line)
+            chr_idx = header.index("chr")
+
+            filtered_lines = []
+            for line in f:
+                parts = line.split(",")
+                if parts[chr_idx] in chrom_set:
+                    filtered_lines.append(line)
 
         if not filtered_lines:
-            self.log.warning(f"[REVEL] No entries found for transcript {transcript_id}")
-            return pd.DataFrame(columns=header.strip().split(','))
+            self.log.warning(
+                f"[REVEL] No entries found for chromosomes {sorted(chrom_set)}"
+            )
+            return pd.DataFrame(columns=header)
 
         buffer = StringIO()
-        buffer.write(header)
+        buffer.write(",".join(header) + "\n")
         buffer.writelines(filtered_lines)
         buffer.seek(0)
-
-        return pd.read_csv(buffer)
+        return pd.read_csv(buffer, dtype=str)
 
     def add_metadata(self, sequence, md_type=['revel_score']):
         if type(md_type) is str:
@@ -1246,8 +1255,16 @@ class RevelDatabase(StaticSource, object):
                raise ValueError(f"[REVEL] No Ensembl transcript ID available for sequence {sequence}. "
         "REVEL annotation cannot proceed.")
         
-        if self._revel_filtered_df is None:
-            self._revel_filtered_df = self._filter_revel_by_transcript(transcript_id)
+        chrom_set = set()
+        for pos in sequence.positions:
+            for mut in pos.mutations:
+                for gm in mut.metadata.get('genomic_mutations', []):
+                    if hasattr(gm, 'chr'):
+                        chrom_set.add(str(gm.chr))
+
+        if (self._revel_filtered_df is None) or (getattr(self, "_cached_chroms", None) != frozenset(chrom_set)):
+            self._revel_filtered_df = self._filter_revel_by_chromosomes(chrom_set)
+            self._cached_chroms = frozenset(chrom_set)
 
         mutations = []
         for pos in sequence.positions:
@@ -1280,8 +1297,11 @@ class RevelDatabase(StaticSource, object):
                     self.log.warning(f"[REVEL] Unsupported genome version '{gm.genome_build}' for {mutation}")
                     continue
 
+                tx_mask = df["Ensembl_transcriptid"].astype(str).str.contains(
+                    rf'(^|;){re.escape(transcript_id)}($|;)', na=False)
+
                 df_filtered = df[
-                    (df["Ensembl_transcriptid"] == str(transcript_id)) &
+                    tx_mask &
                     (df["chr"].astype(str) == str(gm.chr)) &
                     (df[coord_col].astype(str) == str(gm.get_coord())) &
                     (df["alt"] == gm.alt)]
@@ -1315,7 +1335,7 @@ class RevelDatabase(StaticSource, object):
                         f"[REVEL] Multiple REVEL scores found for {mutation} at chr={gm.chr}, "
                         f"pos={gm.get_coord()}, transcript={transcript_id}: {df_final['REVEL'].unique().tolist()}"
                     )
-                    
+
                 for score_str in df_final["REVEL"].dropna():
                     if score_str in [".", "NA"]:
                         continue
