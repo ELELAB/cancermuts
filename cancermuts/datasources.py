@@ -1222,7 +1222,7 @@ class RevelDatabase(StaticSource, object):
             if missing:
                 raise ValueError(f"[REVEL] Missing columns in file: {missing}")
 
-            prefixes = tuple(f"{c}," for c in chrom_set)
+            prefixes = tuple(f"{str(c)}," for c in chrom_set)
 
             filtered_lines = []
             for line in f:
@@ -1250,7 +1250,7 @@ class RevelDatabase(StaticSource, object):
             if md not in self._supported_metadata:
                 raise ValueError(f"Unsupported metadata type requested: {md}")
 
-        transcript_id = sequence.aliases.get('ensembl_transcript_id')
+        transcript_id = sequence.aliases['ensembl_transcript_id']
         if not transcript_id:
                raise ValueError(f"[REVEL] No Ensembl transcript ID available for sequence {sequence}. "
         "REVEL annotation cannot proceed.")
@@ -1296,9 +1296,13 @@ class RevelDatabase(StaticSource, object):
                 if coord_col is None:
                     self.log.warning(f"[REVEL] Unsupported genome version '{gm.genome_build}' for {mutation}")
                     continue
-
+                
+                # Build a boolean mask to check if the Ensembl_transcriptid column contains the exact transcript_id.
+                # Some rows have multiple IDs separated by ';', so we use a regex with:
+                #   (^|;)  → ensures the match is either at the start of the string or follows a semicolon
+                #   ($|;)  → ensures the match ends at the end of the string or is followed by a semicolon
                 tx_mask = df["Ensembl_transcriptid"].astype(str).str.contains(
-                    rf'(^|;){re.escape(transcript_id)}($|;)', na=False)
+                    rf'(^|;){(transcript_id)}($|;)', na=False)
 
                 df_filtered = df[
                     tx_mask &
@@ -1338,7 +1342,10 @@ class RevelDatabase(StaticSource, object):
 
                 for score_str in df_final["REVEL"].dropna():
                     if score_str in [".", "NA"]:
+                        self.log.warning(f"[REVEL] Invalid REVEL score value '{score_str}' for {mutation} "
+                        f"at chr={gm.chr}, pos={gm.get_coord()}, transcript={transcript_id}")
                         continue
+                    
                     try:
                         score = float(score_str)
                         mutation.metadata['revel_score'].append(Revel(source=self, score=score))
