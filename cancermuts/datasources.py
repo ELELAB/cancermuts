@@ -1222,7 +1222,7 @@ class RevelDatabase(StaticSource, object):
             if missing:
                 raise ValueError(f"[REVEL] Missing columns in file: {missing}")
 
-            prefixes = tuple(f"{str(c)}," for c in chrom_set)
+            prefixes = tuple(str(c) for c in chrom_set)
 
             filtered_lines = []
             for line in f:
