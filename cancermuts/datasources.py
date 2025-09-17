@@ -1206,7 +1206,7 @@ class RevelDatabase(StaticSource, object):
 
         self._revel_file = revel_file
         self._supported_metadata = {'revel_score': self._get_revel}
-        self._revel_filtered_df = None
+        self._revel_cache_by_chr = {}
 
     def _filter_revel_by_chromosomes(self, chrom_set):
         file_path = self._revel_file
@@ -1215,14 +1215,14 @@ class RevelDatabase(StaticSource, object):
             header_line = next(f).rstrip("\n")
             header = header_line.split(",")
 
-            cols = [
-                "chr","hg19_pos","grch38_pos","ref","alt",
+            cols = ["chr","hg19_pos","grch38_pos","ref","alt",
                 "aaref","aaalt","REVEL","Ensembl_transcriptid"]
+            
             missing = [c for c in cols if c not in header]
             if missing:
                 raise ValueError(f"[REVEL] Missing columns in file: {missing}")
 
-            prefixes = tuple(f"{c}," for c in chrom_set)
+            prefixes = f"{chrom_set},"
 
             filtered_lines = []
             for line in f:
@@ -1255,17 +1255,6 @@ class RevelDatabase(StaticSource, object):
                raise ValueError(f"[REVEL] No Ensembl transcript ID available for sequence {sequence}. "
         "REVEL annotation cannot proceed.")
         
-        chrom_set = set()
-        for pos in sequence.positions:
-            for mut in pos.mutations:
-                for gm in mut.metadata.get('genomic_mutations', []):
-                    if hasattr(gm, 'chr'):
-                        chrom_set.add(str(gm.chr))
-
-        if (self._revel_filtered_df is None) or (getattr(self, "_cached_chroms", None) != frozenset(chrom_set)):
-            self._revel_filtered_df = self._filter_revel_by_chromosomes(chrom_set)
-            self._cached_chroms = frozenset(chrom_set)
-
         mutations = []
         for pos in sequence.positions:
             for mut in pos.mutations:
@@ -1278,7 +1267,27 @@ class RevelDatabase(StaticSource, object):
         self._get_revel(mutations)
     
     def _get_revel(self, mutation_entries):
-        df = self._revel_filtered_df  
+        
+        needed_chroms = set()
+        for _, gms, _ in mutation_entries:
+            for gm in gms:
+                if hasattr(gm, 'chr') and gm.chr is not None:
+                    needed_chroms.add(str(gm.chr))
+
+        # Ensure the cache has all needed chromosome slices
+        for chrom in needed_chroms:
+            if chrom not in self._revel_cache_by_chr:
+                self._revel_cache_by_chr[chrom] = self._filter_revel_by_chromosomes(chrom)
+
+        # Build a working DataFrame from just the needed chromosomes
+        if needed_chroms:
+            df = pd.concat(
+                [self._revel_cache_by_chr[c] for c in needed_chroms],
+                ignore_index=True
+            )
+        else:
+            df = pd.DataFrame(columns=["chr", "hg19_pos", "grch38_pos", "ref", "alt",
+                                       "aaref", "aaalt", "REVEL", "Ensembl_transcriptid"])
 
         for mutation, gms, transcript_id in mutation_entries:
             mutation.metadata['revel_score'] = []
