@@ -1208,7 +1208,7 @@ class RevelDatabase(StaticSource, object):
         self._supported_metadata = {'revel_score': self._get_revel}
         self._revel_cache_by_chr = {}
 
-    def _filter_revel_by_chromosomes(self, chrom_set):
+    def _filter_revel_by_chromosomes(self, chrom):
         file_path = self._revel_file
 
         with open(file_path, "r") as f:
@@ -1222,15 +1222,15 @@ class RevelDatabase(StaticSource, object):
             if missing:
                 raise ValueError(f"[REVEL] Missing columns in file: {missing}")
 
-            prefixes = f"{chrom_set},"
+            prefix = f"{chrom},"
 
             filtered_lines = []
             for line in f:
-                if line.startswith(prefixes):
+                if line.startswith(prefix):
                     filtered_lines.append(line)
 
         if not filtered_lines:
-            self.log.warning(f"[REVEL] No entries found for chromosomes {sorted(chrom_set)}")
+            self.log.warning(f"[REVEL] No entries found for chromosomes {sorted(chrom)}")
             return pd.DataFrame(columns=cols)
 
         buffer = StringIO()
