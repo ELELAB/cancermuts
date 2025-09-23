@@ -1375,18 +1375,16 @@ class RevelDatabase(StaticSource, object):
                     self.log.warning(f"[REVEL] Unsupported genome version '{gm.genome_build}' for {mutation}")
                     continue
                 
+                df_filtered = df[df[coord_col].astype(str) == str(gm.get_coord())]
+                df_filtered = df_filtered[df_filtered["chr"].astype(str) == str(gm.chr)]
+                df_filtered = df_filtered[df_filtered["alt"] == gm.alt]
+
                 # Build a boolean mask to check if the Ensembl_transcriptid column contains the exact transcript_id.
                 # Some rows have multiple IDs separated by ';', so we use a regex with:
-                #   (^|;)  → ensures the match is either at the start of the string or follows a semicolon
-                #   ($|;)  → ensures the match ends at the end of the string or is followed by a semicolon
-                tx_mask = df["Ensembl_transcriptid"].astype(str).str.contains(
-                    rf'(^|;){(transcript_id)}($|;)', na=False)
-
-                df_filtered = df[
-                    tx_mask &
-                    (df["chr"].astype(str) == str(gm.chr)) &
-                    (df[coord_col].astype(str) == str(gm.get_coord())) &
-                    (df["alt"] == gm.alt)]
+                #   (^|;) ensures the match is either at the start of the string or follows a semicolon
+                #   ($|;) ensures the match ends at the end of the string or is followed by a semicolon
+                df_filtered = df_filtered[df_filtered["Ensembl_transcriptid"].astype(str).str.contains(
+                    rf'(^|;){(transcript_id)}($|;)', na=False)]
 
                 if df_filtered.empty:
                     self.log.warning(f"[REVEL] No REVEL match at chr={gm.chr}, pos={gm.get_coord()}, alt={gm.alt}, "
