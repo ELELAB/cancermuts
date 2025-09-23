@@ -1,5 +1,5 @@
 # import the UniProt data source class
-from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, MobiDB, MyVariant, RevelDatabase
+from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, COSMIC, MobiDB, MyVariant, RevelDatabase
 from cancermuts.exceptions import *
 from cancermuts.core import Mutation
 from cancermuts.metadata import GenomicMutation
@@ -55,7 +55,19 @@ try:
 except UnexpectedIsoformError:
     print("cBioPortal mutations will not be added, as a non-canonical isoform has been provided")
 
-# PhosphoSite does not support non-canonical mutations
+cosmic = COSMIC(targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
+                screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
+                classification_database_file='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
+                transcript_database_file='/data/databases/cosmic-v102/Cosmic_Transcripts_v102_GRCh38.tsv',
+                database_encoding='latin1', lazy_load_db=True)
+
+# COSMIC does not support non-canonical isoforms
+try:
+    cosmic.add_mutations(seq)
+except UnexpectedIsoformError:
+    print("COSMIC mutations will not be added, as a non-canonical isoform has been provided")
+
+# PhosphoSite does not support non-canonical isoforms
 ps = PhosphoSite('/data/databases/phosphosite/')
 
 try:
