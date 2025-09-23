@@ -1361,9 +1361,7 @@ class RevelDatabase(StaticSource, object):
 
         for mutation, gms, transcript_id in mutation_entries:
             mutation.metadata['revel_score'] = []
-            
-            _seen_query_keys= set()
-            
+                      
             for gm in gms:
                 if not all(hasattr(gm, attr) for attr in ['genome_build', 'chr', 'get_coord', 'ref', 'alt']):
                     self.log.warning(f"[REVEL] Skipping genomic mutation without complete coordinate information: {gm}")
@@ -1384,11 +1382,6 @@ class RevelDatabase(StaticSource, object):
                     f"|tx={transcript_id}"
                     f"|aa={mutation.sequence_position.wt_residue_type}>{mutation.mutated_residue_type}")
                 
-                if query_str in _seen_query_keys:
-                    continue
-                _seen_query_keys.add(query_str)
-
-
                 cached = self._revel_cache_by_mut.get(query_str, None)
                 if cached is not None:
                     for s in cached:
@@ -1448,14 +1441,18 @@ class RevelDatabase(StaticSource, object):
                     
                     try:
                         score = float(score_str)
-                        mutation.metadata['revel_score'].append(Revel(source=self, score=score))
+                        parsed_scores.append(score)
                         self.log.info(
                             f"[REVEL] Match for {mutation}: chr={gm.chr}, pos={gm.get_coord()}, "
                             f"ref={gm.ref}, alt={gm.alt}, aaref={mutation.sequence_position.wt_residue_type}, "
                             f"aaalt={mutation.mutated_residue_type}, transcript={transcript_id}, score={score}")
                     except ValueError:
                         self.log.warning(f"[REVEL] Could not parse REVEL score '{score_str}' for {mutation}")
+   
                 self._revel_cache_by_mut[query_str] = tuple(parsed_scores)
+                for s in parsed_scores:
+                    mutation.metadata['revel_score'].append(Revel(source=self, score=s))
+        
 class ELMDatabase(DynamicSource, object):
     def __init__(self):
         description = "ELM Database"
