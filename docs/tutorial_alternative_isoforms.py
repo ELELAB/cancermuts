@@ -83,11 +83,7 @@ try:
 except UnexpectedIsoformError:
     print("REVEL scores from MyVariant annotations will not be added, as a non-canonical isoform has been provided")
 
-
 # Save MetaTable
-
 tbl = Table()
-
 df = tbl.to_dataframe(seq)
-
 df.to_csv("metatable_non_canonical.csv")
