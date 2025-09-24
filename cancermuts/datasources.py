@@ -1276,7 +1276,6 @@ class RevelDatabase(StaticSource, object):
         self._revel_file = revel_file
         self._supported_metadata = {'revel_score': self._get_revel}
         self._revel_cache_by_chr = {}
-        self._revel_cache_by_mut = {}
 
     def _filter_revel_by_chromosomes(self, chrom):
         file_path = self._revel_file
@@ -1361,7 +1360,7 @@ class RevelDatabase(StaticSource, object):
 
         for mutation, gms, transcript_id in mutation_entries:
             mutation.metadata['revel_score'] = []
-                      
+            mutation_cache = {}      
             for gm in gms:
                 if not all(hasattr(gm, attr) for attr in ['genome_build', 'chr', 'get_coord', 'ref', 'alt']):
                     self.log.warning(f"[REVEL] Skipping genomic mutation without complete coordinate information: {gm}")
@@ -1375,16 +1374,9 @@ class RevelDatabase(StaticSource, object):
                 if coord_col is None:
                     self.log.warning(f"[REVEL] Unsupported genome version '{gm.genome_build}' for {mutation}")
                     continue
-                
-                query_str = (
-                    f"chr{gm.chr}:g.{gm.get_coord()}{gm.ref}>{gm.alt}"
-                    f"|build={gm.genome_build}"
-                    f"|tx={transcript_id}"
-                    f"|aa={mutation.sequence_position.wt_residue_type}>{mutation.mutated_residue_type}")
-                
-                cached = self._revel_cache_by_mut.get(query_str, None)
-                if cached is not None:
-                    for s in cached:
+                                
+                if gm in mutation_cache:
+                    for s in mutation_cache[gm]:
                         mutation.metadata['revel_score'].append(Revel(source=self, score=s))
                     continue
                 
@@ -1401,7 +1393,7 @@ class RevelDatabase(StaticSource, object):
                 if df_filtered.empty:
                     self.log.warning(f"[REVEL] No REVEL match at chr={gm.chr}, pos={gm.get_coord()}, alt={gm.alt}, "
                         f"transcript={transcript_id}")
-                    self._revel_cache_by_mut[query_str] = ()
+                    mutation_cache[gm] = ()
                     continue
 
                 ref_mismatches = df_filtered[df_filtered["ref"] != gm.ref]
@@ -1409,7 +1401,7 @@ class RevelDatabase(StaticSource, object):
                     self.log.warning(f"[REVEL] Reference base mismatch for {mutation}: expected {gm.ref}, "
                         f"got {set(ref_mismatches['ref'])} at chr={gm.chr}, pos={gm.get_coord()} "
                         f"(transcript {transcript_id})")
-                    self._revel_cache_by_mut[query_str] = ()
+                    mutation_cache[gm] = ()
                     continue
 
                 aa_mismatches = df_filtered[df_filtered["aaref"] != mutation.sequence_position.wt_residue_type]
@@ -1417,14 +1409,14 @@ class RevelDatabase(StaticSource, object):
                     self.log.warning(f"[REVEL] Amino acid reference mismatch for {mutation}: expected "
                         f"{mutation.sequence_position.wt_residue_type}, got {set(aa_mismatches['aaref'])} "
                         f"at chr={gm.chr}, pos={gm.get_coord()} (transcript {transcript_id})")
-                    self._revel_cache_by_mut[query_str] = ()
+                    mutation_cache[gm] = ()
                     continue
 
                 df_final = df_filtered[df_filtered["aaalt"] == mutation.mutated_residue_type]
                 if df_final.empty:
                     self.log.warning(f"[REVEL] No match with expected alt amino acid {mutation.mutated_residue_type} "
                         f"for {mutation} at chr={gm.chr}, pos={gm.get_coord()}")
-                    self._revel_cache_by_mut[query_str] = ()
+                    mutation_cache[gm] = ()
                     continue
                     
                 if df_final["REVEL"].nunique(dropna=True) > 1:
@@ -1432,6 +1424,7 @@ class RevelDatabase(StaticSource, object):
                         f"[REVEL] Multiple REVEL scores found for {mutation} at chr={gm.chr}, "
                         f"pos={gm.get_coord()}, transcript={transcript_id}: {df_final['REVEL'].unique().tolist()}"
                     )
+
                 parsed_scores = []
                 for score_str in df_final["REVEL"].dropna():
                     if score_str in [".", "NA"]:
@@ -1449,7 +1442,7 @@ class RevelDatabase(StaticSource, object):
                     except ValueError:
                         self.log.warning(f"[REVEL] Could not parse REVEL score '{score_str}' for {mutation}")
    
-                self._revel_cache_by_mut[query_str] = tuple(parsed_scores)
+                mutation_cache[gm] = tuple(parsed_scores)
                 for s in parsed_scores:
                     mutation.metadata['revel_score'].append(Revel(source=self, score=s))
         
