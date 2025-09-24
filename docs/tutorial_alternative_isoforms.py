@@ -85,5 +85,6 @@ except UnexpectedIsoformError:
 
 # Save MetaTable
 tbl = Table()
+
 df = tbl.to_dataframe(seq)
 df.to_csv("metatable_non_canonical.csv")
