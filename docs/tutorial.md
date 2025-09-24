@@ -414,7 +414,7 @@ As with cBioPortal and COSMIC, Cancermuts supports mutation annotation using the
 We begin by creating a ClinVar data source object:
 
 ```py
->>> cb = cBioPortal()
+>>> clinvar = ClinVar()
 ```
 ClinVar queries require both the gene name and the RefSeq accession number of the canonical isoform. 
 While the gene name is inferred automatically from the Sequence object, the RefSeq ID must be manually specified using the aliases attribute:

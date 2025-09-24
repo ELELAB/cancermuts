@@ -13,7 +13,7 @@ seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
 # OPTIONAL: Use a specific UniProt isoform instead of canonical
 # seq = up.get_sequence("AMBRA1", isoform='Q9C0C7-2')
 
-aeq.aliases["refseq"] = "NP_073729"
+seq.aliases["refseq"] = "NP_073729"
 
 # this prints the downloaded protein sequence
 print(seq.sequence)
@@ -65,13 +65,14 @@ print(seq.positions[64].mutations[0].sources)
 
 print(seq.positions[64].mutations[0].metadata)
 
+# add mutations from ClinVar
 clinvar = ClinVar()
 clinvar.add_mutations(seq, metadata=[
     'clinvar_classification',
     'clinvar_condition',
     'clinvar_review_status',
-    'genomic_mutations',
     'clinvar_variant_id',
+    'genomic_mutations',
     'genomic_coordinates'
 ])
 
