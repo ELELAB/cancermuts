@@ -449,6 +449,8 @@ the two scores we are able to gather have the same value.
 The REVEL scores from MyVariant are only available for the canonical isoform.  
 If we want to annotate mutations on *alternative isoforms* we need to use the `RevelDatabase` 
 class, which works from a local REVEL file and matches variants by Ensembl transcript ID.
+We can download from [RevelDatabase](https://zenodo.org/records/7072866) the file 
+called `revel-v1.3_all_chromosomes.zip`.
 
 First we need to download a local copy of the REVEL database in CSV format. 
 The file must contain the following columns:
