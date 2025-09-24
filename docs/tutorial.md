@@ -444,43 +444,60 @@ annotated with two genomic mutations. The two genomic mutations corresponded
 to the same mutations annotated in two different genome assemblies, therefore
 the two scores we are able to gather have the same value.
 
-#### REVEL score from a local file
+#### REVEL score from a local database file
 
 The REVEL scores from MyVariant are only available for the canonical isoform.  
 If we want to annotate mutations on *alternative isoforms* we need to use the `RevelDatabase` 
-class, which works from a local REVEL file and matches variants by Ensembl transcript ID.
-We can download from [RevelDatabase](https://zenodo.org/records/7072866) the file 
-called `revel-v1.3_all_chromosomes.zip`.
+class, which doesn't rely on MyVariant, but works from a REVEL scores database 
+which needs to be available locally. In this database, scores calculated for
+alternative isoforms, specified as ENSEMBL transcript IDs, are available.
 
-First we need to download a local copy of the REVEL database in CSV format. 
-The file must contain the following columns:
+In order to do this, we first need to download the database file called `revel-v1.3_all_chromosomes.zip`
+from the [REVEL Zenodo entry](https://zenodo.org/records/7072866) and unzip it.
 
-chr,hg19_pos,grch38_pos,ref,alt,aaref,aaalt,REVEL,Ensembl_transcriptid
+The resulting file is in CSV format, and expected to contain the following columns:
 
-The Ensembl_transcriptid column may contain multiple IDs separated by ;.
-Both hg19_pos and grch38_pos should be present, as Cancermuts will automatically 
-use the correct one depending on the genome assembly of the genomic mutation.
+```
+chr
+hg19_pos
+grch38_pos
+ref
+alt
+aaref
+aaalt
+REVEL
+Ensembl_transcriptid
+```
+
+The `Ensembl_transcriptid` column may contain multiple IDs separated by `;`.
+
+Both `hg19_pos` and `grch38_pos`, which contain the genomic position,
+should be present, as Cancermuts will automatically use the correct one
+depending on the genome assembly of the genomic mutation.
 
 We can then annotate our sequence with the local REVEL database:
 
+```py
 >>> from cancermuts.datasources import RevelDatabase
 
->>> revel_file = "/data/databases/REVEL/revel_with_transcript_ids.csv"
+>>> revel_file = "/path/to/revel_with_transcript_ids.csv"
 >>> rv = RevelDatabase(revel_file)
 >>> rv.add_metadata(seq)
+```
 
 We can now check that REVEL scores have been annotated for our mutations:
 
+```py
 >>> seq.positions[64].mutations[0].metadata['revel_score']
 [<Revel, 0.575>]
+```
 
-This score was matched by chromosome, position, reference and alternative alleles,
+This score was obtained by matching chromosome, position, reference and alternative alleles,
 the amino acid change, and the Ensembl transcript ID associated to the sequence.
 
 When working with canonical isoforms, both MyVariant and RevelDatabase can be used.
-For alternative isoforms, only RevelDatabase supports annotation, since it directly 
-matches Ensembl transcript IDs from the local file.
-
+Alternative isoforms are only supported using RevelDatabase.
+ 
 #### gnomAD allele frequencies
 
 Similarly, we annotate mutations with their exome or genome allele frequencies
