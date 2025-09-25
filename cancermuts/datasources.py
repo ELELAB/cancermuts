@@ -1186,7 +1186,7 @@ class ClinVar(DynamicSource, object):
                 self.log.error(f"Could not parse annotation: {ann} → {e}")
         return genomic_mutations
 
-    def _get_available_muts_and_md(self, sequence, gene, refseq, clinvar_ids, metadata=[]):
+    def _get_available_muts_and_md(self, clinvar_ids, metadata=[]):
 
         # Initial object assignment:
         missense_variants = {}
@@ -1197,7 +1197,9 @@ class ClinVar(DynamicSource, object):
         var_right_iso = 0
         var_other_iso = 0
         uncanonical_annotation = 0
-
+        gene = sequence.gene_id
+        refseq = sequence.aliases["refseq"]
+        
         # Prepare classification-based queries for consistency check:
         filter_ids = {}
         classifications = ["Pathogenic", "Benign", "Likely Pathogenic", "Likely Benign", "vus", "Conflicting"]
@@ -1449,7 +1451,7 @@ class ClinVar(DynamicSource, object):
                     "inconsistency_annotations": pd.DataFrame()
             }
 
-        mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene = self._get_available_muts_and_md(sequence, gene, refseq, clinvar_ids, metadata)
+        mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene = self._get_available_muts_and_md(sequence, clinvar_ids, metadata)
 
         for mutation_idx, mutation in enumerate(mutations):
             for md in metadata:
