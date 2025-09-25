@@ -547,6 +547,91 @@ class CancerHistology(Metadata):
     def __hash__(self):
         return hash((self.source, self.histology))
 
+class ClinVarVariantID(Metadata):
+    description = "ClinVar variant ID"
+    header = "clinvar_variant_id"
+
+    def __init__(self, source, variant_id):
+        super().__init__(source)
+        self.variant_id = str(variant_id)
+
+    def get_value(self):
+        return self.variant_id
+
+    def get_value_str(self):
+        return self.variant_id
+
+    def __repr__(self):
+        return f"<ClinVarVariantID {self.variant_id} from {self.source.name}>"
+
+class ClinVarCondition(Metadata):
+    description = "ClinVar condition"
+    header = "clinvar_condition"
+
+    def __init__(self, source, data):
+        super().__init__(source)
+        conds = data["GermlineClassification"]
+        self.conditions = conds if isinstance(conds, list) else [conds]
+        
+    def get_value(self):
+        return self.conditions
+
+    def get_value_str(self):
+        return ";".join(self.conditions)
+
+class ClinVarReviewStatus(Metadata):
+    description = "ClinVar review status"
+    header = "clinvar_review_status"
+
+    stars_map = {
+        'practice guideline': 4, 
+        'reviewed by expert panel': 3, 
+        'criteria provided, multiple submitters, no conflicts': 2,
+        'criteria provided, multiple submitters': 'NA',
+        'criteria provided, conflicting interpretations': 1,
+        'criteria provided, conflicting classifications': 1,
+        'criteria provided, single submitter': 1,
+        'no assertion for the individual variant': 0, 
+        'no interpretation for the single variant': 0,
+        'no assertion criteria provided': 0, 
+        'no assertion provided': 0,
+        'no classification provided': 0
+    }
+
+    def __init__(self, source, data):
+        super().__init__(source)
+        self.status = data["GermlineClassification"]
+        self.stars = self.stars_map[self.status]
+
+    def get_value(self):
+        return self.stars
+
+    def get_value_str(self):
+        return self.stars
+
+    def get_status_text(self):
+        return self.status
+
+    def get_stars(self):
+        return self.stars
+
+    def __repr__(self):
+        return f"<ClinVarReviewStatus {self.stars} (from: {self.status}) from {self.source.name}>"
+
+class ClinVarClassification(Metadata):
+    description = "ClinVar classification"
+    header = "clinvar_classification"
+
+    def __init__(self, source, data):
+        super().__init__(source)
+        self.classification = data["GermlineClassification"]
+
+    def get_value(self):
+        return self.classification
+
+    def get_value_str(self):
+        return self.classification
+
 metadata_classes = { 
                      'cancer_type'                 : CancerType,
                      'cancer_study'                : CancerStudy,
@@ -559,4 +644,9 @@ metadata_classes = {
                      'gnomad_popmax_exome_allele_frequency' : gnomADPopmaxExomeAlleleFrequency,
                      'cancer_site'                 : CancerSite,
                      'cancer_histology'            : CancerHistology,
-                   }
+                     'clinvar_variant_id'         : ClinVarVariantID,
+                     'clinvar_condition'          : ClinVarCondition,
+                     'clinvar_review_status'      : ClinVarReviewStatus,
+                     'clinvar_classification'     : ClinVarClassification,
+
+                    }

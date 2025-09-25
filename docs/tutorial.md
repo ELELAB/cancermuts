@@ -186,16 +186,21 @@ Q9C0C7-3
 False
 ```
 
+# Specify the desired RefSeq isoform for ClinVar parsing:
+```py
+>>> seq.aliases["refseq"] = "NP_073729"
+```
+
 ### Collecting cancer mutations
 
 Now that we have the Sequence ready, we can start adding annotations to it.
-We will first download cancer mutations from cBioPortal and COSMIC.
+We will first download cancer mutations from cBioPortal, COSMIC and ClinVar.
 
 We first import the required datasource classes for them:
 
 ```py
 # import data sources classes
->>> from cancermuts.datasources import cBioPortal, COSMIC
+>>> from cancermuts.datasources import cBioPortal, COSMIC, ClinVar
 ```
 
 #### cBioPortal
@@ -409,10 +414,66 @@ and COSMIC are present:
  'cancer_histology': [<TumorHistology, carcinoma, adenocarcinoma>]}
 ```
 
+#### ClinVar
+As with cBioPortal and COSMIC, Cancermuts supports mutation annotation using the ClinVar database.
+We begin by creating a ClinVar data source object:
+
+```py
+>>> clinvar = ClinVar()
+```
+ClinVar queries require both the gene name and the RefSeq accession number of the canonical isoform. 
+While the gene name is inferred automatically from the Sequence object, the RefSeq ID must be manually specified using the aliases attribute:
+
+```py
+>>> seq.aliases["refseq"] = "NP_073729"
+```
+
+Once the RefSeq is set, we can annotate the sequence object with all ClinVar missense variants by running:
+
+```py
+>>> clinvar.add_mutations(seq, metadata=[
+...     'clinvar_classification',
+...     'clinvar_condition',
+...     'clinvar_review_status',
+...     'genomic_mutations',
+...     'genomic_coordinates',
+...     'clinvar_variant_id'
+... ])
+
+```
+
+Once complete, mutations identified by ClinVar will be added to the appropriate positions in the sequence:
+
+```py
+>>> seq.positions[14].mutations
+[<Mutation Q15R from ClinVar>]
+
+```
+
+Each mutation is recorded in a Mutation object that can be further explored:
+
+```py
+>>> seq.positions[14].mutations
+[<Mutation Q15R from ClinVar>]
+
+>>> seq.positions[14].mutations[0].sources
+[<cancermuts.datasources.ClinVar object at 0x7fcdb3880a60>]
+
+>>> seq.positions[14].mutations[0].mutated_residue_type
+'R'
+
+>>> seq.positions[14].mutations[0].metadata['clinvar_condition'][0].get_value_str()
+'not specified'
+
+>>> seq.positions[14].mutations[0].metadata['clinvar_classification'][0].get_value_str()
+'Uncertain significance'
+
+```
+
 ### Additional mutation metadata
 
 Cancermuts allows to enrich the downloaded mutations with further metadata. We
-will see now how to download the REVEL pathogenicy score and the gnomAD allele
+will see now how to download the REVEL pathogenicity score and the gnomAD allele
 frequency for each specific variant.
 
 #### REVEL score from MyVariant
