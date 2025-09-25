@@ -614,7 +614,7 @@ class cBioPortal(DynamicSource, object):
 
 class COSMIC(DynamicSource, object):
     @logger_init
-    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, transcript_database_file, database_encoding=None, lazy_load_db=True):
+    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, database_encoding=None, lazy_load_db=True):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
 
@@ -639,11 +639,8 @@ class COSMIC(DynamicSource, object):
 
         self._use_cols_classification_files = self._cosmic_phenotype_id_kwd + self._site_kwd + self._histology_kwd
 
-        self._use_cols_transcript_files = ['TRANSCRIPT_ACCESSION', 'IS_CANONICAL']
-
-
         database_files = [targeted_database_file,screen_mutant_database_file,
-                          classification_database_file,transcript_database_file]
+                          classification_database_file]
         for file in database_files:
             if not isinstance(file, str):
                 self.log.error('COSMIC database file must be a string.')
@@ -652,7 +649,6 @@ class COSMIC(DynamicSource, object):
         self._targeted_database_file = targeted_database_file
         self._screen_mutant_database_file = screen_mutant_database_file
         self._classification_database_file = classification_database_file
-        self._transcript_database_file = transcript_database_file
 
         if database_encoding is None or isinstance(database_encoding, str):
             self._encoding = database_encoding
@@ -682,7 +678,10 @@ class COSMIC(DynamicSource, object):
         for fi, file in enumerate(targeted_screenmut_db_files):
             self.log.info(f"Parsing database file {targeted_screenmut_db_filenames[fi]}...")
             try:
-                targeted_screenmut_dataframes.append(pd.read_csv(file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=self._encoding))
+                df_tmp = pd.read_csv(file, sep='\\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=self._encoding)
+                if 'TRANSCRIPT_ACCESSION' in df_tmp.columns:
+                    df_tmp['TRANSCRIPT_ACCESSION'] = df_tmp['TRANSCRIPT_ACCESSION'].map(lambda x: x.split('.', 1)[0] if isinstance(x, str) else x)
+                targeted_screenmut_dataframes.append(df_tmp)
             except:
                 self.log.error(f"Couldn't parse database file {targeted_screenmut_db_filenames[fi]}")
                 raise TypeError(f"Couldn't parse database file {targeted_screenmut_db_filenames[fi]}")
@@ -697,23 +696,8 @@ class COSMIC(DynamicSource, object):
             self.log.error(f"Couldn't parse database file {classification_db_filename}")
             raise TypeError(f"Couldn't parse database file {classification_db_filename}")
 
-        transcript_db_filename = os.path.basename(self._transcript_database_file)
-        self.log.info(f"Parsing database file {transcript_db_filename}...")
         try:
-            transcript_df = pd.read_csv(self._transcript_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_transcript_files, encoding=self._encoding)
-        except ValueError:
-            self.log.error(f"Couldn't parse database file {transcript_db_filename}")
-            raise TypeError(f"Couldn't parse database file {transcript_db_filename}")
-
-        self.log.info("Merging database files into a dataframe...")
-        try:
-            tmp_targeted_screenmut_classification_df = tmp_targeted_screenmut_df.merge(classification_df, on = 'COSMIC_PHENOTYPE_ID', sort=False)
-        except KeyError:
-            self.log.error("Couldn't merge database files due to missing or incorrectly named join columns")
-            raise TypeError("Couldn't merge database files due to missing or incorrectly named join columns")
-
-        try:
-            df = tmp_targeted_screenmut_classification_df.merge(transcript_df, on = 'TRANSCRIPT_ACCESSION',sort=False)
+            df = tmp_targeted_screenmut_df.merge(classification_df, on='COSMIC_PHENOTYPE_ID', sort=False)
         except KeyError:
             self.log.error("Couldn't merge database files due to missing or incorrectly named join columns")
             raise TypeError("Couldn't merge database files due to missing or incorrectly named join columns")
@@ -729,7 +713,8 @@ class COSMIC(DynamicSource, object):
                        cancer_site_subtype_1=None,
                        cancer_site_subtype_2=None,
                        cancer_site_subtype_3=None,
-                       metadata=[]):
+                       metadata=[],
+                       transcript_accession=None):
 
         mutations = []
 
@@ -754,7 +739,8 @@ class COSMIC(DynamicSource, object):
             do_histology = True
 
         if self._df is not None:
-            df = self._df[ (self._df['GENE_SYMBOL'] == gene_id) & (self._df['IS_CANONICAL'] == 'y') ]
+            df = self._df[(self._df['GENE_SYMBOL'] == gene_id)]
+
         else:
             filtered_lines_t = []
             filtered_lines_s = []
@@ -773,7 +759,14 @@ class COSMIC(DynamicSource, object):
 
             df = self._load_db_files(filtered_targeted_database_file, filtered_screenmut_database_file)
 
-            df = df[ (df['IS_CANONICAL'] == 'y') ]
+        if transcript_accession:
+            self.log.info(f"Filtering by transcript_accession={transcript_accession}")
+            if 'TRANSCRIPT_ACCESSION' in df.columns:
+                df = df[df['TRANSCRIPT_ACCESSION'] == transcript_accession]
+                if df.empty:
+                    self.log.warning(f"No COSMIC rows for gene {gene_id} with TRANSCRIPT_ACCESSION={transcript_accession}; falling back to gene-level rows")
+                    if self._df is not None:
+                        df = self._df[(self._df['GENE_SYMBOL'] == gene_id)]
 
         if cancer_types is not None:
             df = df[ df['PRIMARY_HISTOLOGY'].isin(cancer_types) ]
@@ -851,10 +844,6 @@ class COSMIC(DynamicSource, object):
                     cancer_site_subtype_3=None,
                     use_alias=None, metadata=[]):
 
-        if not sequence.is_canonical:
-            raise UnexpectedIsoformError(
-                "COSMIC supports canonical isoforms. Please use a Sequence object for a canonical isoform")
-
         _cosmic_supported_metadata = ['cancer_type', 'genomic_coordinates', 'genomic_mutations', 'cancer_site', 'cancer_histology']
 
         for md in metadata:
@@ -870,6 +859,12 @@ class COSMIC(DynamicSource, object):
         else:
             gene_id = sequence.gene_id
 
+        transcript_accession = sequence.aliases.get('ensembl_transcript_id')
+        if transcript_accession:
+            self.log.info(f"Using Ensembl transcript for COSMIC filter: {transcript_accession}")
+        else:
+            self.log.info("No Ensembl transcript found in sequence aliases; using gene-level COSMIC rows")            
+
         raw_mutations, out_metadata = self._parse_db_files(gene_id, genome_assembly_version = genome_assembly_version,
                                                             cancer_types=cancer_types,
                                                             cancer_histology_subtype_1=cancer_histology_subtype_1,
@@ -879,7 +874,8 @@ class COSMIC(DynamicSource, object):
                                                             cancer_site_subtype_1=cancer_site_subtype_1,
                                                             cancer_site_subtype_2=cancer_site_subtype_2,
                                                             cancer_site_subtype_3=cancer_site_subtype_3,
-                                                            metadata=metadata)
+                                                            metadata=metadata,
+                                                            transcript_accession=transcript_accession)
 
         mutations = [x[2:] for x in raw_mutations]
         unique_mutations = list(set(mutations))
