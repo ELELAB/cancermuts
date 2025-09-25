@@ -1,11 +1,3 @@
-import logging
-
-# Configure logging once for the whole script
-logging.basicConfig(
-    level=logging.INFO,   # or logging.DEBUG for more detail
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
-
 # import the UniProt data source class
 from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, COSMIC, MobiDB, MyVariant, RevelDatabase, ManualAnnotation
 from cancermuts.exceptions import *
