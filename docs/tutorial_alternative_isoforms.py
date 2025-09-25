@@ -1,6 +1,9 @@
 # import the UniProt data source class
-from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, COSMIC, MobiDB
+from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, COSMIC, MobiDB, MyVariant, RevelDatabase, ManualAnnotation
 from cancermuts.exceptions import *
+from cancermuts.core import Mutation
+from cancermuts.metadata import GenomicMutation
+from cancermuts.table import Table
 
 # create the UniProt object
 up = UniProt()
@@ -17,7 +20,26 @@ print(seq.positions[0:5])
 # confirm non-canonical status
 print("Is the sequence canonical?", seq.is_canonical)
 
-# cBioPortal does not support non-canonical isoforms
+# create a ManualAnnotation input
+from io import StringIO
+csv = StringIO("name;site;type;function;reference;genomic_mutations\n"
+                "manual;p.Val820Met;mutation;;;"
+                "hg19,11:g.46456582C>T\n")
+
+# add mutation with ManualAnnotation class
+ma = ManualAnnotation(csv)
+ma.add_mutations(seq, metadata=['genomic_mutations'])
+
+# annotate with REVEL using local database
+rl = RevelDatabase("/data/databases/REVEL/revel_with_transcript_ids")
+rl.add_metadata(seq)
+
+# print annotated mutation and REVEL score
+mut = seq.positions[819].mutations[0]
+print("Mutation:", mut)
+print("REVEL score:", mut.metadata.get('revel_score', []))
+
+# cBioPortal does not support non-canonical mutations
 cbioportal = cBioPortal()
 
 try:
@@ -52,3 +74,17 @@ try:
     mdb.add_position_properties(seq)
 except UnexpectedIsoformError:
     print("MobiDB annotations will not be added, as a non-canonical isoform has been provided")
+
+# MyVariant does not suport non-canonical isoforms
+mv = MyVariant()
+
+try:
+    mv.add_metadata(seq)
+except UnexpectedIsoformError:
+    print("REVEL scores from MyVariant annotations will not be added, as a non-canonical isoform has been provided")
+
+# Save MetaTable
+tbl = Table()
+
+df = tbl.to_dataframe(seq)
+df.to_csv("metatable_non_canonical.csv")
