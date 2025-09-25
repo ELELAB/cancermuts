@@ -14,6 +14,7 @@ seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
 # OPTIONAL: Load a specific UniProt isoform instead of canonical
 # seq = up.get_sequence("AMBRA1", isoform='Q9C0C7-2')
 
+# Specify the desired RefSeq isoform for ClinVar parsing:
 seq.aliases["refseq"] = "NP_073729"
 
 # this prints the downloaded protein sequence
@@ -75,7 +76,7 @@ print(seq.positions[14].mutations[0].sources)
 print(seq.positions[14].mutations[0].mutated_residue_type)
 print(seq.positions[14].mutations[0].metadata['clinvar_condition'][0].get_value_str())
 print(seq.positions[14].mutations[0].metadata['clinvar_classification'][0].get_value_str())
-                                        
+
 # add annotations from MyVariant (REVEL)
 from cancermuts.datasources import MyVariant
 

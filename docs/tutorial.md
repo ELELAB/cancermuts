@@ -186,6 +186,11 @@ Q9C0C7-3
 False
 ```
 
+# Specify the desired RefSeq isoform for ClinVar parsing:
+```py
+>>> seq.aliases["refseq"] = "NP_073729"
+```
+
 ### Collecting cancer mutations
 
 Now that we have the Sequence ready, we can start adding annotations to it.
