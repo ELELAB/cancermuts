@@ -1186,7 +1186,7 @@ class ClinVar(DynamicSource, object):
                 self.log.error(f"Could not parse annotation: {ann} → {e}")
         return genomic_mutations
 
-    def _get_available_muts_and_md(self, clinvar_ids, metadata=[]):
+    def _get_available_muts_and_md(self, sequence, clinvar_ids, metadata=[]):
 
         # Initial object assignment:
         missense_variants = {}
@@ -1199,7 +1199,7 @@ class ClinVar(DynamicSource, object):
         uncanonical_annotation = 0
         gene = sequence.gene_id
         refseq = sequence.aliases["refseq"]
-        
+
         # Prepare classification-based queries for consistency check:
         filter_ids = {}
         classifications = ["Pathogenic", "Benign", "Likely Pathogenic", "Likely Benign", "vus", "Conflicting"]
@@ -1433,6 +1433,9 @@ class ClinVar(DynamicSource, object):
 
     def add_mutations(self, sequence, metadata=[]):
         gene = sequence.gene_id
+        if "refseq" not in sequence.aliases or sequence.aliases["refseq"] is None:
+            self.log.warning(f"No valid 'refseq' alias for gene {sequence.gene_id} was provided. ClinVar will not be parsed for variants.")
+            return
         refseq = sequence.aliases["refseq"]
         filter_missense_variants = f'({gene}[gene] AND ("missense variant"[molecular consequence] OR "SO:0001583"[molecular consequence]))'
         mutation_type = "missense"
