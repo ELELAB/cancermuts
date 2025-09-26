@@ -849,7 +849,8 @@ the Table module:
 ```
 
 We can then manipulate the dataframe as we see fit, e.g. by saving it
-as a csv file:
+as a csv file (note that it can be different from the precalculated ones in 
+the tutorial due to database updates):
 
 ```py
 # save pandas dataframe as CSV
