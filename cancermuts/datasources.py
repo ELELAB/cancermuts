@@ -703,7 +703,7 @@ class COSMIC(DynamicSource, object):
 
         return df
 
-    def _parse_db_files(self, gene_id, genome_assembly_version = 'GRCh38', transcript_accession=None,
+    def _parse_db_files(self, gene_id, transcript_accession, genome_assembly_version = 'GRCh38',
                        cancer_types=None,
                        cancer_histology_subtype_1=None,
                        cancer_histology_subtype_2=None,
@@ -759,11 +759,10 @@ class COSMIC(DynamicSource, object):
 
 
         self.log.info(f"Filtering by transcript_accession={transcript_accession}")
-        if 'TRANSCRIPT_ACCESSION' in df.columns:
-            df = df[df['TRANSCRIPT_ACCESSION'] == transcript_accession]
-            if df.empty:
-                self.log.warning(f"No COSMIC mutations for gene {gene_id} with TRANSCRIPT_ACCESSION={transcript_accession}; falling back to gene-level rows")
-                return [], out_metadata
+        df = df[df['TRANSCRIPT_ACCESSION'] == transcript_accession]
+        if df.empty:
+            self.log.warning(f"No COSMIC mutations for gene {gene_id} with TRANSCRIPT_ACCESSION={transcript_accession}; falling back to gene-level rows")
+            return [], out_metadata
             
         if cancer_types is not None:
             df = df[ df['PRIMARY_HISTOLOGY'].isin(cancer_types) ]
@@ -862,7 +861,7 @@ class COSMIC(DynamicSource, object):
             raise ValueError("ensembl_transcript_id is required in sequence.aliases for COSMIC filtering")
         self.log.info(f"Using Ensembl transcript for COSMIC filter: {transcript_accession}")           
 
-        raw_mutations, out_metadata = self._parse_db_files(gene_id, genome_assembly_version = genome_assembly_version, transcript_accession=transcript_accession,
+        raw_mutations, out_metadata = self._parse_db_files(gene_id, transcript_accession, genome_assembly_version = genome_assembly_version, 
                                                             cancer_types=cancer_types,
                                                             cancer_histology_subtype_1=cancer_histology_subtype_1,
                                                             cancer_histology_subtype_2=cancer_histology_subtype_2,
