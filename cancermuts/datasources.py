@@ -757,15 +757,14 @@ class COSMIC(DynamicSource, object):
 
             df = self._load_db_files(filtered_targeted_database_file, filtered_screenmut_database_file)
 
-        if transcript_accession:
-            self.log.info(f"Filtering by transcript_accession={transcript_accession}")
-            if 'TRANSCRIPT_ACCESSION' in df.columns:
-                df = df[df['TRANSCRIPT_ACCESSION'] == transcript_accession]
-                if df.empty:
-                    self.log.warning(f"No COSMIC rows for gene {gene_id} with TRANSCRIPT_ACCESSION={transcript_accession}; falling back to gene-level rows")
-                    if self._df is not None:
-                        df = self._df[(self._df['GENE_SYMBOL'] == gene_id)]
 
+        self.log.info(f"Filtering by transcript_accession={transcript_accession}")
+        if 'TRANSCRIPT_ACCESSION' in df.columns:
+            df = df[df['TRANSCRIPT_ACCESSION'] == transcript_accession]
+            if df.empty:
+                self.log.warning(f"No COSMIC mutations for gene {gene_id} with TRANSCRIPT_ACCESSION={transcript_accession}; falling back to gene-level rows")
+                return [], out_metadata
+            
         if cancer_types is not None:
             df = df[ df['PRIMARY_HISTOLOGY'].isin(cancer_types) ]
         if cancer_histology_subtype_1 is not None:
@@ -858,10 +857,10 @@ class COSMIC(DynamicSource, object):
             gene_id = sequence.gene_id
 
         transcript_accession = sequence.aliases.get('ensembl_transcript_id')
-        if transcript_accession:
-            self.log.info(f"Using Ensembl transcript for COSMIC filter: {transcript_accession}")
-        else:
-            self.log.info("No Ensembl transcript found in sequence aliases; using gene-level COSMIC rows")            
+        if not transcript_accession:
+            self.log.error("Missing required sequence.aliases['ensembl_transcript_id'] for COSMIC filtering")
+            raise ValueError("ensembl_transcript_id is required in sequence.aliases for COSMIC filtering")
+        self.log.info(f"Using Ensembl transcript for COSMIC filter: {transcript_accession}")           
 
         raw_mutations, out_metadata = self._parse_db_files(gene_id, genome_assembly_version = genome_assembly_version,
                                                             cancer_types=cancer_types,
