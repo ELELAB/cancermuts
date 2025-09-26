@@ -679,8 +679,7 @@ class COSMIC(DynamicSource, object):
             self.log.info(f"Parsing database file {targeted_screenmut_db_filenames[fi]}...")
             try:
                 df_tmp = pd.read_csv(file, sep='\\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=self._encoding)
-                if 'TRANSCRIPT_ACCESSION' in df_tmp.columns:
-                    df_tmp['TRANSCRIPT_ACCESSION'] = df_tmp['TRANSCRIPT_ACCESSION'].map(lambda x: x.split('.', 1)[0] if isinstance(x, str) else x)
+                df_tmp['TRANSCRIPT_ACCESSION'] = df_tmp['TRANSCRIPT_ACCESSION'].map(lambda x: x.split('.', 1)[0] if isinstance(x, str) else x)
                 targeted_screenmut_dataframes.append(df_tmp)
             except:
                 self.log.error(f"Couldn't parse database file {targeted_screenmut_db_filenames[fi]}")
