@@ -71,11 +71,6 @@ try:
 except UnexpectedIsoformError:
     print("cBioPortal mutations will not be added, as a non-canonical isoform has been provided")
 
-cosmic = COSMIC(targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
-                screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
-                classification_database_file='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
-                database_encoding='latin1', lazy_load_db=True)
-
 # PhosphoSite does not support non-canonical isoforms
 ps = PhosphoSite('/data/databases/phosphosite/')
 
