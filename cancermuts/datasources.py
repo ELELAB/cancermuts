@@ -703,7 +703,7 @@ class COSMIC(DynamicSource, object):
 
         return df
 
-    def _parse_db_files(self, gene_id, genome_assembly_version = 'GRCh38',
+    def _parse_db_files(self, gene_id, genome_assembly_version = 'GRCh38', transcript_accession=None,
                        cancer_types=None,
                        cancer_histology_subtype_1=None,
                        cancer_histology_subtype_2=None,
@@ -712,8 +712,7 @@ class COSMIC(DynamicSource, object):
                        cancer_site_subtype_1=None,
                        cancer_site_subtype_2=None,
                        cancer_site_subtype_3=None,
-                       metadata=[],
-                       transcript_accession=None):
+                       metadata=[]):
 
         mutations = []
 
