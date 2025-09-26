@@ -761,7 +761,7 @@ class COSMIC(DynamicSource, object):
         self.log.info(f"Filtering by transcript_accession={transcript_accession}")
         df = df[df['TRANSCRIPT_ACCESSION'] == transcript_accession]
         if df.empty:
-            self.log.warning(f"No COSMIC mutations for gene {gene_id} with TRANSCRIPT_ACCESSION={transcript_accession}; falling back to gene-level rows")
+            self.log.warning(f"No COSMIC mutations for gene {gene_id} with TRANSCRIPT_ACCESSION={transcript_accession}; returning empty results")
             return [], out_metadata
             
         if cancer_types is not None:
