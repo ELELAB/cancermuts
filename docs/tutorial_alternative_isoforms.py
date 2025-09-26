@@ -22,7 +22,7 @@ print("Is the sequence canonical?", seq.is_canonical)
 print("Transcript accession for filtering (if any):",
       seq.aliases.get('transcript_accession') or seq.aliases.get('ensembl_transcript_id'))
 
-# COSMIC now suports non-canonical alternative isofrom
+# Use COSMIC to retrieve non-canonical alternative isofrom annotations
 
 cosmic = COSMIC(
     targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
