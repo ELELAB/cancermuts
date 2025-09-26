@@ -18,7 +18,6 @@ You also need to have downloaded the following COSMIC files:
 - Cosmic_CompleteTargetedScreensMutant_Tsv_v102_GRCh38.tar
 - Cosmic_GenomeScreensMutant_Tsv_v102_GRCh38.tar
 - Cosmic_Classification_Tsv_v102_GRCh38.tar
-- Cosmic_Transcripts_Tsv_v102_GRCh38.tar
 as detailed in the installation section.
 
 Finally, you can decide to perform this tutorial either interactively (i.e.
@@ -320,15 +319,18 @@ In this cases, Cancermuts tries its best to infer it from the study name.
 
 As before, we first create a COSMIC data source object:
 
+{% hint style='info' %}
+Note that COSMIC supports non-canonical alternative isoforms. 
+{% endhint %}
+
 ```py
 cosmic = COSMIC(targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
 screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
 classification_database_fil='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
-transcript_database_file='/data/databases/cosmic-v102/Cosmic_Transcripts_v102_GRCh38.tsv',
 database_encoding='latin1', lazy_load_db= rue)
 ```
 
-here the `targeted_database_file`, `screen_mutant_database_file`, `classification_database_file`, `transcript_database_file` argument are strings.
+here the `targeted_database_file`, `screen_mutant_database_file`, `classification_database_file` argument are strings.
 Usually, the argument for this file would be the COSMIC files  that
 was downloaded as detailed in the Install section.
 
@@ -357,6 +359,7 @@ cosmic.add_mutations(seq,
 
 Here we restrict the search to those mutations that are involved in colorectal
 adenocarcinoma.
+
 
 {% hint style='info' %}
 It is also possible to search in any available cancer type or site as well (i.e. pancancer),
@@ -849,7 +852,8 @@ the Table module:
 ```
 
 We can then manipulate the dataframe as we see fit, e.g. by saving it
-as a csv file:
+as a csv file (note that it can be different from the precalculated ones in 
+the tutorial due to database updates):
 
 ```py
 # save pandas dataframe as CSV

@@ -19,16 +19,40 @@ print(seq.positions[0:5])
 
 # confirm non-canonical status
 print("Is the sequence canonical?", seq.is_canonical)
+print("Transcript accession for filtering (if any):",
+      seq.aliases.get('transcript_accession') or seq.aliases.get('ensembl_transcript_id'))
 
-# create a ManualAnnotation input
-from io import StringIO
-csv = StringIO("name;site;type;function;reference;genomic_mutations\n"
-                "manual;p.Val820Met;mutation;;;"
-                "hg19,11:g.46456582C>T\n")
+# Use COSMIC to retrieve non-canonical alternative isofrom annotations
 
-# add mutation with ManualAnnotation class
-ma = ManualAnnotation(csv)
-ma.add_mutations(seq, metadata=['genomic_mutations'])
+cosmic = COSMIC(
+    targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
+    screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
+    classification_database_file='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
+    database_encoding='latin1',
+    lazy_load_db=True
+)
+
+cosmic.add_mutations(
+    seq,
+    genome_assembly_version='GRCh38',
+    metadata=['genomic_coordinates', 'genomic_mutations', 'cancer_site', 'cancer_histology']
+)
+
+positions_with_mut = [p for p in seq.positions if p.mutations]
+if positions_with_mut:
+    first_pos = positions_with_mut[0]
+    first_mut = first_pos.mutations[0]
+    print("First COSMIC mutation:", first_mut, "at position", first_pos.sequence_position)
+    print("Sources:", first_mut.sources)
+    print("Metadata:", first_mut.metadata)
+else:
+    print("No COSMIC mutations found for transcript:",
+          seq.aliases.get('transcript_accession') or seq.aliases.get('ensembl_transcript_id') or "canonical")
+
+
+#print(seq.positions[819].mutations[0])
+#print(seq.positions[819].mutations[0].sources)
+#print(seq.positions[819].mutations[0].metadata)
 
 # annotate with REVEL using local database
 rl = RevelDatabase("/data/databases/REVEL/revel_with_transcript_ids")
@@ -46,18 +70,6 @@ try:
     cbioportal.add_mutations(seq)
 except UnexpectedIsoformError:
     print("cBioPortal mutations will not be added, as a non-canonical isoform has been provided")
-
-cosmic = COSMIC(targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
-                screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
-                classification_database_file='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
-                transcript_database_file='/data/databases/cosmic-v102/Cosmic_Transcripts_v102_GRCh38.tsv',
-                database_encoding='latin1', lazy_load_db=True)
-
-# COSMIC does not support non-canonical isoforms
-try:
-    cosmic.add_mutations(seq)
-except UnexpectedIsoformError:
-    print("COSMIC mutations will not be added, as a non-canonical isoform has been provided")
 
 # PhosphoSite does not support non-canonical isoforms
 ps = PhosphoSite('/data/databases/phosphosite/')
