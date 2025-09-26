@@ -862,7 +862,7 @@ class COSMIC(DynamicSource, object):
             raise ValueError("ensembl_transcript_id is required in sequence.aliases for COSMIC filtering")
         self.log.info(f"Using Ensembl transcript for COSMIC filter: {transcript_accession}")           
 
-        raw_mutations, out_metadata = self._parse_db_files(gene_id, genome_assembly_version = genome_assembly_version,
+        raw_mutations, out_metadata = self._parse_db_files(gene_id, genome_assembly_version = genome_assembly_version, transcript_accession=transcript_accession,
                                                             cancer_types=cancer_types,
                                                             cancer_histology_subtype_1=cancer_histology_subtype_1,
                                                             cancer_histology_subtype_2=cancer_histology_subtype_2,
@@ -871,8 +871,7 @@ class COSMIC(DynamicSource, object):
                                                             cancer_site_subtype_1=cancer_site_subtype_1,
                                                             cancer_site_subtype_2=cancer_site_subtype_2,
                                                             cancer_site_subtype_3=cancer_site_subtype_3,
-                                                            metadata=metadata,
-                                                            transcript_accession=transcript_accession)
+                                                            metadata=metadata)
 
         mutations = [x[2:] for x in raw_mutations]
         unique_mutations = list(set(mutations))
