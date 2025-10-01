@@ -18,7 +18,6 @@ You also need to have downloaded the following COSMIC files:
 - Cosmic_CompleteTargetedScreensMutant_Tsv_v102_GRCh38.tar
 - Cosmic_GenomeScreensMutant_Tsv_v102_GRCh38.tar
 - Cosmic_Classification_Tsv_v102_GRCh38.tar
-- Cosmic_Transcripts_Tsv_v102_GRCh38.tar
 as detailed in the installation section.
 
 Finally, you can decide to perform this tutorial either interactively (i.e.
@@ -325,15 +324,18 @@ In this cases, Cancermuts tries its best to infer it from the study name.
 
 As before, we first create a COSMIC data source object:
 
+{% hint style='info' %}
+Note that COSMIC supports non-canonical alternative isoforms. 
+{% endhint %}
+
 ```py
 cosmic = COSMIC(targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
 screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
 classification_database_fil='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
-transcript_database_file='/data/databases/cosmic-v102/Cosmic_Transcripts_v102_GRCh38.tsv',
 database_encoding='latin1', lazy_load_db= rue)
 ```
 
-here the `targeted_database_file`, `screen_mutant_database_file`, `classification_database_file`, `transcript_database_file` argument are strings.
+here the `targeted_database_file`, `screen_mutant_database_file`, `classification_database_file` argument are strings.
 Usually, the argument for this file would be the COSMIC files  that
 was downloaded as detailed in the Install section.
 
@@ -362,6 +364,7 @@ cosmic.add_mutations(seq,
 
 Here we restrict the search to those mutations that are involved in colorectal
 adenocarcinoma.
+
 
 {% hint style='info' %}
 It is also possible to search in any available cancer type or site as well (i.e. pancancer),
@@ -505,6 +508,60 @@ annotated with two genomic mutations. The two genomic mutations corresponded
 to the same mutations annotated in two different genome assemblies, therefore
 the two scores we are able to gather have the same value.
 
+#### REVEL score from a local database file
+
+The REVEL scores from MyVariant are only available for the canonical isoform.  
+If we want to annotate mutations on *alternative isoforms* we need to use the `RevelDatabase` 
+class, which doesn't rely on MyVariant, but works from a REVEL scores database 
+which needs to be available locally. In this database, scores calculated for
+alternative isoforms, specified as ENSEMBL transcript IDs, are available.
+
+In order to do this, we first need to download the database file called `revel-v1.3_all_chromosomes.zip`
+from the [REVEL Zenodo entry](https://zenodo.org/records/7072866) and unzip it.
+
+The resulting file is in CSV format, and expected to contain the following columns:
+
+```
+chr
+hg19_pos
+grch38_pos
+ref
+alt
+aaref
+aaalt
+REVEL
+Ensembl_transcriptid
+```
+
+The `Ensembl_transcriptid` column may contain multiple IDs separated by `;`.
+
+Both `hg19_pos` and `grch38_pos`, which contain the genomic position,
+should be present, as Cancermuts will automatically use the correct one
+depending on the genome assembly of the genomic mutation.
+
+We can then annotate our sequence with the local REVEL database:
+
+```py
+>>> from cancermuts.datasources import RevelDatabase
+
+>>> revel_file = "/path/to/revel_with_transcript_ids.csv"
+>>> rv = RevelDatabase(revel_file)
+>>> rv.add_metadata(seq)
+```
+
+We can now check that REVEL scores have been annotated for our mutations:
+
+```py
+>>> seq.positions[64].mutations[0].metadata['revel_score']
+[<Revel, 0.575>]
+```
+
+This score was obtained by matching chromosome, position, reference and alternative alleles,
+the amino acid change, and the Ensembl transcript ID associated to the sequence.
+
+When working with canonical isoforms, both MyVariant and RevelDatabase can be used.
+Alternative isoforms are only supported using RevelDatabase.
+ 
 #### gnomAD allele frequencies
 
 Similarly, we annotate mutations with their exome or genome allele frequencies
@@ -856,7 +913,8 @@ the Table module:
 ```
 
 We can then manipulate the dataframe as we see fit, e.g. by saving it
-as a csv file:
+as a csv file (note that it can be different from the precalculated ones in 
+the tutorial due to database updates):
 
 ```py
 # save pandas dataframe as CSV

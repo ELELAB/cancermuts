@@ -45,7 +45,6 @@ print(seq.positions[38].mutations[0].metadata)
 cosmic = COSMIC(targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
 				screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
 				classification_database_file='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
-                transcript_database_file='/data/databases/cosmic-v102/Cosmic_Transcripts_v102_GRCh38.tsv',
 				database_encoding='latin1', lazy_load_db=True)
 cosmic.add_mutations(seq,
 					 genome_assembly_version='GRCh38',

@@ -208,6 +208,12 @@ class UniProt(DynamicSource, object):
         else:
             aliases = {'uniprot'     : this_upid,
                        'uniprot_acc' : this_upac }
+        
+        transcript_lookup_id = isoform if isoform is not None else this_upac
+        ensembl_transcript = self._get_transcript_id(transcript_lookup_id)
+        
+        if ensembl_transcript:
+            aliases['ensembl_transcript_id'] = ensembl_transcript
 
         self.log.info("final aliases: %s" % aliases)
 
@@ -253,6 +259,30 @@ class UniProt(DynamicSource, object):
             self.log.warning(f"Multiple FASTA sequences for {upid} found; the first one will be used")
 
         return str(sequences[0].seq)
+    
+    def _get_transcript_id(self, transcript_lookup_id):
+        url = f"https://rest.uniprot.org/uniprotkb/{transcript_lookup_id}.json"
+        self.log.debug(f"Querying UniProt for {transcript_lookup_id} at {url}")
+        try:
+            response = rq.get(url)
+            if not response.ok:
+                self.log.warning(f"Failed to fetch UniProt JSON for {transcript_lookup_id}: status {response.status_code}")
+                return None
+            data = response.json()
+        except Exception as e:
+            self.log.warning(f"Could not fetch or parse UniProt JSON for {transcript_lookup_id}: {e}")
+            return None
+
+        for xref in data.get('uniProtKBCrossReferences', []):
+            if xref.get('database') == 'Ensembl':
+                transcript_id = xref.get('id')
+                if transcript_id:
+                    transcript_id = transcript_id.split('.')[0]
+                    self.log.info(f"Resolved Ensembl transcript ID for {transcript_lookup_id}: {transcript_id}")
+                    return transcript_id
+                
+        self.log.warning(f"No Ensembl transcript ID found for {transcript_lookup_id}")
+        return None
 
     def _get_aliases(self, gene_id, to, fr='UniProtKB_AC-ID'):
 
@@ -287,7 +317,6 @@ class UniProt(DynamicSource, object):
                 out[t] = results['to'][t_keyword]
             else:
                 out[t] = results['to']
-
 
         return out
 
@@ -1482,7 +1511,7 @@ class ClinVar(DynamicSource, object):
 
 class COSMIC(DynamicSource, object):
     @logger_init
-    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, transcript_database_file, database_encoding=None, lazy_load_db=True):
+    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, database_encoding=None, lazy_load_db=True):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
 
@@ -1507,11 +1536,8 @@ class COSMIC(DynamicSource, object):
 
         self._use_cols_classification_files = self._cosmic_phenotype_id_kwd + self._site_kwd + self._histology_kwd
 
-        self._use_cols_transcript_files = ['TRANSCRIPT_ACCESSION', 'IS_CANONICAL']
-
-
         database_files = [targeted_database_file,screen_mutant_database_file,
-                          classification_database_file,transcript_database_file]
+                          classification_database_file]
         for file in database_files:
             if not isinstance(file, str):
                 self.log.error('COSMIC database file must be a string.')
@@ -1520,7 +1546,6 @@ class COSMIC(DynamicSource, object):
         self._targeted_database_file = targeted_database_file
         self._screen_mutant_database_file = screen_mutant_database_file
         self._classification_database_file = classification_database_file
-        self._transcript_database_file = transcript_database_file
 
         if database_encoding is None or isinstance(database_encoding, str):
             self._encoding = database_encoding
@@ -1550,7 +1575,9 @@ class COSMIC(DynamicSource, object):
         for fi, file in enumerate(targeted_screenmut_db_files):
             self.log.info(f"Parsing database file {targeted_screenmut_db_filenames[fi]}...")
             try:
-                targeted_screenmut_dataframes.append(pd.read_csv(file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=self._encoding))
+                df_tmp = pd.read_csv(file, sep='\\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=self._encoding)
+                df_tmp['TRANSCRIPT_ACCESSION'] = df_tmp['TRANSCRIPT_ACCESSION'].map(lambda x: x.split('.', 1)[0] if isinstance(x, str) else x)
+                targeted_screenmut_dataframes.append(df_tmp)
             except:
                 self.log.error(f"Couldn't parse database file {targeted_screenmut_db_filenames[fi]}")
                 raise TypeError(f"Couldn't parse database file {targeted_screenmut_db_filenames[fi]}")
@@ -1565,30 +1592,15 @@ class COSMIC(DynamicSource, object):
             self.log.error(f"Couldn't parse database file {classification_db_filename}")
             raise TypeError(f"Couldn't parse database file {classification_db_filename}")
 
-        transcript_db_filename = os.path.basename(self._transcript_database_file)
-        self.log.info(f"Parsing database file {transcript_db_filename}...")
         try:
-            transcript_df = pd.read_csv(self._transcript_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_transcript_files, encoding=self._encoding)
-        except ValueError:
-            self.log.error(f"Couldn't parse database file {transcript_db_filename}")
-            raise TypeError(f"Couldn't parse database file {transcript_db_filename}")
-
-        self.log.info("Merging database files into a dataframe...")
-        try:
-            tmp_targeted_screenmut_classification_df = tmp_targeted_screenmut_df.merge(classification_df, on = 'COSMIC_PHENOTYPE_ID', sort=False)
-        except KeyError:
-            self.log.error("Couldn't merge database files due to missing or incorrectly named join columns")
-            raise TypeError("Couldn't merge database files due to missing or incorrectly named join columns")
-
-        try:
-            df = tmp_targeted_screenmut_classification_df.merge(transcript_df, on = 'TRANSCRIPT_ACCESSION',sort=False)
+            df = tmp_targeted_screenmut_df.merge(classification_df, on='COSMIC_PHENOTYPE_ID', sort=False)
         except KeyError:
             self.log.error("Couldn't merge database files due to missing or incorrectly named join columns")
             raise TypeError("Couldn't merge database files due to missing or incorrectly named join columns")
 
         return df
 
-    def _parse_db_files(self, gene_id, genome_assembly_version = 'GRCh38',
+    def _parse_db_files(self, gene_id, transcript_accession, genome_assembly_version = 'GRCh38',
                        cancer_types=None,
                        cancer_histology_subtype_1=None,
                        cancer_histology_subtype_2=None,
@@ -1622,7 +1634,8 @@ class COSMIC(DynamicSource, object):
             do_histology = True
 
         if self._df is not None:
-            df = self._df[ (self._df['GENE_SYMBOL'] == gene_id) & (self._df['IS_CANONICAL'] == 'y') ]
+            df = self._df[(self._df['GENE_SYMBOL'] == gene_id)]
+
         else:
             filtered_lines_t = []
             filtered_lines_s = []
@@ -1641,8 +1654,13 @@ class COSMIC(DynamicSource, object):
 
             df = self._load_db_files(filtered_targeted_database_file, filtered_screenmut_database_file)
 
-            df = df[ (df['IS_CANONICAL'] == 'y') ]
 
+        self.log.info(f"Filtering by transcript_accession={transcript_accession}")
+        df = df[df['TRANSCRIPT_ACCESSION'] == transcript_accession]
+        if df.empty:
+            self.log.warning(f"No COSMIC mutations for gene {gene_id} with TRANSCRIPT_ACCESSION={transcript_accession}; returning empty results")
+            return [], out_metadata
+            
         if cancer_types is not None:
             df = df[ df['PRIMARY_HISTOLOGY'].isin(cancer_types) ]
         if cancer_histology_subtype_1 is not None:
@@ -1719,10 +1737,6 @@ class COSMIC(DynamicSource, object):
                     cancer_site_subtype_3=None,
                     use_alias=None, metadata=[]):
 
-        if not sequence.is_canonical:
-            raise UnexpectedIsoformError(
-                "COSMIC supports canonical isoforms. Please use a Sequence object for a canonical isoform")
-
         _cosmic_supported_metadata = ['cancer_type', 'genomic_coordinates', 'genomic_mutations', 'cancer_site', 'cancer_histology']
 
         for md in metadata:
@@ -1738,7 +1752,13 @@ class COSMIC(DynamicSource, object):
         else:
             gene_id = sequence.gene_id
 
-        raw_mutations, out_metadata = self._parse_db_files(gene_id, genome_assembly_version = genome_assembly_version,
+        transcript_accession = sequence.aliases.get('ensembl_transcript_id')
+        if not transcript_accession:
+            self.log.error("Missing required sequence.aliases['ensembl_transcript_id'] for COSMIC filtering")
+            raise ValueError("ensembl_transcript_id is required in sequence.aliases for COSMIC filtering")
+        self.log.info(f"Using Ensembl transcript for COSMIC filter: {transcript_accession}")           
+
+        raw_mutations, out_metadata = self._parse_db_files(gene_id, transcript_accession, genome_assembly_version = genome_assembly_version, 
                                                             cancer_types=cancer_types,
                                                             cancer_histology_subtype_1=cancer_histology_subtype_1,
                                                             cancer_histology_subtype_2=cancer_histology_subtype_2,
@@ -1898,6 +1918,10 @@ class MyVariant(DynamicSource, object):
 
 
     def add_metadata(self, sequence, md_type=['revel_score']):
+        
+        if not sequence.is_canonical:
+            raise UnexpectedIsoformError("MyVariant REVEL annotation only supports canonical isoforms. Please use a Sequence object for the canonical isoform.")
+    
         if type(md_type) is str:
             md_types = [md_type]
         else:
@@ -2038,7 +2062,7 @@ class MyVariant(DynamicSource, object):
         try:
             revel_scores = self._revel_cache_gm[query_str]
             self.log.info(f"Revel score for {query_str} retrieved from cache")
-            return [ DbnsfpRevel(source=self, score=r) for r in revel_scores ]
+            return [ Revel(source=self, score=r) for r in revel_scores ]
         except KeyError:
             pass
 
@@ -2067,7 +2091,7 @@ class MyVariant(DynamicSource, object):
         revel_scores = sorted(list(set(revel_scores)))
         self._revel_cache_gm[query_str] = revel_scores
 
-        return [ DbnsfpRevel(source=self, score=r) for r in revel_scores ]
+        return [ Revel(source=self, score=r) for r in revel_scores ]
 
     def _get_revel_from_gc(self, mutation, gc):
 
@@ -2125,9 +2149,191 @@ class MyVariant(DynamicSource, object):
         else:
             revel_scores = revel_scores[0]
             self.log.debug(f"Downloaded revel score: {revel_scores}")
-            return [ DbnsfpRevel(source=self, score=r) for r in revel_scores ]
+            return [ Revel(source=self, score=r) for r in revel_scores ]
 
+class RevelDatabase(StaticSource, object):
 
+    @logger_init
+    def __init__(self, revel_file):
+        description = "Local REVEL score annotation using Ensembl transcript ID"
+        super(RevelDatabase, self).__init__(name='RevelDatabase', version='1.0', description=description)
+
+        if not os.path.exists(revel_file):
+            raise FileNotFoundError(f"REVEL database file does not exist: {revel_file}")
+
+        self._revel_file = revel_file
+        self._supported_metadata = {'revel_score': self._get_revel}
+        self._revel_cache_by_chr = {}
+
+    def _filter_revel_by_chromosomes(self, chrom):
+        file_path = self._revel_file
+
+        with open(file_path, "r") as f:
+            header_line = next(f).rstrip("\n")
+            header = header_line.split(",")
+
+            cols = ["chr","hg19_pos","grch38_pos","ref","alt",
+                "aaref","aaalt","REVEL","Ensembl_transcriptid"]
+            
+            missing = [c for c in cols if c not in header]
+            if missing:
+                raise ValueError(f"[REVEL] Missing columns in file: {missing}")
+
+            prefix = f"{chrom},"
+
+            filtered_lines = []
+            for line in f:
+                if line.startswith(prefix):
+                    filtered_lines.append(line)
+
+        if not filtered_lines:
+            self.log.warning(f"[REVEL] No entries found for chromosomes {chrom}")
+            return pd.DataFrame(columns=cols)
+
+        buffer = StringIO()
+        buffer.write(header_line + "\n")
+        buffer.writelines(filtered_lines)
+        buffer.seek(0)
+
+        return pd.read_csv(buffer, dtype=str)
+
+    def add_metadata(self, sequence, md_type=['revel_score']):
+        if type(md_type) is str:
+            md_types = [md_type]
+        else:
+            md_types = md_type
+
+        for md in md_types:
+            if md not in self._supported_metadata:
+                raise ValueError(f"Unsupported metadata type requested: {md}")
+
+        transcript_id = sequence.aliases['ensembl_transcript_id']
+        if not transcript_id:
+               raise ValueError(f"[REVEL] No Ensembl transcript ID available for sequence {sequence}. "
+        "REVEL annotation cannot proceed.")
+        
+        mutations = []
+        for pos in sequence.positions:
+            for mut in pos.mutations:
+                gms = mut.metadata.get('genomic_mutations', [])
+                if not gms:
+                    self.log.debug(f"[REVEL] No genomic mutation available for {mut}; skipping.")
+                    continue
+                mutations.append((mut, gms, transcript_id))
+
+        self._get_revel(mutations)
+    
+    def _get_revel(self, mutation_entries):
+        
+        needed_chroms = set()
+        for _, gms, _ in mutation_entries:
+            for gm in gms:
+                if hasattr(gm, 'chr') and gm.chr is not None:
+                    needed_chroms.add(str(gm.chr))
+
+        # Ensure the cache has all needed chromosome slices
+        for chrom in needed_chroms:
+            if chrom not in self._revel_cache_by_chr:
+                self._revel_cache_by_chr[chrom] = self._filter_revel_by_chromosomes(chrom)
+
+        # Build a working DataFrame from just the needed chromosomes
+        if needed_chroms:
+            df = pd.concat(
+                [self._revel_cache_by_chr[c] for c in needed_chroms],
+                ignore_index=True
+            )
+        else:
+            df = pd.DataFrame(columns=["chr", "hg19_pos", "grch38_pos", "ref", "alt",
+                                       "aaref", "aaalt", "REVEL", "Ensembl_transcriptid"])
+
+        for mutation, gms, transcript_id in mutation_entries:
+            mutation.metadata['revel_score'] = []
+            mutation_cache = {}      
+            for gm in gms:
+                if not all(hasattr(gm, attr) for attr in ['genome_build', 'chr', 'get_coord', 'ref', 'alt']):
+                    self.log.warning(f"[REVEL] Skipping genomic mutation without complete coordinate information: {gm}")
+                    continue
+
+                coord_col = (
+                    "grch38_pos" if gm.genome_build == "hg38"
+                    else "hg19_pos" if gm.genome_build == "hg19"
+                    else None)
+                
+                if coord_col is None:
+                    self.log.warning(f"[REVEL] Unsupported genome version '{gm.genome_build}' for {mutation}")
+                    continue
+                                
+                if gm in mutation_cache:
+                    for s in mutation_cache[gm]:
+                        mutation.metadata['revel_score'].append(Revel(source=self, score=s))
+                    continue
+                
+                df_filtered = df[df[coord_col].astype(str) == str(gm.get_coord())]
+                df_filtered = df_filtered[df_filtered["chr"].astype(str) == str(gm.chr)]
+                df_filtered = df_filtered[df_filtered["alt"] == gm.alt]
+
+                # Some rows have multiple IDs separated by ';', so we use a regex with:
+                #   (^|;) ensures the match is either at the start of the string or follows a semicolon
+                #   ($|;) ensures the match ends at the end of the string or is followed by a semicolon
+                df_filtered = df_filtered[df_filtered["Ensembl_transcriptid"].astype(str).str.contains(
+                    rf'(^|;){(transcript_id)}($|;)', na=False)]
+
+                if df_filtered.empty:
+                    self.log.warning(f"[REVEL] No REVEL match at chr={gm.chr}, pos={gm.get_coord()}, alt={gm.alt}, "
+                        f"transcript={transcript_id}")
+                    mutation_cache[gm] = ()
+                    continue
+
+                ref_mismatches = df_filtered[df_filtered["ref"] != gm.ref]
+                if not ref_mismatches.empty:
+                    self.log.warning(f"[REVEL] Reference base mismatch for {mutation}: expected {gm.ref}, "
+                        f"got {set(ref_mismatches['ref'])} at chr={gm.chr}, pos={gm.get_coord()} "
+                        f"(transcript {transcript_id})")
+                    mutation_cache[gm] = ()
+                    continue
+
+                aa_mismatches = df_filtered[df_filtered["aaref"] != mutation.sequence_position.wt_residue_type]
+                if not aa_mismatches.empty:
+                    self.log.warning(f"[REVEL] Amino acid reference mismatch for {mutation}: expected "
+                        f"{mutation.sequence_position.wt_residue_type}, got {set(aa_mismatches['aaref'])} "
+                        f"at chr={gm.chr}, pos={gm.get_coord()} (transcript {transcript_id})")
+                    mutation_cache[gm] = ()
+                    continue
+
+                df_final = df_filtered[df_filtered["aaalt"] == mutation.mutated_residue_type]
+                if df_final.empty:
+                    self.log.warning(f"[REVEL] No match with expected alt amino acid {mutation.mutated_residue_type} "
+                        f"for {mutation} at chr={gm.chr}, pos={gm.get_coord()}")
+                    mutation_cache[gm] = ()
+                    continue
+                    
+                if df_final["REVEL"].nunique(dropna=True) > 1:
+                    self.log.warning(
+                        f"[REVEL] Multiple REVEL scores found for {mutation} at chr={gm.chr}, "
+                        f"pos={gm.get_coord()}, transcript={transcript_id}: {df_final['REVEL'].unique().tolist()}"
+                    )
+
+                parsed_scores = []
+                for score_str in df_final["REVEL"].dropna():
+                    if score_str in [".", "NA"]:
+                        self.log.warning(f"[REVEL] Invalid REVEL score value '{score_str}' for {mutation} "
+                        f"at chr={gm.chr}, pos={gm.get_coord()}, transcript={transcript_id}")
+                        continue
+                    
+                    try:
+                        score = float(score_str)
+                        parsed_scores.append(score)
+                        self.log.info(
+                            f"[REVEL] Match for {mutation}: chr={gm.chr}, pos={gm.get_coord()}, "
+                            f"ref={gm.ref}, alt={gm.alt}, aaref={mutation.sequence_position.wt_residue_type}, "
+                            f"aaalt={mutation.mutated_residue_type}, transcript={transcript_id}, score={score}")
+                    except ValueError:
+                        self.log.warning(f"[REVEL] Could not parse REVEL score '{score_str}' for {mutation}")
+   
+                mutation_cache[gm] = tuple(parsed_scores)
+                for s in parsed_scores:
+                    mutation.metadata['revel_score'].append(Revel(source=self, score=s))
+        
 class ELMDatabase(DynamicSource, object):
     def __init__(self):
         description = "ELM Database"
