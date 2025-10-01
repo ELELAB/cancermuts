@@ -1462,9 +1462,9 @@ class ClinVar(DynamicSource, object):
 
     def add_mutations(self, sequence, metadata=[]):
         gene = sequence.gene_id
-        if "refseq" not in sequence.aliases or sequence.aliases["refseq"] is None:
-            self.log.warning(f"No valid 'refseq' alias for gene {sequence.gene_id} was provided. ClinVar will not be parsed for variants.")
-            return
+        if "refseq" not in sequence.aliases or not sequence.aliases["refseq"]:
+            self.log.error(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
+            raise TypeError(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
         refseq = sequence.aliases["refseq"]
         filter_missense_variants = f'({gene}[gene] AND ("missense variant"[molecular consequence] OR "SO:0001583"[molecular consequence]))'
         mutation_type = "missense"
