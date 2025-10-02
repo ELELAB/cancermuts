@@ -120,7 +120,7 @@ Cancermuts allows requesting alternative isoforms, if available in UniProt.
 To request a specific isoform, provide a isoform ID, in the form of a UniProt isoform
 identifier, to the isoform argument, as in the following example. If this is not done,
 the canonical UniProt isoform will be used. You must also provide the refseq ID corresponding 
-to that isoform for ClinVar to be parsed. Notice that, currently, only somedata sources
+to the selected isoform for ClinVar to be parsed. Notice that, currently, only somedata sources
 support alternative isoform; those that do not support them will
 raise exceptions if a Sequence object containing an alternative isoform is provided to them.
 In this case we provide an example which use a non-canonical isoform as input in the
