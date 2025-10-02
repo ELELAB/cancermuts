@@ -119,8 +119,9 @@ together with a `my_table_pancancer.pdf` figure.
 Cancermuts allows requesting alternative isoforms, if available in UniProt.
 To request a specific isoform, provide a isoform ID, in the form of a UniProt isoform
 identifier, to the isoform argument, as in the following example. If this is not done,
-the canonical UniProt isoform will be used. Notice that, currently, only some
-data sources support alternative isoform; those that do not support them will
+the canonical UniProt isoform will be used. You must also provide the refseq ID corresponding 
+to that isoform for ClinVar to be parsed. Notice that, currently, only somedata sources
+support alternative isoform; those that do not support them will
 raise exceptions if a Sequence object containing an alternative isoform is provided to them.
 In this case we provide an example which use a non-canonical isoform as input in the
 `tutorial_alternative_isoforms.py` file. It's run in the same way as with the other
@@ -424,7 +425,7 @@ We begin by creating a ClinVar data source object:
 ```py
 >>> clinvar = ClinVar()
 ```
-ClinVar queries require both the gene name and the RefSeq accession number of the canonical isoform. 
+ClinVar queries require both the gene name and the RefSeq accession number of the desired isoform. 
 While the gene name is inferred automatically from the Sequence object, the RefSeq ID must be manually specified using the aliases attribute:
 
 ```py
