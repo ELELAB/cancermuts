@@ -176,7 +176,8 @@ class Table:
 
 
 
-    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency','gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency'],
+    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency','gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency','clinvar_classification',
+    'clinvar_condition', 'clinvar_review_status', 'clinvar_variant_id'],
                         position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage', 'ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation', 'ptm_ogalnac', 'ptm_oglcnac', 'mobidb_disorder_propensity'],
                         sequence_properties=['linear_motif', 'structure']):
 
@@ -234,7 +235,10 @@ class Table:
                             md_values.append(this_value)
                             self.log.info(f"appending {single_md.get_value_str()}")
                         self.log.info(f"values to be joined {md}: {sorted(list(set(md_values)))}")
-                        md_str = ", ".join(sorted(list(set(md_values))))
+                        if md not in ["clinvar_variant_id", "clinvar_classification", "clinvar_condition", "clinvar_review_status"]:
+                            md_str = ", ".join(sorted(set(map(str, md_values))))
+                        else:
+                            md_str = ", ".join(map(str, md_values))
                     except KeyError:
                         md_str = None
                     this_row.append(md_str)

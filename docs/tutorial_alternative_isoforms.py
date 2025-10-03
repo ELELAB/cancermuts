@@ -1,5 +1,5 @@
 # import the UniProt data source class
-from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, COSMIC, MobiDB, MyVariant, RevelDatabase, ManualAnnotation
+from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, COSMIC, MobiDB, MyVariant, RevelDatabase, ManualAnnotation, ClinVar
 from cancermuts.exceptions import *
 from cancermuts.core import Mutation
 from cancermuts.metadata import GenomicMutation
@@ -10,6 +10,9 @@ up = UniProt()
 
 # retrieve a specific UniProt isoform
 seq = up.get_sequence("AMBRA1", isoform="Q9C0C7-2")
+
+# provide refseq of selected isoform for ClinVar parsing:
+seq.aliases["refseq"] = "NP_001287660"
 
 # this prints the downloaded isoform sequence
 print(seq.sequence)
@@ -70,6 +73,40 @@ try:
     cbioportal.add_mutations(seq)
 except UnexpectedIsoformError:
     print("cBioPortal mutations will not be added, as a non-canonical isoform has been provided")
+
+# Use ClinVar to retrieve non-canonical alternative isoform annotations
+clinvar = ClinVar()
+clinvar.add_mutations(seq, metadata=[
+    'clinvar_classification',
+    'clinvar_condition',
+    'clinvar_review_status',
+    'clinvar_variant_id',
+    'genomic_mutations',
+    'genomic_coordinates'
+])
+
+is_cv = lambda m: m.metadata.get("clinvar_variant_id") is not None
+
+positions_with_cv = [
+    p for p in seq.positions
+    if p.mutations and any(is_cv(m) for m in p.mutations)
+]
+
+if positions_with_cv:
+    first_pos = positions_with_cv[0]
+    first_mut = [m for m in first_pos.mutations if is_cv(m)][0]
+    print("First ClinVar mutation:", first_mut, "at position", first_pos.sequence_position)
+
+    last_pos = positions_with_cv[-1]
+    last_mutations = [m for m in last_pos.mutations if is_cv(m)]
+    last_mut = last_mutations[-1]
+
+    if last_pos == first_pos and last_mut == first_mut:
+        print("(Only one ClinVar mutation found)")
+    else:
+        print("Last ClinVar mutation:", last_mut, "at position", last_pos.sequence_position)
+else:
+    print("No ClinVar mutations found for refseq:", seq.aliases['refseq'])
 
 # PhosphoSite does not support non-canonical isoforms
 ps = PhosphoSite('/data/databases/phosphosite/')

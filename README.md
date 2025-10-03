@@ -19,6 +19,7 @@ mutations. At the moment it supports:
 * Annotation of the sequence with data from
     * cBioPortal - cancer mutations
     * COSMIC - cancer mutations (after SNP filtering)
+    * ClinVar - disease mutations
     * ELM - linear motifs
     * REVEL - pathogenicity prediction
     * Phosphosite - post-translational modifications

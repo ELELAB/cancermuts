@@ -1,6 +1,7 @@
 # import the UniProt data source class
 from cancermuts.datasources import UniProt
 
+
 # create the corresponding uniprot object
 up = UniProt()
 
@@ -10,6 +11,12 @@ seq = up.get_sequence('MAP1LC3B')
 # alternatively, we can specifically ask for a Uniprot ID
 seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN')
 
+# OPTIONAL: Load a specific UniProt isoform instead of canonical
+# seq = up.get_sequence("AMBRA1", isoform='Q9C0C7-2')
+
+# Specify the desired RefSeq isoform for ClinVar parsing:
+seq.aliases["refseq"] = "NP_073729"
+
 # this prints the downloaded protein sequence
 print(seq.sequence)
 
@@ -17,7 +24,7 @@ print(seq.sequence)
 seq.positions[0:3]
 
 # import data sources classes
-from cancermuts.datasources import cBioPortal, COSMIC
+from cancermuts.datasources import cBioPortal, COSMIC, ClinVar
 
 # add mutations from cBioPortal
 
@@ -34,7 +41,6 @@ print(seq.positions[64].mutations[0].sources)
 print(seq.positions[64].mutations[0].mutated_residue_type)
 print(seq.positions[38].mutations[0].metadata)
 
-
 # add mutations from COSMIC
 cosmic = COSMIC(targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
 				screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
@@ -45,13 +51,30 @@ cosmic.add_mutations(seq,
 					 metadata=['genomic_coordinates', 'genomic_mutations',
 					 			'cancer_site', 'cancer_histology'])
 
-
 # let's check them out
 print(seq.positions[64].mutations[0])
 
 print(seq.positions[64].mutations[0].sources)
 
 print(seq.positions[64].mutations[0].metadata)
+
+# add mutations from ClinVar
+clinvar = ClinVar()
+clinvar.add_mutations(seq, metadata=[
+    'clinvar_classification',
+    'clinvar_condition',
+    'clinvar_review_status',
+    'clinvar_variant_id',
+    'genomic_mutations',
+    'genomic_coordinates'
+])
+
+# Check ClinVar Variant
+print(seq.positions[14].mutations)
+print(seq.positions[14].mutations[0].sources)
+print(seq.positions[14].mutations[0].mutated_residue_type)
+print(seq.positions[14].mutations[0].metadata['clinvar_condition'][0].get_value_str())
+print(seq.positions[14].mutations[0].metadata['clinvar_classification'][0].get_value_str())
 
 # add annotations from MyVariant (REVEL)
 from cancermuts.datasources import MyVariant
