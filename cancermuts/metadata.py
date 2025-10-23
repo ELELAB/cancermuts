@@ -156,7 +156,7 @@ class GenomicMutation(Metadata):
         self.genome_build = genome_build
         self.definition = definition
 
-        if self.definition == self.definition and self._mut_snv_prog.match(definition):
+        if self._mut_snv_prog.match(definition):
             tokens = parse(self._mut_snv_parse, definition)
 
             if tokens['chr'] == '23':
@@ -174,7 +174,7 @@ class GenomicMutation(Metadata):
 
             self.definition=f"{self.chr}:g.{self.coord}{self.ref}>{self.alt}"
 
-        elif self.definition == self.definition and self._mut_insdel_prog.match(definition):
+        elif self._mut_insdel_prog.match(definition):
             tokens = parse(self._mut_insdel_parse, definition)
 
             if tokens['chr'] == '23':

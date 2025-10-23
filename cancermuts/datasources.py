@@ -1660,7 +1660,7 @@ class COSMIC(DynamicSource, object):
         if df.empty:
             self.log.warning(f"No COSMIC mutations for gene {gene_id} with TRANSCRIPT_ACCESSION={transcript_accession}; returning empty results")
             return [], out_metadata
-            
+
         if cancer_types is not None:
             df = df[ df['PRIMARY_HISTOLOGY'].isin(cancer_types) ]
         if cancer_histology_subtype_1 is not None:
@@ -1708,14 +1708,18 @@ class COSMIC(DynamicSource, object):
                 gd.append(r['MUTATION_CDS'][-3])
 
             if do_genomic_coordinates:
+                if pd.isna(gd).any():
+                    gd = None
+
                 out_metadata['genomic_coordinates'].append(gd)
 
             if do_genomic_mutations:
-                if gd is None:
+                if gd is None or pd.isna(r['HGVSG']):
                     self.log.warning("couldn't annotate genomic mutation")
                     gm = None
                 else:
                     gm = [gd[0], r['HGVSG']]
+
                 out_metadata['genomic_mutations'].append(gm)
 
             if do_site:
