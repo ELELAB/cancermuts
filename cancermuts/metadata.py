@@ -19,7 +19,7 @@
 """
 metadata classes --- :mod:`cancermuts.metadata`
 ================================================================
-Classes to handle metadata 
+Classes to handle metadata
 
 """
 
@@ -572,7 +572,7 @@ class ClinVarCondition(Metadata):
         super().__init__(source)
         conds = data["GermlineClassification"]
         self.conditions = conds if isinstance(conds, list) else [conds]
-        
+
     def get_value(self):
         return self.conditions
 
@@ -584,16 +584,16 @@ class ClinVarReviewStatus(Metadata):
     header = "clinvar_review_status"
 
     stars_map = {
-        'practice guideline': 4, 
-        'reviewed by expert panel': 3, 
+        'practice guideline': 4,
+        'reviewed by expert panel': 3,
         'criteria provided, multiple submitters, no conflicts': 2,
         'criteria provided, multiple submitters': 'NA',
         'criteria provided, conflicting interpretations': 1,
         'criteria provided, conflicting classifications': 1,
         'criteria provided, single submitter': 1,
-        'no assertion for the individual variant': 0, 
+        'no assertion for the individual variant': 0,
         'no interpretation for the single variant': 0,
-        'no assertion criteria provided': 0, 
+        'no assertion criteria provided': 0,
         'no assertion provided': 0,
         'no classification provided': 0
     }
@@ -632,7 +632,7 @@ class ClinVarClassification(Metadata):
     def get_value_str(self):
         return self.classification
 
-metadata_classes = { 
+metadata_classes = {
                      'cancer_type'                 : CancerType,
                      'cancer_study'                : CancerStudy,
                      'genomic_coordinates'         : GenomicCoordinates,
