@@ -165,7 +165,8 @@ class Table:
         headers['position']    = SequencePosition.header
         headers['wt']          = 'ref_aa'
         headers['mutated']     = 'alt_aa'
-        headers['mut_sources'] = 'sources'
+        headers['mut_sources'] = 'mut_sources'
+        headers['ptm_sources'] = 'ptm_sources'
 
         self.headers = headers
         self.ptms = ptms
@@ -189,7 +190,7 @@ class Table:
 
         header += [ self.headers[p] for p in sequence_properties ]
         sequence_properties_col = list(range(sequence_properties_cols_start, len(header)))
-        header += [self.headers['wt'], self.headers['mutated'], self.headers['mut_sources']]
+        header += [self.headers['wt'], self.headers['mutated'], self.headers['mut_sources'], self.headers['ptm_sources']]
         for md in mutation_metadata:
             header.append(self.headers[md])
 
@@ -213,6 +214,7 @@ class Table:
                 this_row = list(base_row)
                 this_row.append(None)
                 this_row.append(None)
+                this_row.append(None)
                 this_row.extend([None]*len(mutation_metadata))
                 positions_mutlist.append(gi)
                 rows.append(this_row)
@@ -221,7 +223,8 @@ class Table:
             for m in mut_strings_order:
                 this_row = list(base_row)
                 this_row.append(p.mutations[m].mutated_residue_type)
-                this_row.append(",".join( [s.name for s in p.mutations[m].sources] ))
+                this_row.append(",".join( [s.name for s in p.mutations[m].mut_sources] ))
+                this_row.append(None)
                 for md in mutation_metadata:
                     md_values = []
                     try:
