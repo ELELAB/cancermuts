@@ -156,6 +156,8 @@ class Table:
                 ptms[k] = v.header
                 ptm_codes[k] = v.code
 
+        headers['ptm_sources'] = 'ptm_sources'
+
         for k,v in iteritems(sequence_properties_classes):
             headers[k] = v.header
 
@@ -185,6 +187,7 @@ class Table:
 
         header =  [ self.headers['position'] ]
         header += [ self.headers[p] for p in position_properties ]
+        header += [self.headers['ptm_sources']]
         sequence_properties_cols_start = len(header)
 
         header += [ self.headers[p] for p in sequence_properties ]
@@ -203,6 +206,8 @@ class Table:
                 else:
                     val = None
                 base_row.append(val)
+            
+            base_row.append(None)
             base_row.extend([None]*len(sequence_properties_col))
             base_row.append(p.wt_residue_type)
 
