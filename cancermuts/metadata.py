@@ -570,9 +570,12 @@ class ClinVarCondition(Metadata):
 
     def __init__(self, source, data):
         super().__init__(source)
-        conds = data["GermlineClassification"]
-        self.conditions = conds if isinstance(conds, list) else [conds]
-
+        try:
+            conds = data["GermlineClassification"]
+            self.conditions = conds if isinstance(conds, list) else [conds]
+        except KeyError:
+            source.log.warning("No data submitted for GermlineClassification. Condition is not provided.")
+            self.conditions = ['not provided']
     def get_value(self):
         return self.conditions
 
@@ -600,7 +603,11 @@ class ClinVarReviewStatus(Metadata):
 
     def __init__(self, source, data):
         super().__init__(source)
-        self.status = data["GermlineClassification"]
+        try:
+            self.status = data["GermlineClassification"]
+        except KeyError:
+            source.log.warning("No data submitted for GermlineClassification. Review Status is not provided.")
+            self.status = 'no classification provided'
         self.stars = self.stars_map[self.status]
 
     def get_value(self):
@@ -624,13 +631,18 @@ class ClinVarClassification(Metadata):
 
     def __init__(self, source, data):
         super().__init__(source)
-        self.classification = data["GermlineClassification"]
+        try:
+            self.classification = data["GermlineClassification"]
+        except KeyError:
+            source.log.warning("No data submitted for GermlineClassification. Classification is not provided.")
+            self.classification = 'not provided'
 
     def get_value(self):
         return self.classification
 
     def get_value_str(self):
         return self.classification
+
 
 metadata_classes = {
                      'cancer_type'                 : CancerType,
