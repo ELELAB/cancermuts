@@ -643,7 +643,6 @@ class ClinVarClassification(Metadata):
     def get_value_str(self):
         return self.classification
 
-
 metadata_classes = {
                      'cancer_type'                 : CancerType,
                      'cancer_study'                : CancerStudy,
