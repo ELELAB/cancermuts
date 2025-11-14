@@ -1407,11 +1407,23 @@ class ClinVar(DynamicSource, object):
 
             # Store metadata:
             if "clinvar_classification" in metadata:
-                out_metadata["clinvar_classification"].append(data["classifications"])
+                class_dict = data["classifications"]
+                if "GermlineClassification" in class_dict:
+                    out_metadata["clinvar_classification"].append(class_dict)
+                else:
+                    out_metadata["clinvar_classification"].append(None)
             if "clinvar_condition" in metadata:
-                out_metadata["clinvar_condition"].append(data["conditions"])
+                cond_dict = data["conditions"]
+                if "GermlineClassification" in cond_dict and cond_dict["GermlineClassification"]:
+                    out_metadata["clinvar_condition"].append(cond_dict)
+                else:
+                    out_metadata["clinvar_condition"].append(None)
             if "clinvar_review_status" in metadata:
-                out_metadata["clinvar_review_status"].append(data["review_status"])
+                rs_dict = data["review_status"]
+                if "GermlineClassification" in rs_dict:
+                    out_metadata["clinvar_review_status"].append(rs_dict)
+                else:
+                    out_metadata["clinvar_review_status"].append(None)
             if "genomic_mutations" in metadata:
                 out_metadata["genomic_mutations"].append(list(data["genomic_annotations_obj"].values()))
             if "genomic_coordinates" in metadata:
