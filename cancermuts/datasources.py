@@ -1306,7 +1306,8 @@ class ClinVar(DynamicSource, object):
                 key_to_remove.append(clinvar_id)
                 continue
             var_right_iso += 1
-            if re.search(r"\(p\.([A-Z][a-z][a-z][0-9]+[A-Z][a-z][a-z])\)", str(correct_variant)):
+            result = re.search(r"\(p\.([A-Z][a-z][a-z][0-9]+([A-Z][a-z][a-z]))\)", str(correct_variant))
+            if result and result.group(2) != 'Ter':
                 missense_variants[clinvar_id]["variant"] = correct_variant
                 missense_variants[clinvar_id].update({
                     "classifications": classifications,
@@ -1348,7 +1349,8 @@ class ClinVar(DynamicSource, object):
                 hgvss_coding,hgvss_genomic = self._coding_region_variants_extractor(parse_VCV, clinvar_id)
                 if hgvss_coding:
                     correct_variant = self._missense_variants_extractor(hgvss_coding, ids[1][0], clinvar_id, ids[2][0])
-                    if not clinvar_id in missense_variants.keys() and re.search(r"\(p\.([A-Z][a-z][a-z][0-9]+[A-Z][a-z][a-z])\)", str(correct_variant)):
+                    match = re.search(r"\(p\.([A-Z][a-z][a-z][0-9]+([A-Z][a-z][a-z]))\)", str(correct_variant))
+                    if not clinvar_id in missense_variants.keys() and match and match.group(2) != 'Ter':
                         variants.append([clinvar_id, ids[1][0]])
                         classifications = self._classifications_extractor(parse_VCV, clinvar_id)
                         conditions = self._conditions_extractor(parse_VCV, clinvar_id)
