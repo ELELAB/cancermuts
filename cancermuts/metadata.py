@@ -226,7 +226,6 @@ class GenomicMutation(Metadata):
             self.is_insdel = False
             self.is_inv = False
 
-
     def get_value_str(self, fmt='csv'):
         if fmt == 'csv':
             return f"{self.genome_build},{self.definition}"
