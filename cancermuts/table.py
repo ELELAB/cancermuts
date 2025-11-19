@@ -200,14 +200,20 @@ class Table:
 
         for gi,p in enumerate(sequence.positions):
             base_row = [p.sequence_position]
+            ptm_sources_list = []
             for r in position_properties:
                 if r in p.properties:
                     val = p.properties[r].get_value_str()
                 else:
                     val = None
                 base_row.append(val)
+            ptm_sources_list = []
+            for ptm_key in self.ptms.keys():   
+                if ptm_key in p.properties:
+                    ptm_sources_list.extend([s.name for s in p.properties[ptm_key].sources])
             
-            base_row.append(None)
+            ptm_sources_str = ",".join(sorted(set(ptm_sources_list))) if ptm_sources_list else None
+            base_row.append(ptm_sources_str)
             base_row.extend([None]*len(sequence_properties_col))
             base_row.append(p.wt_residue_type)
 
@@ -226,7 +232,7 @@ class Table:
             for m in mut_strings_order:
                 this_row = list(base_row)
                 this_row.append(p.mutations[m].mutated_residue_type)
-                this_row.append(",".join( [s.name for s in p.mutations[m].sources] ))
+                this_row.append(",".join([s.name for s in p.mutations[m].sources]) if p.mutations[m].sources else None)
                 for md in mutation_metadata:
                     md_values = []
                     try:

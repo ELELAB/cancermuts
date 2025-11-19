@@ -3,14 +3,14 @@
 1,2,P,R,,,,,,,,,,,,,,ClinVar,,,"hg19,16:87426038-87426038, hg38,16:87392432-87392432","hg19,16:g.87426038C>G, hg38,16:g.87392432C>G",0.145,,,0.0000000000000000,,,,Uncertain significance,not specified,1,2358122
 2,3,S,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 3,4,E,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-4,5,K,,,,Ubq,,,,,,,,,"PCSK cleavage site (CLV_PCSK_SKI1_1), 5-9, ELM",,,,,,,,,,,,,,,,,
-5,6,T,,P,,,,,,,,,,,"PCSK cleavage site (CLV_PCSK_SKI1_1), 5-9, ELM",,,,,,,,,,,,,,,,,
+4,5,K,,,,Ubq,,,,,,,,PhosphoSite,"PCSK cleavage site (CLV_PCSK_SKI1_1), 5-9, ELM",,,,,,,,,,,,,,,,,
+5,6,T,,P,,,,,,,,,,PhosphoSite,"PCSK cleavage site (CLV_PCSK_SKI1_1), 5-9, ELM",,,,,,,,,,,,,,,,,
 6,7,F,,,,,,,,,,,,,"PCSK cleavage site (CLV_PCSK_SKI1_1), 5-9, ELM",,,,,,,,,,,,,,,,,
 7,8,K,,,,,,,,,,,,,"PCSK cleavage site (CLV_PCSK_SKI1_1), 5-9, ELM",,,,,,,,,,,,,,,,,
 8,9,Q,,,,,,,,,,,,,"PCSK cleavage site (CLV_PCSK_SKI1_1), 5-9, ELM",,,,,,,,,,,,,,,,,
 9,10,R,,,,,,,,,,,,,"NRD cleavage site (CLV_NRD_NRD_1), 10-12, ELM|14-3-3 binding phosphopeptide motif (LIG_14-3-3_CanoR_1), 10-14, ELM",,,,,,,,,,,,,,,,,
 10,11,R,L,,,,,,,,,,,,"NRD cleavage site (CLV_NRD_NRD_1), 10-12, ELM|14-3-3 binding phosphopeptide motif (LIG_14-3-3_CanoR_1), 10-14, ELM",,ClinVar,,,"hg19,16:87426065-87426065, hg38,16:87392459-87392459","hg19,16:g.87426065G>T, hg38,16:g.87392459G>T",0.226,,,0.0000000000000000,,,,Uncertain significance,not specified,1,2226367
-11,12,T,,P,,,,,,,,,,,"NRD cleavage site (CLV_NRD_NRD_1), 10-12, ELM|14-3-3 binding phosphopeptide motif (LIG_14-3-3_CanoR_1), 10-14, ELM",,,,,,,,,,,,,,,,,
+11,12,T,,P,,,,,,,,,,PhosphoSite,"NRD cleavage site (CLV_NRD_NRD_1), 10-12, ELM|14-3-3 binding phosphopeptide motif (LIG_14-3-3_CanoR_1), 10-14, ELM",,,,,,,,,,,,,,,,,
 12,13,F,,,,,,,,,,,,,"14-3-3 binding phosphopeptide motif (LIG_14-3-3_CanoR_1), 10-14, ELM",,,,,,,,,,,,,,,,,
 13,14,E,,,,,,,,,,,,,"14-3-3 binding phosphopeptide motif (LIG_14-3-3_CanoR_1), 10-14, ELM",,,,,,,,,,,,,,,,,
 14,15,Q,R,,,,,,,,,,,,,,ClinVar,,,"hg19,16:87432424-87432424, hg38,16:87398818-87398818","hg19,16:g.87432424A>G, hg38,16:g.87398818A>G",0.193,,,0.0000079532982328,,,,Uncertain significance,not specified,1,3542641
@@ -19,7 +19,7 @@
 17,18,E,,,,,,,,,,,,,"Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_BaEn_1), 18-23, ELM|Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_LyEn_5), 18-23, ELM",,,,,,,,,,,,,,,,,
 18,19,D,,,,,,,,,,,,,"Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_BaEn_1), 18-23, ELM|Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_LyEn_5), 18-23, ELM",,,,,,,,,,,,,,,,,
 19,20,V,,,,,,,,,,,,,"Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_BaEn_1), 18-23, ELM|Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_LyEn_5), 18-23, ELM",,,,,,,,,,,,,,,,,
-20,21,R,,,Me,,,,,,,,,,"Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_BaEn_1), 18-23, ELM|Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_LyEn_5), 18-23, ELM",,,,,,,,,,,,,,,,,
+20,21,R,,,Me,,,,,,,,,PhosphoSite,"Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_BaEn_1), 18-23, ELM|Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_LyEn_5), 18-23, ELM",,,,,,,,,,,,,,,,,
 21,22,L,,,,,,,,,,,,,"Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_BaEn_1), 18-23, ELM|Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_LyEn_5), 18-23, ELM",,,,,,,,,,,,,,,,,
 22,23,I,,,,,,,,,,,,,"Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_BaEn_1), 18-23, ELM|Adaptin binding Endosome-Lysosome-Basolateral sorting signals (TRG_DiLeu_LyEn_5), 18-23, ELM",,,,,,,,,,,,,,,,,
 23,24,R,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
@@ -27,9 +27,9 @@
 25,26,Q,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 26,27,H,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 27,28,P,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-28,29,T,I,P,,,,,,,,,,,,,ClinVar,,,"hg19,16:87432466-87432466, hg38,16:87398860-87398860","hg19,16:g.87432466C>T, hg38,16:g.87398860C>T",0.168,,,0.0000079527922254,,,,Uncertain significance,not specified,1,2493543
-29,29,T,N,P,,,,,,,,,,,,,ClinVar,,,"hg19,16:87432466-87432466, hg38,16:87398860-87398860","hg19,16:g.87432466C>A, hg38,16:g.87398860C>A",0.067,,,0.0000278347727887,0.0000636739891754,,,Uncertain significance,not specified,1,4051121
-30,30,K,,,,Ubq,,,,,,,,,,,,,,,,,,,,,,,,,,
+28,29,T,I,P,,,,,,,,,,PhosphoSite,,,ClinVar,,,"hg19,16:87432466-87432466, hg38,16:87398860-87398860","hg19,16:g.87432466C>T, hg38,16:g.87398860C>T",0.168,,,0.0000079527922254,,,,Uncertain significance,not specified,1,2493543
+29,29,T,N,P,,,,,,,,,,PhosphoSite,,,ClinVar,,,"hg19,16:87432466-87432466, hg38,16:87398860-87398860","hg19,16:g.87432466C>A, hg38,16:g.87398860C>A",0.067,,,0.0000278347727887,0.0000636739891754,,,Uncertain significance,not specified,1,4051121
+30,30,K,,,,Ubq,,,,,,,,PhosphoSite,,,,,,,,,,,,,,,,,,
 31,31,I,,,,,,,,,,,,,"PP2A holoenzyme B56-docking site (DOC_PP2A_B56_1), 31-36, ELM|SUMO interaction site (LIG_SUMO_SIM_par_1), 31-36, ELM",,,,,,,,,,,,,,,,,
 32,32,P,,,,,,,,,,,,,"PP2A holoenzyme B56-docking site (DOC_PP2A_B56_1), 31-36, ELM|SUMO interaction site (LIG_SUMO_SIM_par_1), 31-36, ELM",,,,,,,,,,,,,,,,,
 33,33,V,,,,,,,,,,,,,"PP2A holoenzyme B56-docking site (DOC_PP2A_B56_1), 31-36, ELM|SUMO interaction site (LIG_SUMO_SIM_par_1), 31-36, ELM",,,,,,,,,,,,,,,,,
@@ -41,7 +41,7 @@
 39,39,K,R,,,,,,,,,,,,"MAPK docking motifs (DOC_MAPK_gen_1), 37-46, ELM",,cBioPortal,coadread_tcga_pan_can_atlas_2018,Colorectal Adenocarcinoma,"hg19,16:87435800-87435800","hg19,16:g.87435800A>G",0.065,,,,,,,,,,
 40,40,G,,,,,,,,,,,,,"MAPK docking motifs (DOC_MAPK_gen_1), 37-46, ELM",,,,,,,,,,,,,,,,,
 41,41,E,,,,,,,,,,,,,"MAPK docking motifs (DOC_MAPK_gen_1), 37-46, ELM",,,,,,,,,,,,,,,,,
-42,42,K,,,,Ubq,,,,,,,,,"MAPK docking motifs (DOC_MAPK_gen_1), 37-46, ELM",,,,,,,,,,,,,,,,,
+42,42,K,,,,Ubq,,,,,,,,PhosphoSite,"MAPK docking motifs (DOC_MAPK_gen_1), 37-46, ELM",,,,,,,,,,,,,,,,,
 43,43,Q,,,,,,,,,,,,,"MAPK docking motifs (DOC_MAPK_gen_1), 37-46, ELM",,,,,,,,,,,,,,,,,
 44,44,L,F,,,,,,,,,,,,"MAPK docking motifs (DOC_MAPK_gen_1), 37-46, ELM",,ClinVar,,,"hg19,16:87435814-87435814, hg38,16:87402208-87402208","hg19,16:g.87435814C>T, hg38,16:g.87402208C>T",0.359,,,,,,,Uncertain significance,not specified,1,2298840
 45,44,L,P,,,,,,,,,,,,"MAPK docking motifs (DOC_MAPK_gen_1), 37-46, ELM",,ClinVar,,,"hg19,16:87435815-87435815, hg38,16:87402209-87402209","hg19,16:g.87435815T>C, hg38,16:g.87402209T>C",0.632,,,,,,,Uncertain significance,not specified,1,2298841
@@ -49,9 +49,9 @@
 47,46,V,,,,,,,,,,,,,"MAPK docking motifs (DOC_MAPK_gen_1), 37-46, ELM",,,,,,,,,,,,,,,,,
 48,47,L,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 49,48,D,,,,,,,,,,,,,"FHA phosphopeptide ligands (LIG_FHA_1), 48-54, ELM",,,,,,,,,,,,,,,,,
-50,49,K,,,,Ubq,,,Ac,,,,,,"FHA phosphopeptide ligands (LIG_FHA_1), 48-54, ELM",,,,,,,,,,,,,,,,,
-51,50,T,R,P,,,,,,,,,,,"FHA phosphopeptide ligands (LIG_FHA_1), 48-54, ELM",,ClinVar,,,"hg19,16:87435833-87435833, hg38,16:87402227-87402227","hg19,16:g.87435833C>G, hg38,16:g.87402227C>G",0.415,,,0.0000039767440011,,,,Uncertain significance,not specified,1,3870023
-52,51,K,,,,Ubq,,,Ac,,,,,,"FHA phosphopeptide ligands (LIG_FHA_1), 48-54, ELM",,,,,,,,,,,,,,,,,
+50,49,K,,,,Ubq,,,Ac,,,,,PhosphoSite,"FHA phosphopeptide ligands (LIG_FHA_1), 48-54, ELM",,,,,,,,,,,,,,,,,
+51,50,T,R,P,,,,,,,,,,PhosphoSite,"FHA phosphopeptide ligands (LIG_FHA_1), 48-54, ELM",,ClinVar,,,"hg19,16:87435833-87435833, hg38,16:87402227-87402227","hg19,16:g.87435833C>G, hg38,16:g.87402227C>G",0.415,,,0.0000039767440011,,,,Uncertain significance,not specified,1,3870023
+52,51,K,,,,Ubq,,,Ac,,,,,PhosphoSite,"FHA phosphopeptide ligands (LIG_FHA_1), 48-54, ELM",,,,,,,,,,,,,,,,,
 53,52,F,,,,,,,,,,,,,"PP4 EVH1-binding docking motifs (DOC_PP4_FxxP_1), 52-55, ELM|FHA phosphopeptide ligands (LIG_FHA_1), 48-54, ELM",,,,,,,,,,,,,,,,,
 54,53,L,,,,,,,,,,,,,"PP4 EVH1-binding docking motifs (DOC_PP4_FxxP_1), 52-55, ELM|FHA phosphopeptide ligands (LIG_FHA_1), 48-54, ELM",,,,,,,,,,,,,,,,,
 55,54,V,,,,,,,,,,,,,"PP4 EVH1-binding docking motifs (DOC_PP4_FxxP_1), 52-55, ELM|Arc N-lobe binding ligand (LIG_Arc_Nlobe_1), 54-58, ELM|FHA phosphopeptide ligands (LIG_FHA_1), 48-54, ELM",,,,,,,,,,,,,,,,,
@@ -65,7 +65,7 @@
 63,62,E,,,,,,,,,,,,,"NES Nuclear Export Signals (TRG_NES_CRM1_1), 62-77, ELM",,,,,,,,,,,,,,,,,
 64,63,L,,,,,,,,,,,,,"NES Nuclear Export Signals (TRG_NES_CRM1_1), 62-77, ELM",,,,,,,,,,,,,,,,,
 65,64,I,,,,,,,,,,,,,"NES Nuclear Export Signals (TRG_NES_CRM1_1), 62-77, ELM",,,,,,,,,,,,,,,,,
-66,65,K,E,,,Ubq,,,,,,,,,"MAPK docking motifs (DOC_MAPK_gen_1), 65-73, ELM|NES Nuclear Export Signals (TRG_NES_CRM1_1), 62-77, ELM",,"cBioPortal,COSMIC",coadread_genentech,Colorectal Adenocarcinoma,"hg19,16:87435877-87435877, hg38,16:87402271-87402271","hg19,16:g.87435877A>G, hg38,16:g.87402271A>G",0.314,"large_intestine, colon","carcinoma, adenocarcinoma",0.0000278640235650,,,,,,,
+66,65,K,E,,,Ubq,,,,,,,,PhosphoSite,"MAPK docking motifs (DOC_MAPK_gen_1), 65-73, ELM|NES Nuclear Export Signals (TRG_NES_CRM1_1), 62-77, ELM",,"cBioPortal,COSMIC",coadread_genentech,Colorectal Adenocarcinoma,"hg19,16:87435877-87435877, hg38,16:87402271-87402271","hg19,16:g.87435877A>G, hg38,16:g.87402271A>G",0.314,"large_intestine, colon","carcinoma, adenocarcinoma",0.0000278640235650,,,,,,,
 67,66,I,,,,,,,,,,,,,"MAPK docking motifs (DOC_MAPK_gen_1), 65-73, ELM|NES Nuclear Export Signals (TRG_NES_CRM1_1), 62-77, ELM",,,,,,,,,,,,,,,,,
 68,67,I,,,,,,,,,,,,,"MAPK docking motifs (DOC_MAPK_gen_1), 65-73, ELM|di Arginine retention/retrieving signal (TRG_ER_diArg_1), 67-70, ELM|NES Nuclear Export Signals (TRG_NES_CRM1_1), 62-77, ELM",,,,,,,,,,,,,,,,,
 69,68,R,,,,,,,,,,,,,"MAPK docking motifs (DOC_MAPK_gen_1), 65-73, ELM|di Arginine retention/retrieving signal (TRG_ER_diArg_1), 67-70, ELM|di Arginine retention/retrieving signal (TRG_ER_diArg_1), 68-70, ELM|NES Nuclear Export Signals (TRG_NES_CRM1_1), 62-77, ELM",,,,,,,,,,,,,,,,,
