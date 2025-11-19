@@ -1306,7 +1306,8 @@ class ClinVar(DynamicSource, object):
                 key_to_remove.append(clinvar_id)
                 continue
             var_right_iso += 1
-            if re.search("p.[A-Z][a-z][a-z][0-9]+[A-Z][a-z][a-z]", str(correct_variant)) or re.search("p.\\w+delins\\w+", str(correct_variant)):
+            result = re.search(r"\(p\.([A-Z][a-z][a-z][0-9]+([A-Z][a-z][a-z]))\)", str(correct_variant))
+            if result and result.group(2) != 'Ter':
                 missense_variants[clinvar_id]["variant"] = correct_variant
                 missense_variants[clinvar_id].update({
                     "classifications": classifications,
@@ -1348,7 +1349,8 @@ class ClinVar(DynamicSource, object):
                 hgvss_coding,hgvss_genomic = self._coding_region_variants_extractor(parse_VCV, clinvar_id)
                 if hgvss_coding:
                     correct_variant = self._missense_variants_extractor(hgvss_coding, ids[1][0], clinvar_id, ids[2][0])
-                    if not clinvar_id in missense_variants.keys() and re.search("p.[A-Z][a-z][a-z][0-9]+[A-Z][a-z][a-z]",str(correct_variant)) or re.search("p.\\w+delins\\w+",str(correct_variant)):
+                    match = re.search(r"\(p\.([A-Z][a-z][a-z][0-9]+([A-Z][a-z][a-z]))\)", str(correct_variant))
+                    if not clinvar_id in missense_variants.keys() and match and match.group(2) != 'Ter':
                         variants.append([clinvar_id, ids[1][0]])
                         classifications = self._classifications_extractor(parse_VCV, clinvar_id)
                         conditions = self._conditions_extractor(parse_VCV, clinvar_id)
@@ -1407,11 +1409,23 @@ class ClinVar(DynamicSource, object):
 
             # Store metadata:
             if "clinvar_classification" in metadata:
-                out_metadata["clinvar_classification"].append(data["classifications"])
+                class_dict = data["classifications"]
+                if "GermlineClassification" in class_dict:
+                    out_metadata["clinvar_classification"].append(class_dict)
+                else:
+                    out_metadata["clinvar_classification"].append(None)
             if "clinvar_condition" in metadata:
-                out_metadata["clinvar_condition"].append(data["conditions"])
+                cond_dict = data["conditions"]
+                if "GermlineClassification" in cond_dict and cond_dict["GermlineClassification"]:
+                    out_metadata["clinvar_condition"].append(cond_dict)
+                else:
+                    out_metadata["clinvar_condition"].append(None)
             if "clinvar_review_status" in metadata:
-                out_metadata["clinvar_review_status"].append(data["review_status"])
+                rs_dict = data["review_status"]
+                if "GermlineClassification" in rs_dict:
+                    out_metadata["clinvar_review_status"].append(rs_dict)
+                else:
+                    out_metadata["clinvar_review_status"].append(None)
             if "genomic_mutations" in metadata:
                 out_metadata["genomic_mutations"].append(list(data["genomic_annotations_obj"].values()))
             if "genomic_coordinates" in metadata:
@@ -1660,7 +1674,7 @@ class COSMIC(DynamicSource, object):
         if df.empty:
             self.log.warning(f"No COSMIC mutations for gene {gene_id} with TRANSCRIPT_ACCESSION={transcript_accession}; returning empty results")
             return [], out_metadata
-            
+
         if cancer_types is not None:
             df = df[ df['PRIMARY_HISTOLOGY'].isin(cancer_types) ]
         if cancer_histology_subtype_1 is not None:
@@ -1708,14 +1722,18 @@ class COSMIC(DynamicSource, object):
                 gd.append(r['MUTATION_CDS'][-3])
 
             if do_genomic_coordinates:
+                if pd.isna(gd).any():
+                    gd = None
+
                 out_metadata['genomic_coordinates'].append(gd)
 
             if do_genomic_mutations:
-                if gd is None:
+                if gd is None or pd.isna(r['HGVSG']):
                     self.log.warning("couldn't annotate genomic mutation")
                     gm = None
                 else:
                     gm = [gd[0], r['HGVSG']]
+
                 out_metadata['genomic_mutations'].append(gm)
 
             if do_site:
