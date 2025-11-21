@@ -615,8 +615,9 @@ class ClinVar(DynamicSource, object):
 
     # ClinVar Metadata
     _clinvar_supported_metadata = [
-        'clinvar_classification', 'clinvar_condition', 'clinvar_review_status', 'genomic_mutations', 'clinvar_variant_id', 'genomic_coordinates']
-
+        'germline_classification', 'germline_condition', 'germline_review_status', 'genomic_mutations',
+        'clinvar_variant_id', 'genomic_coordinates', 'oncogenicity_condition', 'oncogenicity_classification',
+        'oncogenicity_review_status', 'clinical_impact_condition', 'clinical_impact_review_status', 'clinical_impact_classification']
     @logger_init
     def __init__(self):
         description = "ClinVar mutation database"
@@ -1055,9 +1056,9 @@ class ClinVar(DynamicSource, object):
         '''
         classification_types = ['GermlineClassification', 'SomaticClinicalImpact', 'OncogenicityClassification']
         condition_out = {}
-        condition_value =[]
 
         for classification_type in classification_types:
+            condition_value =[]
             try:               
                 condition = clinvar_VCV_xml['ClinVarResult-Set']\
                                            ['VariationArchive']\
@@ -1408,24 +1409,34 @@ class ClinVar(DynamicSource, object):
             mutation = Mutation(position, alt_aa, [self])
 
             # Store metadata:
-            if "clinvar_classification" in metadata:
-                class_dict = data["classifications"]
-                if "GermlineClassification" in class_dict:
-                    out_metadata["clinvar_classification"].append(class_dict)
-                else:
-                    out_metadata["clinvar_classification"].append(None)
-            if "clinvar_condition" in metadata:
-                cond_dict = data["conditions"]
-                if "GermlineClassification" in cond_dict and cond_dict["GermlineClassification"]:
-                    out_metadata["clinvar_condition"].append(cond_dict)
-                else:
-                    out_metadata["clinvar_condition"].append(None)
-            if "clinvar_review_status" in metadata:
-                rs_dict = data["review_status"]
-                if "GermlineClassification" in rs_dict:
-                    out_metadata["clinvar_review_status"].append(rs_dict)
-                else:
-                    out_metadata["clinvar_review_status"].append(None)
+
+            md_dict = {"GermlineClassification": ("germline_condition", "germline_classification",  "germline_review_status"),
+                       "OncogenicityClassification": ("oncogenicity_condition","oncogenicity_classification", "oncogenicity_review_status"),
+                        "SomaticClinicalImpact": ("clinical_impact_condition","clinical_impact_classification", "clinical_impact_review_status")}
+
+            for xml_key, (cond_key, class_key, rs_key) in md_dict.items():
+
+                if cond_key in metadata:
+                    cond_dict = data["conditions"]
+                    if xml_key in cond_dict and cond_dict[xml_key]:
+                        out_metadata[cond_key].append(cond_dict)
+                    else:
+                        out_metadata[cond_key].append(None)
+      
+                if class_key in metadata:
+                    class_dict = data["classifications"]
+                    if xml_key in class_dict and class_dict[xml_key]:
+                        out_metadata[class_key].append(class_dict)
+                    else:
+                        out_metadata[class_key].append(None)
+
+                if rs_key in metadata:
+                    rs_dict = data["review_status"]
+                    if xml_key in rs_dict and rs_dict[xml_key]:
+                        out_metadata[rs_key].append(rs_dict)
+                    else:
+                        out_metadata[rs_key].append(None)
+
             if "genomic_mutations" in metadata:
                 out_metadata["genomic_mutations"].append(list(data["genomic_annotations_obj"].values()))
             if "genomic_coordinates" in metadata:
