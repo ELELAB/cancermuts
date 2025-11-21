@@ -176,8 +176,9 @@ class Table:
 
 
 
-    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency','gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency','clinvar_classification',
-    'clinvar_condition', 'clinvar_review_status', 'clinvar_variant_id'],
+    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency', 
+                                                        'gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency', 'germline_classification', 'germline_condition', 'germline_review_status', 'clinvar_variant_id', 
+                                                        'oncogenicity_condition', 'oncogenicity_review_status', 'oncogenicity_classification', 'clinical_impact_condition', 'clinical_impact_review_status', 'clinical_impact_classification'],
                         position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage', 'ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation', 'ptm_ogalnac', 'ptm_oglcnac', 'mobidb_disorder_propensity'],
                         sequence_properties=['linear_motif', 'structure']):
 
