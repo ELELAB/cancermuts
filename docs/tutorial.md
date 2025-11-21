@@ -436,13 +436,9 @@ Once the RefSeq is set, we can annotate the sequence object with all ClinVar mis
 
 ```py
 >>> clinvar.add_mutations(seq, metadata=[
-...     'clinvar_classification',
-...     'clinvar_condition',
-...     'clinvar_review_status',
-...     'genomic_mutations',
-...     'genomic_coordinates',
-...     'clinvar_variant_id'
-... ])
+        'germline_classification', 'germline_condition', 'germline_review_status', 'genomic_mutations',
+        'clinvar_variant_id', 'genomic_coordinates', 'oncogenicity_condition', 'oncogenicity_classification',
+        'oncogenicity_review_status', 'clinical_impact_condition', 'clinical_impact_review_status', 'clinical_impact_classification'])
 
 ```
 
@@ -466,10 +462,10 @@ Each mutation is recorded in a Mutation object that can be further explored:
 >>> seq.positions[14].mutations[0].mutated_residue_type
 'R'
 
->>> seq.positions[14].mutations[0].metadata['clinvar_condition'][0].get_value_str()
+>>> seq.positions[14].mutations[0].metadata['germline_condition'][0].get_value_str()
 'not specified'
 
->>> seq.positions[14].mutations[0].metadata['clinvar_classification'][0].get_value_str()
+>>> seq.positions[14].mutations[0].metadata['germline_classification'][0].get_value_str()
 'Uncertain significance'
 
 ```
