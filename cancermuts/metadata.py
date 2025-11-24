@@ -680,8 +680,8 @@ class Condition(Metadata):
         return ";".join(self.conditions)
 
 class GermlineCondition(Condition):
-    description = "Germline classification"
-    header = "germline_classification"
+    description = "Germline condition"
+    header = "germline_condition"
     xml_key = "GermlineClassification"
 
 class ClinicalImpactCondition(Condition):
@@ -690,8 +690,8 @@ class ClinicalImpactCondition(Condition):
     xml_key = "SomaticClinicalImpact"
 
 class OncogenicityCondition(Condition):
-    description = "Oncogenicity classification"
-    header = "oncogenicity_classification"
+    description = "Oncogenicity conditionn"
+    header = "oncogenicity_condition"
     xml_key = "OncogenicityClassification"
 
 metadata_classes = {
