@@ -63,9 +63,10 @@ except UnexpectedIsoformError:
 # Use ClinVar to retrieve non-canonical alternative isoform annotations
 clinvar = ClinVar()
 clinvar.add_mutations(seq, metadata=[
-        'germline_classification', 'germline_condition', 'germline_review_status', 'genomic_mutations',
-        'clinvar_variant_id', 'genomic_coordinates', 'oncogenicity_condition', 'oncogenicity_classification',
-        'oncogenicity_review_status', 'clinical_impact_condition', 'clinical_impact_review_status', 'clinical_impact_classification'])
+        'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status', 'genomic_mutations',
+        'clinvar_variant_id', 'genomic_coordinates', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_classification',
+        'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status', 
+        'clinvar_clinical_impact_classification'])
 
 is_cv = lambda m: m.metadata.get("clinvar_variant_id") is not None
 

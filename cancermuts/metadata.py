@@ -564,7 +564,7 @@ class ClinVarVariantID(Metadata):
     def __repr__(self):
         return f"<ClinVarVariantID {self.variant_id} from {self.source.name}>"
 
-class Classification(Metadata):
+class ClinvarClassification(Metadata):
 
     xml_key = ""
     description = ""
@@ -580,22 +580,22 @@ class Classification(Metadata):
     def get_value_str(self):
         return self.classification
 
-class GermlineClassification(Classification):
-    description = "Germline classification"
-    header = "germline_classification"
+class ClinvarGermlineClassification(ClinvarClassification):
+    description = "Clinvar Germline classification"
+    header = "clinvar_germline_classification"
     xml_key = "GermlineClassification"
 
-class ClinicalImpactClassification(Classification):
-    description = "Clinical impact classification"
-    header = "clinical_impact_classification"
+class ClinvarClinicalImpactClassification(ClinvarClassification):
+    description = "Clinvar Clinical impact classification"
+    header = "clinvar_clinical_impact_classification"
     xml_key = "SomaticClinicalImpact"
 
-class OncogenicityClassification(Classification):
-    description = "Oncogenicity classification"
-    header = "oncogenicity_classification"
+class ClinvarOncogenicityClassification(ClinvarClassification):
+    description = "Clinvar Oncogenicity classification"
+    header = "clinvar_oncogenicity_classification"
     xml_key = "OncogenicityClassification"
 
-class ReviewStatus(Metadata):
+class ClinvarReviewStatus(Metadata):
 
     xml_key = ""
     description = ""
@@ -637,9 +637,9 @@ class ReviewStatus(Metadata):
         return f"{self.header} {self.stars} (from: {self.status}) from {self.source.name}>"
 
 
-class ClinicalImpactReviewStatus(ReviewStatus):
-    description = "Clinical impact review status"
-    header = "clinical_impact_review_status"
+class ClinvarClinicalImpactReviewStatus(ClinvarReviewStatus):
+    description = "Clinvar Clinical impact review status"
+    header = "clinvar_clinical_impact_review_status"
     xml_key = "SomaticClinicalImpact"
 
     stars_map = {
@@ -652,17 +652,17 @@ class ClinicalImpactReviewStatus(ReviewStatus):
         'no classification for the individual variant': 0
     }
 
-class GermlineReviewStatus(ReviewStatus):
-    description = "Germline review status"
-    header = "germline_review_status"
+class ClinvarGermlineReviewStatus(ClinvarReviewStatus):
+    description = "Clinvar Germline review status"
+    header = "clinvar_germline_review_status"
     xml_key = "GermlineClassification"
 
-class OncogenicityReviewStatus(ReviewStatus):
-    description = "Oncogenicity review status"
-    header = "oncogenicity_review_status"
+class ClinvarOncogenicityReviewStatus(ClinvarReviewStatus):
+    description = "Clinvar Oncogenicity review status"
+    header = "clinvar_oncogenicity_review_status"
     xml_key = "OncogenicityClassification"
 
-class Condition(Metadata):
+class ClinvarCondition(Metadata):
 
     xml_key = ""
     description = ""
@@ -679,19 +679,19 @@ class Condition(Metadata):
     def get_value_str(self):
         return ";".join(self.conditions)
 
-class GermlineCondition(Condition):
-    description = "Germline condition"
-    header = "germline_condition"
+class ClinvarGermlineCondition(ClinvarCondition):
+    description = "Clinvar Germline condition"
+    header = "clinvar_germline_condition"
     xml_key = "GermlineClassification"
 
-class ClinicalImpactCondition(Condition):
-    description = "Clinical impact condition"
-    header = "clinical_impact_condition"
+class ClinvarClinicalImpactCondition(ClinvarCondition):
+    description = "Clinvar Clinical impact condition"
+    header = "clinvar_clinical_impact_condition"
     xml_key = "SomaticClinicalImpact"
 
-class OncogenicityCondition(Condition):
-    description = "Oncogenicity conditionn"
-    header = "oncogenicity_condition"
+class ClinvarOncogenicityCondition(ClinvarCondition):
+    description = "Clinvar Oncogenicity condition"
+    header = "clinvar_oncogenicity_condition"
     xml_key = "OncogenicityClassification"
 
 metadata_classes = {
@@ -707,13 +707,13 @@ metadata_classes = {
                      'cancer_site'                 : CancerSite,
                      'cancer_histology'            : CancerHistology,
                      'clinvar_variant_id'          : ClinVarVariantID,
-                     'germline_condition'          : GermlineCondition,
-                     'germline_review_status'      : GermlineReviewStatus,
-                     'germline_classification'     : GermlineClassification,
-                     'oncogenicity_condition'      : OncogenicityCondition,
-                     'oncogenicity_review_status'  : OncogenicityReviewStatus,
-                     'oncogenicity_classification' : OncogenicityClassification,
-                     'clinical_impact_condition'      : ClinicalImpactCondition,
-                     'clinical_impact_review_status'  : ClinicalImpactReviewStatus,
-                     'clinical_impact_classification' : ClinicalImpactClassification
+                     'clinvar_germline_condition'          : ClinvarGermlineCondition,
+                     'clinvar_germline_review_status'      : ClinvarGermlineReviewStatus,
+                     'clinvar_germline_classification'     : ClinvarGermlineClassification,
+                     'clinvar_oncogenicity_condition'      : ClinvarOncogenicityCondition,
+                     'clinvar_oncogenicity_review_status'  : ClinvarOncogenicityReviewStatus,
+                     'clinvar_oncogenicity_classification' : ClinvarOncogenicityClassification,
+                     'clinvar_clinical_impact_condition'      : ClinvarClinicalImpactCondition,
+                     'clinvar_clinical_impact_review_status'  : ClinvarClinicalImpactReviewStatus,
+                     'clinvar_clinical_impact_classification' : ClinvarClinicalImpactClassification
                     }

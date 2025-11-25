@@ -68,16 +68,17 @@ print(seq.positions[64].mutations[0].metadata)
 # add mutations from ClinVar
 clinvar = ClinVar()
 clinvar.add_mutations(seq, metadata=[
-        'germline_classification', 'germline_condition', 'germline_review_status', 'genomic_mutations',
-        'clinvar_variant_id', 'genomic_coordinates', 'oncogenicity_condition', 'oncogenicity_classification',
-        'oncogenicity_review_status', 'clinical_impact_condition', 'clinical_impact_review_status', 'clinical_impact_classification'])
+        'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status', 'genomic_mutations',
+        'clinvar_variant_id', 'genomic_coordinates', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_classification',
+        'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status', 
+        'clinvar_clinical_impact_classification'])
 
 # Check ClinVar Variant
 print(seq.positions[14].mutations)
 print(seq.positions[14].mutations[0].sources)
 print(seq.positions[14].mutations[0].mutated_residue_type)
-print(seq.positions[14].mutations[0].metadata['germline_condition'][0].get_value_str())
-print(seq.positions[14].mutations[0].metadata['germline_classification'][0].get_value_str())
+print(seq.positions[14].mutations[0].metadata['clinvar_germline_condition'][0].get_value_str())
+print(seq.positions[14].mutations[0].metadata['clinvar_germline_classification'][0].get_value_str())
 
 # add annotations from MyVariant (REVEL)
 from cancermuts.datasources import MyVariant

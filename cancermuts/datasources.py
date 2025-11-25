@@ -615,9 +615,9 @@ class ClinVar(DynamicSource, object):
 
     # ClinVar Metadata
     _clinvar_supported_metadata = [
-        'germline_classification', 'germline_condition', 'germline_review_status', 'genomic_mutations',
-        'clinvar_variant_id', 'genomic_coordinates', 'oncogenicity_condition', 'oncogenicity_classification',
-        'oncogenicity_review_status', 'clinical_impact_condition', 'clinical_impact_review_status', 'clinical_impact_classification']
+        'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status', 'genomic_mutations',
+        'clinvar_variant_id', 'genomic_coordinates', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_classification',
+        'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status', 'clinvar_clinical_impact_classification']
     @logger_init
     def __init__(self):
         description = "ClinVar mutation database"
@@ -1410,9 +1410,9 @@ class ClinVar(DynamicSource, object):
 
             # Store metadata:
 
-            md_dict = {"GermlineClassification": ("germline_condition", "germline_classification",  "germline_review_status"),
-                       "OncogenicityClassification": ("oncogenicity_condition","oncogenicity_classification", "oncogenicity_review_status"),
-                        "SomaticClinicalImpact": ("clinical_impact_condition","clinical_impact_classification", "clinical_impact_review_status")}
+            md_dict = {"GermlineClassification": ("clinvar_germline_condition", "clinvar_germline_classification",  "clinvar_germline_review_status"),
+                       "OncogenicityClassification": ("clinvar_oncogenicity_condition","clinvar_oncogenicity_classification", "clinvar_oncogenicity_review_status"),
+                        "SomaticClinicalImpact": ("clinvar_clinical_impact_condition","clinvar_clinical_impact_classification", "clinvar_clinical_impact_review_status")}
 
             for xml_key, (cond_key, class_key, rs_key) in md_dict.items():
 
