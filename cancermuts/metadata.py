@@ -174,7 +174,7 @@ class GenomicMutation(Metadata):
             self.alt = tokens['alt']
             self.is_snv = True
             self.is_insdel = False
-            self.is_inv = False
+            self.is_inversion = False
 
             self.definition=f"{self.chr}:g.{self.coord}{self.ref}>{self.alt}"
 
@@ -193,7 +193,7 @@ class GenomicMutation(Metadata):
             self.substitution = tokens['substitution']
             self.is_snv = False
             self.is_insdel = True
-            self.is_inv = False
+            self.is_inversion = False
 
             self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}delins{self.substitution}"
 
@@ -212,7 +212,7 @@ class GenomicMutation(Metadata):
             self.substitution = None
             self.is_snv = False
             self.is_insdel = False
-            self.is_inv = True
+            self.is_inversion = True
 
             self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}inv"
 
@@ -224,7 +224,7 @@ class GenomicMutation(Metadata):
             self.alt = None
             self.is_snv = False
             self.is_insdel = False
-            self.is_inv = False
+            self.is_inversion = False
 
     def get_value_str(self, fmt='csv'):
         if fmt == 'csv':
