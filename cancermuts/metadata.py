@@ -144,10 +144,13 @@ class GenomicMutation(Metadata):
 
     _mut_snv_regexp = '^[0-9XY]+:g\.[0-9]+[ACTG]>[ACTG]$'
     _mut_insdel_regexp = '^[0-9XY]+:g\.[0-9]+_[0-9]+delins[ACTG]+$'
+    _mut_inv_regexp = '^[0-9XY]+:g\.[0-9]+_[0-9]+inv$'
     _mut_snv_prog = re.compile(_mut_snv_regexp)
     _mut_insdel_prog = re.compile(_mut_insdel_regexp)
+    _mut_inv_prog = re.compile(_mut_inv_regexp)
     _mut_snv_parse = '{chr}:g.{coord:d}{ref:l}>{alt:l}'
     _mut_insdel_parse = '{chr}:g.{coord_start:d}_{coord_end:d}delins{substitution}'
+    _mut_inv_parse = '{chr}:g.{coord_start:d}_{coord_end:d}inv'
 
     @logger_init
     def __init__(self, source, genome_build, definition):
@@ -171,6 +174,7 @@ class GenomicMutation(Metadata):
             self.alt = tokens['alt']
             self.is_snv = True
             self.is_insdel = False
+            self.is_inversion = False
 
             self.definition=f"{self.chr}:g.{self.coord}{self.ref}>{self.alt}"
 
@@ -189,8 +193,28 @@ class GenomicMutation(Metadata):
             self.substitution = tokens['substitution']
             self.is_snv = False
             self.is_insdel = True
+            self.is_inversion = False
 
             self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}delins{self.substitution}"
+
+        elif self._mut_inv_prog.match(definition):
+            tokens = parse(self._mut_inv_parse, definition)
+
+            if tokens['chr'] == '23':
+                self.chr = 'X'
+            elif tokens['chr'] == '24':
+                self.chr = 'Y'
+            else:
+                self.chr = tokens['chr']
+
+            self.coord_start = tokens['coord_start']
+            self.coord_end = tokens['coord_end']
+            self.substitution = None
+            self.is_snv = False
+            self.is_insdel = False
+            self.is_inversion = True
+
+            self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}inv"
 
         else:
             self.log.info("doing other")
@@ -200,6 +224,7 @@ class GenomicMutation(Metadata):
             self.alt = None
             self.is_snv = False
             self.is_insdel = False
+            self.is_inversion = False
 
     def get_value_str(self, fmt='csv'):
         if fmt == 'csv':
