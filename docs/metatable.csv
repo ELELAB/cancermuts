@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 ,aa_position,ref_aa,alt_aa,phosphorylation_site,methylation_site,ubiquitination_site,cleavage_site,s-nitrosylation_site,acetylation_site,sumoyylation_site,ogalnac_site,oglcnac_site,disorder_propensity,ptm_sources,linear_motif,structure,sources,cancer_study,cancer_type,genomic_coordinates,genomic_mutation,REVEL_score,cancer_site,cancer_histology,gnomad_exome_af,gnomad_genome_af,gnomad_popmax_exome_af,gnomad_popmax_genome_af,clinvar_classification,clinvar_condition,clinvar_review_status,clinvar_variant_id
 0,1,M,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 1,2,P,R,,,,,,,,,,,,,,ClinVar,,,"hg19,16:87426038-87426038, hg38,16:87392432-87392432","hg19,16:g.87426038C>G, hg38,16:g.87392432C>G",0.145,,,0.0000000000000000,,,,Uncertain significance,not specified,1,2358122

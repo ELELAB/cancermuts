@@ -232,7 +232,7 @@ class Table:
             for m in mut_strings_order:
                 this_row = list(base_row)
                 this_row.append(p.mutations[m].mutated_residue_type)
-                this_row.append(",".join([s.name for s in p.mutations[m].sources]) if p.mutations[m].sources else None)
+                this_row.append(",".join([s.name for s in p.mutations[m].sources]))
                 for md in mutation_metadata:
                     md_values = []
                     try:
