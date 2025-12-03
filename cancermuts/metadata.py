@@ -570,15 +570,17 @@ class ClinvarClassification(Metadata):
     description = ""
     header = ""
 
-    def __init__(self, source, data):
+    def __init__(self, source, classification):
         super().__init__(source)
-        self.classification = data[self.xml_key]
+        self.classification = classification
 
     def get_value(self):
         return self.classification
 
     def get_value_str(self):
         return self.classification
+    def __repr__(self):
+       return "%s(source=%r, classification=%r)" % (self.__class__.__name__, self.source, self.classification)
 
 class ClinvarGermlineClassification(ClinvarClassification):
     description = "Clinvar Germline classification"
@@ -616,10 +618,10 @@ class ClinvarReviewStatus(Metadata):
         'no classification provided': 0
     }
 
-    def __init__(self, source, data):
+    def __init__(self, source, status):
         super().__init__(source)
-        self.status = data[self.xml_key]
-        self.stars = self.stars_map[self.status]
+        self.status = status
+        self.stars = self.stars_map[status]
 
     def get_value(self):
         return self.stars
@@ -634,8 +636,7 @@ class ClinvarReviewStatus(Metadata):
         return self.stars
 
     def __repr__(self):
-        return f"{self.header} {self.stars} (from: {self.status}) from {self.source.name}>"
-
+       return "%s(source=%r, status=%r, stars=%r)" % (self.__class__.__name__, self.source, self.status, self.stars)
 
 class ClinvarClinicalImpactReviewStatus(ClinvarReviewStatus):
     description = "Clinvar Clinical impact review status"
@@ -668,16 +669,18 @@ class ClinvarCondition(Metadata):
     description = ""
     header = ""
 
-    def __init__(self, source, data):
+    def __init__(self, source, conditions):
         super().__init__(source)
-        conds = data[self.xml_key]
-        self.conditions = conds if isinstance(conds, list) else [conds]
+        self.conditions = conditions if isinstance(conditions, list) else [conditions]
 
     def get_value(self):
         return self.conditions
 
     def get_value_str(self):
         return ";".join(self.conditions)
+
+    def __repr__(self):
+       return "%s(source=%r, conditions=%r)" % (self.__class__.__name__, self.source, self.conditions)
 
 class ClinvarGermlineCondition(ClinvarCondition):
     description = "Clinvar Germline condition"

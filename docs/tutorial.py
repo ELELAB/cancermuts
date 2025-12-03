@@ -77,8 +77,8 @@ clinvar.add_mutations(seq, metadata=[
 print(seq.positions[14].mutations)
 print(seq.positions[14].mutations[0].sources)
 print(seq.positions[14].mutations[0].mutated_residue_type)
-print(seq.positions[14].mutations[0].metadata['clinvar_germline_condition'][0].get_value_str())
-print(seq.positions[14].mutations[0].metadata['clinvar_germline_classification'][0].get_value_str())
+print(seq.positions[14].mutations[0].metadata['clinvar_germline_condition'])
+print(seq.positions[14].mutations[0].metadata['clinvar_germline_classification'])
 
 # add annotations from MyVariant (REVEL)
 from cancermuts.datasources import MyVariant

@@ -462,11 +462,11 @@ Each mutation is recorded in a Mutation object that can be further explored:
 >>> seq.positions[14].mutations[0].mutated_residue_type
 'R'
 
->>> seq.positions[14].mutations[0].metadata['clinvar_germline_condition'][0].get_value_str()
-'not specified'
+>>> seq.positions[14].mutations[0].metadata['clinvar_germline_condition']
+[ClinvarGermlineCondition(source=<cancermuts.datasources.ClinVar object at 0x7fa0d32b4280>, conditions=['not specified'])]
 
->>> seq.positions[14].mutations[0].metadata['clinvar_germline_classification'][0].get_value_str()
-'Uncertain significance'
+>>> seq.positions[14].mutations[0].metadata['clinvar_germline_classification']
+[ClinvarGermlineClassification(source=<cancermuts.datasources.ClinVar object at 0x7fa0d32b4280>, classification='Uncertain significance')]
 
 ```
 

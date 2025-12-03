@@ -1419,21 +1419,21 @@ class ClinVar(DynamicSource, object):
                 if cond_key in metadata:
                     cond_dict = data["conditions"]
                     if xml_key in cond_dict and cond_dict[xml_key]:
-                        out_metadata[cond_key].append(cond_dict)
+                        out_metadata[cond_key].append(cond_dict[xml_key])
                     else:
                         out_metadata[cond_key].append(None)
       
                 if class_key in metadata:
                     class_dict = data["classifications"]
                     if xml_key in class_dict and class_dict[xml_key]:
-                        out_metadata[class_key].append(class_dict)
+                        out_metadata[class_key].append(class_dict[xml_key])
                     else:
                         out_metadata[class_key].append(None)
 
                 if rs_key in metadata:
                     rs_dict = data["review_status"]
                     if xml_key in rs_dict and rs_dict[xml_key]:
-                        out_metadata[rs_key].append(rs_dict)
+                        out_metadata[rs_key].append(rs_dict[xml_key])
                     else:
                         out_metadata[rs_key].append(None)
 
