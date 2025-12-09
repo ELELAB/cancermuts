@@ -246,10 +246,13 @@ class Table:
                             md_values.append(this_value)
                             self.log.info(f"appending {single_md.get_value_str()}")
                         self.log.info(f"values to be joined {md}: {sorted(list(set(md_values)))}")
-                        if md not in ["clinvar_variant_id", "clinvar_classification", "clinvar_condition", "clinvar_review_status"]:
-                            md_str = ", ".join(sorted(set(map(str, md_values))))
+                        if "clinvar" in str(md):
+                            if "condition" in str(md):
+                                md_str = "|".join(map(str, md_values))
+                            else:
+                                md_str = ", ".join(map(str, md_values))
                         else:
-                            md_str = ", ".join(map(str, md_values))
+                            md_str = ", ".join(sorted(set(map(str, md_values))))
                     except KeyError:
                         md_str = None
                     this_row.append(md_str)
