@@ -91,10 +91,6 @@ if positions_with_cv:
 else:
     print("No ClinVar mutations found for refseq:", seq.aliases['refseq'])
 
-#print(seq.positions[819].mutations[0])
-#print(seq.positions[819].mutations[0].sources)
-#print(seq.positions[819].mutations[0].metadata)
-
 # annotate with REVEL using local database
 rl = RevelDatabase("/data/databases/REVEL/revel_with_transcript_ids")
 rl.add_metadata(seq)
