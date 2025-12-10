@@ -589,24 +589,44 @@ class ClinVarVariantID(Metadata):
     def __repr__(self):
         return f"<ClinVarVariantID {self.variant_id} from {self.source.name}>"
 
-class ClinVarCondition(Metadata):
-    description = "ClinVar condition"
-    header = "clinvar_condition"
+class ClinvarClassification(Metadata):
 
-    def __init__(self, source, data):
+    xml_key = ""
+    description = ""
+    header = ""
+
+    def __init__(self, source, classification):
         super().__init__(source)
-        conds = data["GermlineClassification"]
-        self.conditions = conds if isinstance(conds, list) else [conds]
+        self.classification = classification
 
     def get_value(self):
-        return self.conditions
+        return self.classification
 
     def get_value_str(self):
-        return ";".join(self.conditions)
+        return self.classification
+    def __repr__(self):
+       return "%s(source=%r, classification=%r)" % (self.__class__.__name__, self.source, self.classification)
 
-class ClinVarReviewStatus(Metadata):
-    description = "ClinVar review status"
-    header = "clinvar_review_status"
+class ClinvarGermlineClassification(ClinvarClassification):
+    description = "Clinvar Germline classification"
+    header = "clinvar_germline_classification"
+    xml_key = "GermlineClassification"
+
+class ClinvarClinicalImpactClassification(ClinvarClassification):
+    description = "Clinvar Clinical impact classification"
+    header = "clinvar_clinical_impact_classification"
+    xml_key = "SomaticClinicalImpact"
+
+class ClinvarOncogenicityClassification(ClinvarClassification):
+    description = "Clinvar Oncogenicity classification"
+    header = "clinvar_oncogenicity_classification"
+    xml_key = "OncogenicityClassification"
+
+class ClinvarReviewStatus(Metadata):
+
+    xml_key = ""
+    description = ""
+    header = ""
 
     stars_map = {
         'practice guideline': 4,
@@ -623,10 +643,10 @@ class ClinVarReviewStatus(Metadata):
         'no classification provided': 0
     }
 
-    def __init__(self, source, data):
+    def __init__(self, source, status):
         super().__init__(source)
-        self.status = data["GermlineClassification"]
-        self.stars = self.stars_map[self.status]
+        self.status = status
+        self.stars = self.stars_map[status]
 
     def get_value(self):
         return self.stars
@@ -641,21 +661,66 @@ class ClinVarReviewStatus(Metadata):
         return self.stars
 
     def __repr__(self):
-        return f"<ClinVarReviewStatus {self.stars} (from: {self.status}) from {self.source.name}>"
+       return "%s(source=%r, status=%r, stars=%r)" % (self.__class__.__name__, self.source, self.status, self.stars)
 
-class ClinVarClassification(Metadata):
-    description = "ClinVar classification"
-    header = "clinvar_classification"
+class ClinvarClinicalImpactReviewStatus(ClinvarReviewStatus):
+    description = "Clinvar Clinical impact review status"
+    header = "clinvar_clinical_impact_review_status"
+    xml_key = "SomaticClinicalImpact"
 
-    def __init__(self, source, data):
+    stars_map = {
+        'practice guideline': 4,
+        'reviewed by expert panel': 3,
+        'criteria provided, multiple submitters': 2,
+        'criteria provided, single submitter': 1,
+        'no assertion criteria provided': 0,
+        'no classification provided': 0,
+        'no classification for the individual variant': 0
+    }
+
+class ClinvarGermlineReviewStatus(ClinvarReviewStatus):
+    description = "Clinvar Germline review status"
+    header = "clinvar_germline_review_status"
+    xml_key = "GermlineClassification"
+
+class ClinvarOncogenicityReviewStatus(ClinvarReviewStatus):
+    description = "Clinvar Oncogenicity review status"
+    header = "clinvar_oncogenicity_review_status"
+    xml_key = "OncogenicityClassification"
+
+class ClinvarCondition(Metadata):
+
+    xml_key = ""
+    description = ""
+    header = ""
+
+    def __init__(self, source, conditions):
         super().__init__(source)
-        self.classification = data["GermlineClassification"]
+        self.conditions = conditions if isinstance(conditions, list) else [conditions]
 
     def get_value(self):
-        return self.classification
+        return self.conditions
 
     def get_value_str(self):
-        return self.classification
+        return ";".join(self.conditions)
+
+    def __repr__(self):
+       return "%s(source=%r, conditions=%r)" % (self.__class__.__name__, self.source, self.conditions)
+
+class ClinvarGermlineCondition(ClinvarCondition):
+    description = "Clinvar Germline condition"
+    header = "clinvar_germline_condition"
+    xml_key = "GermlineClassification"
+
+class ClinvarClinicalImpactCondition(ClinvarCondition):
+    description = "Clinvar Clinical impact condition"
+    header = "clinvar_clinical_impact_condition"
+    xml_key = "SomaticClinicalImpact"
+
+class ClinvarOncogenicityCondition(ClinvarCondition):
+    description = "Clinvar Oncogenicity condition"
+    header = "clinvar_oncogenicity_condition"
+    xml_key = "OncogenicityClassification"
 
 metadata_classes = {
                      'cancer_type'                 : CancerType,
@@ -669,9 +734,14 @@ metadata_classes = {
                      'gnomad_popmax_exome_allele_frequency' : gnomADPopmaxExomeAlleleFrequency,
                      'cancer_site'                 : CancerSite,
                      'cancer_histology'            : CancerHistology,
-                     'clinvar_variant_id'         : ClinVarVariantID,
-                     'clinvar_condition'          : ClinVarCondition,
-                     'clinvar_review_status'      : ClinVarReviewStatus,
-                     'clinvar_classification'     : ClinVarClassification,
-
+                     'clinvar_variant_id'          : ClinVarVariantID,
+                     'clinvar_germline_condition'          : ClinvarGermlineCondition,
+                     'clinvar_germline_review_status'      : ClinvarGermlineReviewStatus,
+                     'clinvar_germline_classification'     : ClinvarGermlineClassification,
+                     'clinvar_oncogenicity_condition'      : ClinvarOncogenicityCondition,
+                     'clinvar_oncogenicity_review_status'  : ClinvarOncogenicityReviewStatus,
+                     'clinvar_oncogenicity_classification' : ClinvarOncogenicityClassification,
+                     'clinvar_clinical_impact_condition'      : ClinvarClinicalImpactCondition,
+                     'clinvar_clinical_impact_review_status'  : ClinvarClinicalImpactReviewStatus,
+                     'clinvar_clinical_impact_classification' : ClinvarClinicalImpactClassification
                     }
