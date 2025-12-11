@@ -173,15 +173,15 @@ class SNitrosylationSite(PositionProperty):
 
     def get_value_str(self):
         return self.code
-
-class OGalNAcSite(PositionProperty):
-    description = "OGalNAc site"
-    header = "ogalnac_site"
-    category='ptm_ogalnac'
-    code = "O-GalNAc"
+    
+class GlycosylationSite(PositionProperty):
+    description = "Glycosylation site"
+    header = "glycosylation_site"
+    category='ptm_glycosylation'
+    code = "Gly"   
 
     def __init__(self, position, sources):
-        super(OGalNAcSite, self).__init__(  name="o-GalNAc Site",
+        super(GlycosylationSite, self).__init__(  name="Glycosylation Site",
                                                     position=position,
                                                     sources=sources,
                                                     values={},
@@ -189,30 +189,36 @@ class OGalNAcSite(PositionProperty):
 
     def get_value_str(self):
         return self.code
+    
+class GlycosylationSubtype(PositionProperty):
+    description = "Glycosylation Subtype"
+    header = "glycosylation_subtype"
+    category="glycosylation_subtype"
+    #code =    
 
-class OGlcNAcSite(PositionProperty):
-    description = "OGlcNAc site"
-    header = "oglcnac_site"
-    category='ptm_oglcnac'
-    code = "O-GlcNAc"
+    subtype = ""
 
-
-    def __init__(self, position, sources):
-        super(OGlcNAcSite, self).__init__(  name="o-GlcNAc Site",
+    def __init__(self, position, sources, subtype):
+        super(GlycosylationSubtype, self).__init__(  name="GlycosylationSubtype",
                                                     position=position,
                                                     sources=sources,
-                                                    values={},
+                                                    values={"subtype": subtype},
                                                     metadata={}  )
 
     def get_value_str(self):
-        return self.code
-
+        return self.values.get("subtype", "")
+        #return self.values.get("subtype")
+        #val = self.values.get("subtype")
+        #if val is None:
+            #return ""
+        #else:
+            #return str(val)
+    
 class SumoylationSite(PositionProperty):
     description = "Sumoylation site"
     header = "sumoyylation_site"
     category='ptm_sumoylation'
     code = "Sumo"
-
 
     def __init__(self, position, sources):
         super(SumoylationSite, self).__init__(  name="Sumoylation Site",
@@ -306,8 +312,8 @@ position_properties_classes = {  'ptm_phosphorylation'            : Phosphorylat
                                  'ptm_methylation'                : MethylationSite,
                                  'ptm_acetylation'                : AcetylationSite,
 				                 'ptm_nitrosylation'              : SNitrosylationSite,
-                                 'ptm_ogalnac'                    : OGalNAcSite,
-                                 'ptm_oglcnac'                    : OGlcNAcSite,
+                                 'ptm_glycosylation'              : GlycosylationSite,
+                                 'glycosylation_subtype'          : GlycosylationSubtype,
                                  'ptm_sumoylation'                : SumoylationSite,
                                  'ptm_ubiquitination'             : UbiquitinationSite,
                                  'ptm_cleavage'                   : CleavageSite,

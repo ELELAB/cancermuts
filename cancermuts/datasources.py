@@ -1846,12 +1846,12 @@ class PhosphoSite(DynamicSource, object):
         self._ptm_types = ['acetylation', 'methylation', 'O-GalNAc', 'O-GlcNAc', 'phosphorylation', 'sumoylation', 'ubiquitination']
         self._ptm_types_to_classes = {  'acetylation'     : 'ptm_acetylation',
                                         'methylation'     : 'ptm_methylation',
-                                        'O-GalNAc'        : 'ptm_ogalnac',
-                                        'O-GlcNAc'        : 'ptm_oglcnac',
+                                        'O-GalNAc'        : 'ptm_glycosylation',
+                                        'O-GlcNAc'        : 'ptm_glycosylation',
                                         'phosphorylation' : 'ptm_phosphorylation',
                                         'sumoylation'     : 'ptm_sumoylation',
                                         'ubiquitination'  : 'ptm_ubiquitination' }
-        self._ptm_suffixes = ['ac', 'm[0-9]', 'ga', 'gl', 'p', 'sm', 'ub']
+        self._ptm_suffixes = ['ac', 'm[0-9]', 'gly', 'gly', 'p', 'sm', 'ub']
         self._ptm_suffix_offsets = [-3, -3, -3, -3, -2, -3, -3]
 
         self._database_dir = database_dir
@@ -1931,6 +1931,30 @@ class PhosphoSite(DynamicSource, object):
                                                         )
                     position.add_property(property_obj)
                     self.log.info("adding %s to site %s" % (m, property_obj.name))
+                
+                is_gly = False
+                has_gly_site = False
+                has_gly_sub = False
+                for prop in position.properties.values():
+                    if prop.category == 'ptm_glycosylation':
+                        is_gly = True
+                        break 
+                
+                has_gly_site = any(prop.category == 'ptm_glycosylation' for prop in position.properties.values())
+                if not has_gly_site:
+                    gly_site = position_properties_classes['ptm_glycosylation'](
+                        position=position,
+                        sources=[self])
+                    position.add_property(gly_site)
+
+                has_gly_subtype = any(prop.header == 'glycosylation_subtype' for prop in position.properties.values())
+                if not has_gly_subtype:
+                    gly_sub = position_properties_classes['glycosylation_subtype'](
+                        position=position,
+                        sources=[self],
+                        subtype=""     
+                    )
+                    position.add_property(gly_sub)
 
 class MyVariant(DynamicSource, object):
     @logger_init
