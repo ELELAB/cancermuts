@@ -1851,7 +1851,7 @@ class PhosphoSite(DynamicSource, object):
                                         'phosphorylation' : 'ptm_phosphorylation',
                                         'sumoylation'     : 'ptm_sumoylation',
                                         'ubiquitination'  : 'ptm_ubiquitination' }
-        self._ptm_suffixes = ['ac', 'm[0-9]', 'gly', 'gly', 'p', 'sm', 'ub']
+        self._ptm_suffixes = ['ac', 'm[0-9]', 'ga', 'gl', 'p', 'sm', 'ub']
         self._ptm_suffix_offsets = [-3, -3, -3, -3, -2, -3, -3]
 
         self._database_dir = database_dir
@@ -1931,30 +1931,19 @@ class PhosphoSite(DynamicSource, object):
                                                         )
                     position.add_property(property_obj)
                     self.log.info("adding %s to site %s" % (m, property_obj.name))
-                
-                is_gly = False
-                has_gly_site = False
-                has_gly_sub = False
-                for prop in position.properties.values():
-                    if prop.category == 'ptm_glycosylation':
-                        is_gly = True
-                        break 
-                
-                has_gly_site = any(prop.category == 'ptm_glycosylation' for prop in position.properties.values())
-                if not has_gly_site:
-                    gly_site = position_properties_classes['ptm_glycosylation'](
-                        position=position,
-                        sources=[self])
-                    position.add_property(gly_site)
 
-                has_gly_subtype = any(prop.header == 'glycosylation_subtype' for prop in position.properties.values())
-                if not has_gly_subtype:
-                    gly_sub = position_properties_classes['glycosylation_subtype'](
-                        position=position,
-                        sources=[self],
-                        subtype=""     
-                    )
-                    position.add_property(gly_sub)
+                    if ptm == "O-GalNAc":
+                        subtype_obj = GlycosylationSubtype (sources=[self], position=sequence.positions[site_seq_idx], subtype="O-GalNAc"
+                                                            )
+                        position.add_property(subtype_obj)
+
+
+                    if ptm == "O-GlcNAc":
+                        subtype_obj = GlycosylationSubtype (sources=[self], position=sequence.positions[site_seq_idx], subtype="O-GlcNAc"
+                                                            )
+                        position.add_property(subtype_obj)
+
+                
 
 class MyVariant(DynamicSource, object):
     @logger_init
