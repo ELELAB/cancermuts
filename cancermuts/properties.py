@@ -184,35 +184,20 @@ class GlycosylationSite(PositionProperty):
         super(GlycosylationSite, self).__init__(  name="Glycosylation Site",
                                                     position=position,
                                                     sources=sources,
-                                                    values={},
+                                                    values={
+                                                        "subtypes": []
+                                                    },
                                                     metadata={}  )
+        
+    def add_subtype(self,subtype):
+        if subtype not in self.values["subtypes"]:
+            self.values["subtypes"].append(subtype)
+            
+
 
     def get_value_str(self):
         return self.code
     
-class GlycosylationSubtype(PositionProperty):
-    description = "Glycosylation Subtype"
-    header = "glycosylation_subtype"
-    category="glycosylation_subtype"
-    #code =    
-
-    subtype = ""
-
-    def __init__(self, position, sources, subtype):
-        super(GlycosylationSubtype, self).__init__(  name="GlycosylationSubtype",
-                                                    position=position,
-                                                    sources=sources,
-                                                    values={"subtype": subtype},
-                                                    metadata={}  )
-
-    def get_value_str(self):
-        return self.values.get("subtype", "")
-        #return self.values.get("subtype")
-        #val = self.values.get("subtype")
-        #if val is None:
-            #return ""
-        #else:
-            #return str(val)
     
 class SumoylationSite(PositionProperty):
     description = "Sumoylation site"
@@ -313,7 +298,6 @@ position_properties_classes = {  'ptm_phosphorylation'            : Phosphorylat
                                  'ptm_acetylation'                : AcetylationSite,
 				                 'ptm_nitrosylation'              : SNitrosylationSite,
                                  'ptm_glycosylation'              : GlycosylationSite,
-                                 'glycosylation_subtype'          : GlycosylationSubtype,
                                  'ptm_sumoylation'                : SumoylationSite,
                                  'ptm_ubiquitination'             : UbiquitinationSite,
                                  'ptm_cleavage'                   : CleavageSite,

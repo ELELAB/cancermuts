@@ -1925,6 +1925,12 @@ class PhosphoSite(DynamicSource, object):
                         self.log.info("site %s already annotated as %s; source will be added" % (m, position_properties_classes[ptm].name))
                         already_annotated = True
 
+                        if ptm == "O-GalNAc":
+                            prop.add_subtype("O-GalNAc")
+
+                        if ptm == "O-GlcNAc":
+                            prop.add_subtype("O-GlcNAc")
+
                 if not already_annotated:
                     property_obj = position_properties_classes[self._ptm_types_to_classes[ptm]](  sources=[self],
                                                         position=sequence.positions[site_seq_idx]
@@ -1933,15 +1939,10 @@ class PhosphoSite(DynamicSource, object):
                     self.log.info("adding %s to site %s" % (m, property_obj.name))
 
                     if ptm == "O-GalNAc":
-                        subtype_obj = GlycosylationSubtype (sources=[self], position=sequence.positions[site_seq_idx], subtype="O-GalNAc"
-                                                            )
-                        position.add_property(subtype_obj)
-
+                            property_obj.add_subtype("O-GalNAc")
 
                     if ptm == "O-GlcNAc":
-                        subtype_obj = GlycosylationSubtype (sources=[self], position=sequence.positions[site_seq_idx], subtype="O-GlcNAc"
-                                                            )
-                        position.add_property(subtype_obj)
+                            property_obj.add_subtype("O-GlcNAc")
 
                 
 
