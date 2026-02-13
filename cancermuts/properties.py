@@ -174,32 +174,27 @@ class SNitrosylationSite(PositionProperty):
 
     def get_value_str(self):
         return self.code
-    
+
 class GlycosylationSite(PositionProperty):
     description = "Glycosylation site"
     header = "glycosylation_site"
     category='ptm_glycosylation'
-    code = "Gly"   
+    code = "Gly"
 
     def __init__(self, position, sources):
         super(GlycosylationSite, self).__init__(  name="Glycosylation Site",
                                                     position=position,
                                                     sources=sources,
-                                                    values={
-                                                        "subtypes": []
-                                                    },
-                                                    metadata={}  )
-        
-    def add_subtype(self,subtype):
-        if subtype not in self.values["subtypes"]:
-            self.values["subtypes"].append(subtype)
-            
+                                                    values={},
+                                                    metadata={"subtypes": []}  )
 
+    def add_subtype(self,subtype):
+        if subtype not in self.metadata["subtypes"]:
+            self.metadata["subtypes"].append(subtype)
 
     def get_value_str(self):
         return self.code
-    
-    
+
 class SumoylationSite(PositionProperty):
     description = "Sumoylation site"
     header = "sumoyylation_site"
@@ -245,7 +240,6 @@ class CleavageSite(PositionProperty):
 
     def get_value_str(self):
         return self.code
-
 
 class DisorderPropensity(PositionProperty):
     description = "Structural disorder"
