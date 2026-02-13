@@ -1936,7 +1936,7 @@ class PhosphoSite(DynamicSource, object):
                     self.log.info("adding %s to site %s" % (m, property_obj.name))
 
                 if ptm == "O-GalNAc" or ptm == "O-GlcNAc":
-                        property_obj.add_subtype(ptm)
+                    property_obj.add_subtype(ptm)
 
 class MyVariant(DynamicSource, object):
     @logger_init
