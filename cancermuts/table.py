@@ -178,8 +178,8 @@ class Table:
 
 
 
-    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency', 
-                                                        'gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency', 'clinvar_variant_id', 'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status', 
+    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency',
+                                                        'gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency', 'clinvar_variant_id', 'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status',
                                                         'clinvar_oncogenicity_classification', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_classification', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status'],
                         position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage','ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation','ptm_glycosylation', 'mobidb_disorder_propensity'],
                         sequence_properties=['linear_motif', 'structure']):
@@ -213,7 +213,7 @@ class Table:
                     val = None
 
                 base_row.append(val)
-                
+
                 if r == "ptm_glycosylation":
                     str_subtypes = None
                     if r in p.properties:
@@ -222,13 +222,11 @@ class Table:
                             str_subtypes = ", ".join(subtypes)
                     base_row.append(str_subtypes)
 
-            
             ptm_sources_list = []
-            for ptm_key in self.ptms.keys():   
+            for ptm_key in self.ptms.keys():
                 if ptm_key in p.properties:
                     ptm_sources_list.extend([s.name for s in p.properties[ptm_key].sources])
-    
-    
+
             ptm_sources_str = ",".join(sorted(set(ptm_sources_list))) if ptm_sources_list else None
             base_row.append(ptm_sources_str)
             base_row.extend([None]*len(sequence_properties_col))
