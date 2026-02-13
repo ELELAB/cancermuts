@@ -1924,13 +1924,9 @@ class PhosphoSite(DynamicSource, object):
                     if isinstance(prop, position_properties_classes[self._ptm_types_to_classes[ptm]]):
                         prop.sources.append(self)
                         self.log.info("site %s already annotated as %s; source will be added" % (m, position_properties_classes[ptm].name))
+
                         already_annotated = True
-
-                        if ptm == "O-GalNAc":
-                            prop.add_subtype("O-GalNAc")
-
-                        if ptm == "O-GlcNAc":
-                            prop.add_subtype("O-GlcNAc")
+                        property_obj = prop
 
                 if not already_annotated:
                     property_obj = position_properties_classes[self._ptm_types_to_classes[ptm]](  sources=[self],
@@ -1939,13 +1935,8 @@ class PhosphoSite(DynamicSource, object):
                     position.add_property(property_obj)
                     self.log.info("adding %s to site %s" % (m, property_obj.name))
 
-                    if ptm == "O-GalNAc":
-                            property_obj.add_subtype("O-GalNAc")
-
-                    if ptm == "O-GlcNAc":
-                            property_obj.add_subtype("O-GlcNAc")
-
-                
+                if ptm == "O-GalNAc" or ptm == "O-GlcNAc":
+                        property_obj.add_subtype(ptm)
 
 class MyVariant(DynamicSource, object):
     @logger_init
