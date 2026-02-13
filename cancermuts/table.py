@@ -127,13 +127,12 @@ class Table:
                 {   'ptm_acetylation'     : 'grey',
                     'ptm_methylation'     : 'darkgreen',
                     'ptm_glycosylation'   : 'orange',
-                    'ptm_gly_subtype'     : 'darkorange',
                     'ptm_phosphorylation' : 'red',
                     'ptm_ubiquitination'  : 'blue',
                     'ptm_sumoylation'     : 'lightblue',
                     'ptm_nitrosylation'   : 'cyan',
                     'ptm_cleavage'        : 'magenta'
-                        })
+                })
 
     y_ptm = 1.02
 
@@ -216,15 +215,12 @@ class Table:
                 base_row.append(val)
                 
                 if r == "ptm_glycosylation":
+                    str_subtypes = None
                     if r in p.properties:
-                        subtypes = p.properties["ptm_glycosylation"].values["subtypes"]
+                        subtypes = p.properties["ptm_glycosylation"].metadata["subtypes"]
                         if len(subtypes) > 0:
                             str_subtypes = ", ".join(subtypes)
-                            base_row.append(str_subtypes)
-                        else:
-                            base_row.append(None)
-                    else:
-                            base_row.append(None)
+                    base_row.append(str_subtypes)
 
             
             ptm_sources_list = []
