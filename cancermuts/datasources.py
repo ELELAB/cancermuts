@@ -2,6 +2,7 @@
 # (c) 2018 Matteo Tiberti <matteo.tiberti@gmail.com>
 # (c) 2023 Katrine Meldgård <katrine@meldgaard.dk>
 # (c) 2025 Pablo Sanchez-Izquierdo
+# (c) 2026 Beatrice Drago
 # This file is part of cancermuts
 # The function '_get_popmax_af' is taken and modified from the 'gnomad2csv' script
 # which is part of the ELELAB/CSB-scripts repository
@@ -208,10 +209,10 @@ class UniProt(DynamicSource, object):
         else:
             aliases = {'uniprot'     : this_upid,
                        'uniprot_acc' : this_upac }
-        
+
         transcript_lookup_id = isoform if isoform is not None else this_upac
         ensembl_transcript = self._get_transcript_id(transcript_lookup_id)
-        
+
         if ensembl_transcript:
             aliases['ensembl_transcript_id'] = ensembl_transcript
 
@@ -259,7 +260,7 @@ class UniProt(DynamicSource, object):
             self.log.warning(f"Multiple FASTA sequences for {upid} found; the first one will be used")
 
         return str(sequences[0].seq)
-    
+
     def _get_transcript_id(self, transcript_lookup_id):
         url = f"https://rest.uniprot.org/uniprotkb/{transcript_lookup_id}.json"
         self.log.debug(f"Querying UniProt for {transcript_lookup_id} at {url}")
@@ -280,7 +281,7 @@ class UniProt(DynamicSource, object):
                     transcript_id = transcript_id.split('.')[0]
                     self.log.info(f"Resolved Ensembl transcript ID for {transcript_lookup_id}: {transcript_id}")
                     return transcript_id
-                
+
         self.log.warning(f"No Ensembl transcript ID found for {transcript_lookup_id}")
         return None
 
@@ -630,18 +631,18 @@ class ClinVar(DynamicSource, object):
         the corresponding value of the key and populate the output list.
 
         The function takes as input a dictionary containing the ClinVar ID as keys and a list
-        with the variant information from ClinVar as value organized in dictionaries: mutation, 
-        gene, classification, condition, review status, and methods. The function counts how 
-        many classifications (keys) are reported in the classification, condition, and review 
-        status dictionaries and after checking that the keys per position are correct create as 
-        many lists as the number of classifications (keys) in which each list contains the corresponding 
+        with the variant information from ClinVar as value organized in dictionaries: mutation,
+        gene, classification, condition, review status, and methods. The function counts how
+        many classifications (keys) are reported in the classification, condition, and review
+        status dictionaries and after checking that the keys per position are correct create as
+        many lists as the number of classifications (keys) in which each list contains the corresponding
         element of the key. All the generated lists are grouped in the output_list.
 
         Parameters
         ----------
         variants_annotation: dict
-            Input dictionary containing the ClinVar ID as key and a list with the following elements 
-            organized in dictionaries as value: mutation, gene, classification, condition, 
+            Input dictionary containing the ClinVar ID as key and a list with the following elements
+            organized in dictionaries as value: mutation, gene, classification, condition,
             review status, methods.
 
         Returns
@@ -683,11 +684,11 @@ class ClinVar(DynamicSource, object):
         return output_list
 
     def _URL_response_check(self, URL, error_message):
-        ''' 
+        '''
         Check the response from the queried URL
 
-        The function tries to access to the given URL. if it succeeds, 
-        it will return the response, 
+        The function tries to access to the given URL. if it succeeds,
+        it will return the response,
         otherwise it'll try again for 200 times before giving error.
 
         Parameters
@@ -697,7 +698,7 @@ class ClinVar(DynamicSource, object):
 
         Returns
         -------
-        response 
+        response
             output from the function rq.get()
         '''
         max_retries = 200
@@ -724,7 +725,7 @@ class ClinVar(DynamicSource, object):
                 self.log.warning("No response received. Retrying...")
                 attempts += 1
                 time.sleep(delay)
-            
+
         raise RuntimeError("ERROR: request failed after 200 attempts; exiting...")
 
     def _VCV_summary_retriever(self, clinvar_id):
@@ -732,13 +733,13 @@ class ClinVar(DynamicSource, object):
         Retrieve the XML summary file associated with a specific ClinVar ID.
 
         The function takes a clinvar_id as input, retrieves the corresponding VCV
-        code in order to retrieve the summary XML file associated with that 
+        code in order to retrieve the summary XML file associated with that
         clinvar_id, returning it as output.
 
         Parameters
         ----------
         clinvar_id: str
-            ClinVar ID code to access the VCV code from which to retrieve the 
+            ClinVar ID code to access the VCV code from which to retrieve the
             summary XML associated with a specific ClinVar ID.
 
         Returns
@@ -767,8 +768,8 @@ class ClinVar(DynamicSource, object):
         associated with a specific query on the ClinVar database.
 
         The function takes as input a URL filter with which to perform the specific query,
-        the gene name in the Hugo name format, and one of the RefSeq codes associated 
-        with that gene. It extracts all the ClinVar IDs whose mutations are classified 
+        the gene name in the Hugo name format, and one of the RefSeq codes associated
+        with that gene. It extracts all the ClinVar IDs whose mutations are classified
         according to the filter provided as input and returns a dictionary with the classifications
         as keys and a list of variant IDs belonging to missense mutations as values.
 
@@ -783,11 +784,11 @@ class ClinVar(DynamicSource, object):
 
         Returns
         -------
-        classified_missense_ids: dict 
+        classified_missense_ids: dict
             Dictionary in which the keys are the classifications from ClinVar database and
             the values are lists of variant IDs belonging to missense mutations.
         '''
-        
+
         URL="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=clinvar&term="+URL_filter
         if gene:
             error_message=f"XML file with the total number of {mutation_type} mutations for {gene} gene in the ClinVar database"
@@ -825,7 +826,7 @@ class ClinVar(DynamicSource, object):
 
 
             return clinvar_ids,""
-                        
+
         # if no variants are annotated in Clinvar Database the script return a WARNING message:
         else:
             if gene and "missense" in URL_filter and "clinvar_id" not in mutation_type:
@@ -838,11 +839,11 @@ class ClinVar(DynamicSource, object):
 
     def _coding_region_variants_extractor(self, clinvar_VCV_xml, clinvar_code):
         '''
-        Retrieve the HGVS annotations for a given VCV XML file associated with a 
+        Retrieve the HGVS annotations for a given VCV XML file associated with a
         ClinVar variant ID.
 
-        The function takes as input a VCV XML file from a ClinVar variant ID and 
-        returns the list of HGVS annotations belonging to coding and protein 
+        The function takes as input a VCV XML file from a ClinVar variant ID and
+        returns the list of HGVS annotations belonging to coding and protein
         expression types.
 
         Parameters
@@ -854,8 +855,8 @@ class ClinVar(DynamicSource, object):
 
         Returns
         -------
-        hgvss: list 
-            List of HGVS annotations belonging to coding and protein expression 
+        hgvss: list
+            List of HGVS annotations belonging to coding and protein expression
             types.
         '''
 
@@ -867,7 +868,7 @@ class ClinVar(DynamicSource, object):
         except KeyError:
             self.log.error("Error with 'SimpleAllele' key: the clinvar_id "+clinvar_code+ " could have a different annotation structure. It will be annotated in variants_to_check.csv")
             simple_allele_accession={}
-            
+
         if "HGVSlist" in simple_allele_accession.keys():
             try:
                 HGVS_accession = clinvar_VCV_xml['ClinVarResult-Set']\
@@ -883,8 +884,8 @@ class ClinVar(DynamicSource, object):
             try:
                 hgvss_coding = [ x for x in HGVS_accession if x['@Type'] == 'coding' and "ProteinExpression" in x.keys()]
                 hgvss_genomic = [ x for x in HGVS_accession if "@Assembly" in x.keys()]
-                    
-                # there are cases in which the field "InterpretedRecord" is "Included Record", so epeat the previous step with the 
+
+                # there are cases in which the field "InterpretedRecord" is "Included Record", so epeat the previous step with the
                 # new key
 
             except KeyError:
@@ -903,12 +904,12 @@ class ClinVar(DynamicSource, object):
 
     def _missense_variants_extractor(self, hgvss, gene, clinvar_id, isoform_to_check):
         '''
-        Given an HGVS list from a VCV XML file associated with a ClinVar variant ID, 
+        Given an HGVS list from a VCV XML file associated with a ClinVar variant ID,
         returns the coding mutations in HGVS format.
 
-        The function takes as input an HGVS list obtained from a VCV XML file, the 
-        corresponding gene, the ClinVar variant ID associated with the VCV XML file, 
-        and an isoform associated with the input gene. It extracts the coding mutations 
+        The function takes as input an HGVS list obtained from a VCV XML file, the
+        corresponding gene, the ClinVar variant ID associated with the VCV XML file,
+        and an isoform associated with the input gene. It extracts the coding mutations
         associated with the given gene in the HGVS format.
 
         Parameters
@@ -918,7 +919,7 @@ class ClinVar(DynamicSource, object):
         gene: str
             Gene to which the mutations belong.
         clinvar_id: str
-            ClinVar variant ID associated with the VCV XML file from which the HGVS 
+            ClinVar variant ID associated with the VCV XML file from which the HGVS
             has been extracted.
         isoform_to_check: str
             RefSeq associated with the gene.
@@ -932,9 +933,9 @@ class ClinVar(DynamicSource, object):
         for mut_info in hgvss:
             #look for isoform identifier in the hgvss list of dictionaries
             if "@sequenceAccession" in mut_info["ProteinExpression"]:
-                
+
                 identifier = mut_info["ProteinExpression"]["@sequenceAccession"]
-                variant = mut_info["ProteinExpression"]["@change"]            
+                variant = mut_info["ProteinExpression"]["@change"]
                 # use the information associated to the right isoform to build the correct entry
                 if identifier == isoform_to_check:
                     index = mut_info['NucleotideExpression']['Expression'].rfind(":")
@@ -950,7 +951,7 @@ class ClinVar(DynamicSource, object):
 
     def _genomic_annotation_extractor(self, hgvss):
         '''
-        Given an HGVS list from a VCV XML file associated with a ClinVar variant ID, 
+        Given an HGVS list from a VCV XML file associated with a ClinVar variant ID,
         returns the genomic coordinate in GRCh38 and GRCh37 assemblies of the mutation.
 
         Parameters
@@ -972,7 +973,7 @@ class ClinVar(DynamicSource, object):
         '''
         Retrieve all the variant IDs from an XML file associated with a specific query on ClinVar.
 
-        The function takes as input a VCV XML file from a ClinVar variant ID and 
+        The function takes as input a VCV XML file from a ClinVar variant ID and
         returns the list of ClinVar IDs contained in the XML file and associated
         with a specific query on the ClinVar database.
 
@@ -983,10 +984,10 @@ class ClinVar(DynamicSource, object):
 
         Returns
         -------
-        ids: list 
+        ids: list
             List with the ClinVar IDs of interest.
         '''
-        
+
         try:
             ids = clinvar_VCV_xml["eSearchResult"]\
                                  ["IdList"]\
@@ -1005,18 +1006,18 @@ class ClinVar(DynamicSource, object):
         reported in the XML file associated with a specific ClinVar ID
         from the ClinVar database.
 
-        The function takes as input a VCV XML file from a ClinVar variant ID and 
-        returns the list of methods used for the classification of the variant 
+        The function takes as input a VCV XML file from a ClinVar variant ID and
+        returns the list of methods used for the classification of the variant
         associated with that specific variant ID.
 
         Parameters
         ----------
         clinvar_VCV_xml: xml file
-            XML file from a VCV ClinVar entry 
+            XML file from a VCV ClinVar entry
 
         Returns
         -------
-        methods: list 
+        methods: list
             List of methods associated with a specific variant ID
         '''
         method = clinvar_VCV_xml['ClinVarResult-Set']\
@@ -1037,21 +1038,21 @@ class ClinVar(DynamicSource, object):
             return ["not provided"],clinvar_VCV_xml
 
     def _conditions_extractor(self, clinvar_VCV_xml, clinvar_id):
-        ''' 
+        '''
         Retrieve all the condition reported in the xml file associated to a
-        specific clinvar id from ClinVar database 
+        specific clinvar id from ClinVar database
 
-        The function takes as input a VCV xml file from a ClinVar variant id and 
+        The function takes as input a VCV xml file from a ClinVar variant id and
         return the dictionary of conditions associated to that specific variant id
 
         Parameters
         ----------
         clinvar_VCV_xml: xml file
-                xml file from a VCV ClinVar entry 
+                xml file from a VCV ClinVar entry
 
         Returns
         -------
-        conditions: dictionary 
+        conditions: dictionary
            dictionary of conditions associated to a specific variant id
         '''
         classification_types = ['GermlineClassification', 'SomaticClinicalImpact', 'OncogenicityClassification']
@@ -1059,7 +1060,7 @@ class ClinVar(DynamicSource, object):
 
         for classification_type in classification_types:
             condition_value =[]
-            try:               
+            try:
                 condition = clinvar_VCV_xml['ClinVarResult-Set']\
                                            ['VariationArchive']\
                                            ['ClassifiedRecord']\
@@ -1092,7 +1093,7 @@ class ClinVar(DynamicSource, object):
 
     def _classifications_extractor(self, clinvar_VCV_xml, clinvar_id):
         '''
-        Retrieve all the ClinVar classifications reported in the XML file 
+        Retrieve all the ClinVar classifications reported in the XML file
         associated with a specific ClinVar ID from the ClinVar database.
 
         The function takes as input a VCV XML file from a ClinVar variant ID and
@@ -1105,14 +1106,14 @@ class ClinVar(DynamicSource, object):
 
         Returns
         -------
-        classifications: dictionary 
+        classifications: dictionary
            dictionary of classifications associated with a specific ClinVar variant ID.
-        ''' 
+        '''
         classification_types = ['GermlineClassification', 'SomaticClinicalImpact', 'OncogenicityClassification']
         classifications = {}
 
         for classification_type in classification_types:
-            try:               
+            try:
                 classification = clinvar_VCV_xml['ClinVarResult-Set']\
                                                 ['VariationArchive']\
                                                 ['ClassifiedRecord']\
@@ -1136,7 +1137,7 @@ class ClinVar(DynamicSource, object):
         Parameters
         ----------
         clinvar_VCV_xml: xml file
-                xml file from a VCV ClinVar entry 
+                xml file from a VCV ClinVar entry
 
         Returns
         -------
@@ -1144,7 +1145,7 @@ class ClinVar(DynamicSource, object):
            dictionary containing the review_status associated to a specific ClinVar variant id
         '''
         review_status = {}
-        
+
         clinical_assertions = clinvar_VCV_xml['ClinVarResult-Set']\
                                              ['VariationArchive']\
                                              ['ClassifiedRecord']\
@@ -1277,7 +1278,7 @@ class ClinVar(DynamicSource, object):
                 strange_variant_annotation[clinvar_id] = clinvar_id_features
                 key_to_remove.append(clinvar_id)
                 continue
-            
+
             correct_variant = self._missense_variants_extractor(hgvss_coding, gene, clinvar_id, isoform_to_check)
 
             if correct_variant is None:
@@ -1330,7 +1331,7 @@ class ClinVar(DynamicSource, object):
 
         for i in key_to_remove:
             missense_variants.pop(i)
-        
+
         # Consistency check block:
         inconsistent_annotations = {}
         misannotated = {}
@@ -1396,8 +1397,8 @@ class ClinVar(DynamicSource, object):
             except:
                 self.log.warning(f"mutation {one_letter_mut} is outside the protein sequence; it will be skipped")
                 continue
-            
-            position = sequence.positions[site_idx] 
+
+            position = sequence.positions[site_idx]
             if position.wt_residue_type != ref_aa:
                 self.log.warning(
                     f"Error with ClinVar ID {clinvar_id}: Ref AA mismatch at position {pos} "
@@ -1422,7 +1423,7 @@ class ClinVar(DynamicSource, object):
                         out_metadata[cond_key].append(cond_dict[xml_key])
                     else:
                         out_metadata[cond_key].append(None)
-      
+
                 if class_key in metadata:
                     class_dict = data["classifications"]
                     if xml_key in class_dict and class_dict[xml_key]:
@@ -1471,7 +1472,7 @@ class ClinVar(DynamicSource, object):
             data_strange = {}
             for clinvar_id, information in strange_variant_annotation.items():
                 data_strange[clinvar_id] = [information["variant"], information["gene"]]
-            df_strange = pd.DataFrame.from_dict(data_strange, 
+            df_strange = pd.DataFrame.from_dict(data_strange,
                                                 orient="index",
                                                 columns=['variant_name', 'gene_name'])
             df_strange.index.name = 'clinvar_id'
@@ -1524,7 +1525,7 @@ class ClinVar(DynamicSource, object):
                         mutation.metadata[md] = value
                     else:
                         mutation.metadata[md] = [metadata_classes[md](self, value)]
-            
+
             self.log.debug("adding mutation %s" % str(mutation))
             mutation.sequence_position.add_mutation(mutation)
 
@@ -1785,9 +1786,9 @@ class COSMIC(DynamicSource, object):
         if not transcript_accession:
             self.log.error("Missing required sequence.aliases['ensembl_transcript_id'] for COSMIC filtering")
             raise ValueError("ensembl_transcript_id is required in sequence.aliases for COSMIC filtering")
-        self.log.info(f"Using Ensembl transcript for COSMIC filter: {transcript_accession}")           
+        self.log.info(f"Using Ensembl transcript for COSMIC filter: {transcript_accession}")
 
-        raw_mutations, out_metadata = self._parse_db_files(gene_id, transcript_accession, genome_assembly_version = genome_assembly_version, 
+        raw_mutations, out_metadata = self._parse_db_files(gene_id, transcript_accession, genome_assembly_version = genome_assembly_version,
                                                             cancer_types=cancer_types,
                                                             cancer_histology_subtype_1=cancer_histology_subtype_1,
                                                             cancer_histology_subtype_2=cancer_histology_subtype_2,
@@ -1846,8 +1847,8 @@ class PhosphoSite(DynamicSource, object):
         self._ptm_types = ['acetylation', 'methylation', 'O-GalNAc', 'O-GlcNAc', 'phosphorylation', 'sumoylation', 'ubiquitination']
         self._ptm_types_to_classes = {  'acetylation'     : 'ptm_acetylation',
                                         'methylation'     : 'ptm_methylation',
-                                        'O-GalNAc'        : 'ptm_ogalnac',
-                                        'O-GlcNAc'        : 'ptm_oglcnac',
+                                        'O-GalNAc'        : 'ptm_glycosylation',
+                                        'O-GlcNAc'        : 'ptm_glycosylation',
                                         'phosphorylation' : 'ptm_phosphorylation',
                                         'sumoylation'     : 'ptm_sumoylation',
                                         'ubiquitination'  : 'ptm_ubiquitination' }
@@ -1923,7 +1924,9 @@ class PhosphoSite(DynamicSource, object):
                     if isinstance(prop, position_properties_classes[self._ptm_types_to_classes[ptm]]):
                         prop.sources.append(self)
                         self.log.info("site %s already annotated as %s; source will be added" % (m, position_properties_classes[ptm].name))
+
                         already_annotated = True
+                        property_obj = prop
 
                 if not already_annotated:
                     property_obj = position_properties_classes[self._ptm_types_to_classes[ptm]](  sources=[self],
@@ -1931,6 +1934,9 @@ class PhosphoSite(DynamicSource, object):
                                                         )
                     position.add_property(property_obj)
                     self.log.info("adding %s to site %s" % (m, property_obj.name))
+
+                if ptm == "O-GalNAc" or ptm == "O-GlcNAc":
+                    property_obj.add_subtype(ptm)
 
 class MyVariant(DynamicSource, object):
     @logger_init
@@ -1947,10 +1953,10 @@ class MyVariant(DynamicSource, object):
 
 
     def add_metadata(self, sequence, md_type=['revel_score']):
-        
+
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("MyVariant REVEL annotation only supports canonical isoforms. Please use a Sequence object for the canonical isoform.")
-    
+
         if type(md_type) is str:
             md_types = [md_type]
         else:
@@ -2203,7 +2209,7 @@ class RevelDatabase(StaticSource, object):
 
             cols = ["chr","hg19_pos","grch38_pos","ref","alt",
                 "aaref","aaalt","REVEL","Ensembl_transcriptid"]
-            
+
             missing = [c for c in cols if c not in header]
             if missing:
                 raise ValueError(f"[REVEL] Missing columns in file: {missing}")
@@ -2240,7 +2246,7 @@ class RevelDatabase(StaticSource, object):
         if not transcript_id:
                raise ValueError(f"[REVEL] No Ensembl transcript ID available for sequence {sequence}. "
         "REVEL annotation cannot proceed.")
-        
+
         mutations = []
         for pos in sequence.positions:
             for mut in pos.mutations:
@@ -2251,9 +2257,9 @@ class RevelDatabase(StaticSource, object):
                 mutations.append((mut, gms, transcript_id))
 
         self._get_revel(mutations)
-    
+
     def _get_revel(self, mutation_entries):
-        
+
         needed_chroms = set()
         for _, gms, _ in mutation_entries:
             for gm in gms:
@@ -2277,7 +2283,7 @@ class RevelDatabase(StaticSource, object):
 
         for mutation, gms, transcript_id in mutation_entries:
             mutation.metadata['revel_score'] = []
-            mutation_cache = {}      
+            mutation_cache = {}
             for gm in gms:
                 if not all(hasattr(gm, attr) for attr in ['genome_build', 'chr', 'get_coord', 'ref', 'alt']):
                     self.log.warning(f"[REVEL] Skipping genomic mutation without complete coordinate information: {gm}")
@@ -2287,16 +2293,16 @@ class RevelDatabase(StaticSource, object):
                     "grch38_pos" if gm.genome_build == "hg38"
                     else "hg19_pos" if gm.genome_build == "hg19"
                     else None)
-                
+
                 if coord_col is None:
                     self.log.warning(f"[REVEL] Unsupported genome version '{gm.genome_build}' for {mutation}")
                     continue
-                                
+
                 if gm in mutation_cache:
                     for s in mutation_cache[gm]:
                         mutation.metadata['revel_score'].append(Revel(source=self, score=s))
                     continue
-                
+
                 df_filtered = df[df[coord_col].astype(str) == str(gm.get_coord())]
                 df_filtered = df_filtered[df_filtered["chr"].astype(str) == str(gm.chr)]
                 df_filtered = df_filtered[df_filtered["alt"] == gm.alt]
@@ -2335,7 +2341,7 @@ class RevelDatabase(StaticSource, object):
                         f"for {mutation} at chr={gm.chr}, pos={gm.get_coord()}")
                     mutation_cache[gm] = ()
                     continue
-                    
+
                 if df_final["REVEL"].nunique(dropna=True) > 1:
                     self.log.warning(
                         f"[REVEL] Multiple REVEL scores found for {mutation} at chr={gm.chr}, "
@@ -2348,7 +2354,7 @@ class RevelDatabase(StaticSource, object):
                         self.log.warning(f"[REVEL] Invalid REVEL score value '{score_str}' for {mutation} "
                         f"at chr={gm.chr}, pos={gm.get_coord()}, transcript={transcript_id}")
                         continue
-                    
+
                     try:
                         score = float(score_str)
                         parsed_scores.append(score)
@@ -2358,11 +2364,11 @@ class RevelDatabase(StaticSource, object):
                             f"aaalt={mutation.mutated_residue_type}, transcript={transcript_id}, score={score}")
                     except ValueError:
                         self.log.warning(f"[REVEL] Could not parse REVEL score '{score_str}' for {mutation}")
-   
+
                 mutation_cache[gm] = tuple(parsed_scores)
                 for s in parsed_scores:
                     mutation.metadata['revel_score'].append(Revel(source=self, score=s))
-        
+
 class ELMDatabase(DynamicSource, object):
     def __init__(self):
         description = "ELM Database"
@@ -3029,7 +3035,7 @@ class MobiDB(DynamicSource):
         self._supported_properties = { 'mobidb_disorder_propensity' : self._get_mobidb_disorder_predictions }
 
     def add_position_properties(self, sequence, prop=['mobidb_disorder_propensity'], use_alias='uniprot_acc'):
-        
+
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("MobiDB position annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
 

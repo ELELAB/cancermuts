@@ -1,5 +1,6 @@
 # table.py - cancermuts table plotting and saving
 # (c) 2019 Matteo Tiberti <matteo.tiberti@gmail.com>
+# (c) 2026 Beatrice Drago
 # This file is part of cancermuts
 #
 # cancermuts is free software: you can redistribute it and/or modify
@@ -125,14 +126,13 @@ class Table:
     ptm_colors = defaultdict(lambda: 'black',
                 {   'ptm_acetylation'     : 'grey',
                     'ptm_methylation'     : 'darkgreen',
-                    'ptm_ogalnac'         : 'orange',
-                    'ptm_oglcnac'          : 'darkorange',
+                    'ptm_glycosylation'   : 'orange',
                     'ptm_phosphorylation' : 'red',
                     'ptm_ubiquitination'  : 'blue',
                     'ptm_sumoylation'     : 'lightblue',
                     'ptm_nitrosylation'   : 'cyan',
                     'ptm_cleavage'        : 'magenta'
-                        })
+                })
 
     y_ptm = 1.02
 
@@ -178,16 +178,20 @@ class Table:
 
 
 
-    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency', 
-                                                        'gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency', 'clinvar_variant_id', 'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status', 
+    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency',
+                                                        'gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency', 'clinvar_variant_id', 'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status',
                                                         'clinvar_oncogenicity_classification', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_classification', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status'],
-                        position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage', 'ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation', 'ptm_ogalnac', 'ptm_oglcnac', 'mobidb_disorder_propensity'],
+                        position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage','ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation','ptm_glycosylation', 'mobidb_disorder_propensity'],
                         sequence_properties=['linear_motif', 'structure']):
 
         rows = []
 
         header =  [ self.headers['position'] ]
-        header += [ self.headers[p] for p in position_properties ]
+        for p in position_properties:
+            header.append(self.headers[p])
+            if p == 'ptm_glycosylation':
+                header.append('glycosylation_subtype')
+
         header += [self.headers['ptm_sources']]
         sequence_properties_cols_start = len(header)
 
@@ -207,12 +211,22 @@ class Table:
                     val = p.properties[r].get_value_str()
                 else:
                     val = None
+
                 base_row.append(val)
+
+                if r == "ptm_glycosylation":
+                    str_subtypes = None
+                    if r in p.properties:
+                        subtypes = p.properties["ptm_glycosylation"].metadata["subtypes"]
+                        if len(subtypes) > 0:
+                            str_subtypes = ", ".join(subtypes)
+                    base_row.append(str_subtypes)
+
             ptm_sources_list = []
-            for ptm_key in self.ptms.keys():   
+            for ptm_key in self.ptms.keys():
                 if ptm_key in p.properties:
                     ptm_sources_list.extend([s.name for s in p.properties[ptm_key].sources])
-            
+
             ptm_sources_str = ",".join(sorted(set(ptm_sources_list))) if ptm_sources_list else None
             base_row.append(ptm_sources_str)
             base_row.extend([None]*len(sequence_properties_col))
