@@ -2,6 +2,7 @@
 # (c) 2018 Matteo Tiberti <matteo.tiberti@gmail.com>
 # (c) 2023 Katrine Meldgård <katrine@meldgaard.dk>
 # (c) 2025 Pablo Sanchez-Izquierdo
+# (c) 2026 Beatrice Drago
 # This file is part of cancermuts
 # The function '_get_popmax_af' is taken and modified from the 'gnomad2csv' script
 # which is part of the ELELAB/CSB-scripts repository
