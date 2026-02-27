@@ -1941,51 +1941,32 @@ class PhosphoSite(DynamicSource, object):
 
 class GlyGen(StaticSource, object):
     @logger_init
-    def __init__(self, database_dir, database_files=None):
-        description = "GlyGen Dataset 000038"
+    def __init__(self, database_dir, database_file="0038_filtered.csv"):
+        description = "GlyGen Dataset"
         super(GlyGen, self).__init__(name='GlyGen', version='2.10.1', description=description)
         
         self.database_dir = database_dir
-        self.database_files = database_files
+        self.database_file = database_file
+
+        file_path = os.path.join(self.database_dir, self.database_file)
+        self.df = pd.read_csv(file_path)
 
     def _parse_db_file(self, protein_id):
-        filepath = os.path.join(self.database_dir, "human_proteoform_glycosylation_sites_uniprotkb.csv")
-        records = []
-        df = pd.read_csv(filepath)
-        protein_id = protein_id.split("-")[0]
-        protein_df = df[df['src_xref_id'] == protein_id]
-        for _, row in protein_df.iterrows():
-            record = {}
-            glycosylation_site = row["glycosylation_site_uniprotkb"]
-            glycosylation_type = row["glycosylation_type"]
-            glycosylation_type = glycosylation_type.rstrip('-linked.')
-            carb_name = row['carb_name']
-            uniprot_ac = row['src_xref_id']
-            record['uniprot_ac'] = uniprot_ac
-            record['position'] = int(glycosylation_site)
-            record['glycosylation_type'] = glycosylation_type
-            record['carb_name'] = carb_name
-            records.append(record)
-
-        return records
+        protein_df = self.df[self.df['src_xref_id'] == protein_id]
+        protein_df["glycosylation_type"] = protein_df["glycosylation_type"].str.rstrip("-linked")
+        return protein_df
     
     def add_position_properties(self, sequence):
+
+        if not sequence.is_canonical:
+            raise UnexpectedIsoformError("GlyGen annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
+
         records = self._parse_db_file(sequence.uniprot_ac)
-        for record in records:
-            pos = record['position']
+        for index, row in records.iterrows():
+            pos = row['glycosylation_site_uniprotkb']
+            idx = sequence.seq2index(pos)
 
-            if pd.isna(pos):
-                continue
-
-            try:
-                idx = sequence.seq2index(pos)
-            except Exception:
-                continue
-
-            glycosylation_type = record['glycosylation_type']
-            carb_name = record['carb_name']
-            carb_name = carb_name.rstrip('.')
-            subtype = glycosylation_type + "-" + carb_name
+            subtype = f"{row['glycosylation_type']}-{row['carb_name'].rstrip('.')}"
             position_obj = sequence.positions[idx]
 
             already_annotated = False
@@ -2016,6 +1997,7 @@ class MyVariant(DynamicSource, object):
 
 
     def add_metadata(self, sequence, md_type=['revel_score']):
+        
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("MyVariant REVEL annotation only supports canonical isoforms. Please use a Sequence object for the canonical isoform.")
 
