@@ -2842,32 +2842,40 @@ class gnomAD(DynamicSource, object):
                 }
             }"""
 
-        self.log.info("retrieving data for gene %s" % gene_id)
-
-        try:
-            response = rq.post(self._gnomad_endpoint,
-                data=json.dumps({
+        payload = json.dumps({
                                 "query": request,
                                 "variables": { "geneSymbol": gene_id,
                                                "refBuild"  : reference_genome,
                                                "dataset"   : dataset }
-                                }),
-                headers={"Content-Type": "application/json"})
-        except:
-            self.log.error("Couldn't perform request for gnomAD")
-            return None
+                            })
+
+        self.log.info("retrieving data for gene %s" % gene_id)
+        self.log.debug(f"gnomAD endpoint: {self._gnomad_endpoint}")
+        self.log.debug(f"gnomAD payload: {payload}")
+
+        try:
+            response = rq.post(self._gnomad_endpoint,
+                               data=payload,
+                               headers={"Content-Type": "application/json"})
+            response.raise_for_status()
+        except rq.exceptions.RequestException as e:
+            raise RuntimeError(f"API request failed: {e}") from e
 
         try:
             response_json = response.json()
         except:
-            self.log.error("downloaded data couldn't be understood")
-            return None
+            self.log.error("downloaded data couldn't be parsed to JSON")
+            raise RuntimeError("downloaded data couldn't be parsed to JSON")
 
         if 'errors' in response_json.keys():
             self.log.error('The following errors were reported when querying gnomAD:')
+
+            error_str = ""
             for e in response_json['errors']:
-                self.log.error('\t%s' % e['message'])
-            return None
+                self.log.error(f"\t{e['message']}")
+                error_str += f"{e['message']}\n"
+
+            raise RuntimeError(f"The following errors were reported when querying gnomAD {error_str}")
 
         variants = pd.json_normalize(response_json['data']['gene']['variants'])
         variants = variants.rename(columns={'exome.ac':'exome_ac',
