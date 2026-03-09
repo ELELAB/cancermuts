@@ -239,8 +239,10 @@ class UniProt(DynamicSource, object):
             aliases = {'uniprot'     : this_upid,
                        'uniprot_acc' : this_upac }
 
-        transcript_lookup_id = isoform if isoform is not None else this_upac
-        ensembl_transcript = self._get_transcript_id(transcript_lookup_id)
+        if isoform is None or is_canonical:
+            transcript_lookup_id = this_upac
+        else:
+            transcript_lookup_id = isoform
 
         if ensembl_transcript:
             aliases['ensembl_transcript_id'] = ensembl_transcript
