@@ -1941,14 +1941,10 @@ class PhosphoSite(DynamicSource, object):
 class dbPTM(DynamicSource, object):
     @logger_init 
     def __init__(self, database_dir, database_files=None): 
-
         description = "dbPTM Database" 
         super(dbPTM, self).__init__(name='dbPTM', version='2025', description=description) 
-        
-        self._database_dir = database_dir
 
         self._ptm_types = ["acetylation", "c_linked_glycosylation", "methylation", "n_linked_glycosylation", "o_linked_glycosylation", "phosphorylation", "s_linked_glycosylation", "s_nitrosylation", "sumoylation", "ubiquitination"]
-
         self._ptm_types_to_classes = {  'acetylation'               : 'ptm_acetylation',
                                         'methylation'               : 'ptm_methylation',
                                         'c_linked_glycosylation'    : 'ptm_glycosylation',
@@ -1959,8 +1955,6 @@ class dbPTM(DynamicSource, object):
                                         'phosphorylation'           : 'ptm_phosphorylation',
                                         'sumoylation'               : 'ptm_sumoylation',
                                         'ubiquitination'            : 'ptm_ubiquitination' }   
-
-
         self._ptm_types_to_files = {
             'acetylation'            : 'Acetylation',
             'c_linked_glycosylation' : 'C-linked_Glycosylation',
@@ -1974,6 +1968,8 @@ class dbPTM(DynamicSource, object):
             'ubiquitination'         : 'Ubiquitination'
         }
 
+        self._database_dir = database_dir
+
         if database_files is None:
             database_files = self._ptm_types_to_files
 
@@ -1982,21 +1978,19 @@ class dbPTM(DynamicSource, object):
         for ptm_type in self._ptm_types:
             filename = database_files[ptm_type]        
             filepath = os.path.join(self._database_dir, filename)        
-            df = pd.read_csv(filepath, sep=r"\s+", header=None)        
+            df = pd.read_csv(filepath, sep="\t", header=None)        
             df.columns = ["protein", "uniprot", "position", "ptm_type", "pmid", "sequence"]        
             df["position"] = df["position"].astype(int)        
-            df = df[df["protein"].str.endswith("HUMAN", na=False)]       
+            df = df[df["protein"].str.endswith("_HUMAN", na=False)]       
             self._dbptm_data[ptm_type] = df
 
-
-
-    def _parse_db_file(self, uniprot_id):
+    def _parse_db_file(self, uniprot_ac):
 
         sites = dict([(i, []) for i in self._ptm_types])
     
         for ptm in self._ptm_types:    
             df = self._dbptm_data[ptm]    
-            df = df[df["uniprot"] == uniprot_id]
+            df = df[df["uniprot"] == uniprot_ac]
 
             if df.empty:
                 continue    
@@ -2009,18 +2003,20 @@ class dbPTM(DynamicSource, object):
         if not sequence.is_canonical:
             return
 
-        uniprot_id = sequence.uniprot_ac
+        uniprot_ac = sequence.uniprot_ac
         sites = self._parse_db_file(uniprot_ac)
 
         for ptm in self._ptm_types:
             for pos in sites[ptm]:
-                seq_pos = sequence.get_position(pos)
-
-                if seq_pos is None:
+                try:
+                    site_seq_idx = sequence.seq2index(pos)
+                    seq_pos = sequence.positions[site_seq_idx]
+                except:
+                    self.log.warning("dbPTM site %s is outside the protein sequence; it will be skipped" %pos)
                     continue
 
                 prop_name = self._ptm_types_to_classes[ptm]
-                prop = position_properties[prop_name](source=self)
+                prop = position_properties_classes[prop_name](sources=[self], position=seq_pos)
                 seq_pos.add_property(prop)
 
 class MyVariant(DynamicSource, object):
