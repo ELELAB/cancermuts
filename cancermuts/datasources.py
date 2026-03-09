@@ -244,6 +244,9 @@ class UniProt(DynamicSource, object):
         else:
             transcript_lookup_id = isoform
 
+        
+        ensembl_transcript = self._get_transcript_id(transcript_lookup_id)
+
         if ensembl_transcript:
             aliases['ensembl_transcript_id'] = ensembl_transcript
 
