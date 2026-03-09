@@ -1,5 +1,6 @@
 # table.py - cancermuts table plotting and saving
 # (c) 2019 Matteo Tiberti <matteo.tiberti@gmail.com>
+# (c) 2026 Beatrice Drago
 # This file is part of cancermuts
 #
 # cancermuts is free software: you can redistribute it and/or modify
@@ -125,14 +126,13 @@ class Table:
     ptm_colors = defaultdict(lambda: 'black',
                 {   'ptm_acetylation'     : 'grey',
                     'ptm_methylation'     : 'darkgreen',
-                    'ptm_ogalnac'         : 'orange',
-                    'ptm_oglcnac'          : 'darkorange',
+                    'ptm_glycosylation'   : 'orange',
                     'ptm_phosphorylation' : 'red',
                     'ptm_ubiquitination'  : 'blue',
                     'ptm_sumoylation'     : 'lightblue',
                     'ptm_nitrosylation'   : 'cyan',
                     'ptm_cleavage'        : 'magenta'
-                        })
+                })
 
     y_ptm = 1.02
 
@@ -156,6 +156,8 @@ class Table:
                 ptms[k] = v.header
                 ptm_codes[k] = v.code
 
+        headers['ptm_sources'] = 'ptm_sources'
+
         for k,v in iteritems(sequence_properties_classes):
             headers[k] = v.header
 
@@ -176,15 +178,21 @@ class Table:
 
 
 
-    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency','gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency','clinvar_classification',
-    'clinvar_condition', 'clinvar_review_status', 'clinvar_variant_id'],
-                        position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage', 'ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation', 'ptm_ogalnac', 'ptm_oglcnac', 'mobidb_disorder_propensity'],
+    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency',
+                                                        'gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency', 'clinvar_variant_id', 'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status',
+                                                        'clinvar_oncogenicity_classification', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_classification', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status'],
+                        position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage','ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation','ptm_glycosylation', 'mobidb_disorder_propensity'],
                         sequence_properties=['linear_motif', 'structure']):
 
         rows = []
 
         header =  [ self.headers['position'] ]
-        header += [ self.headers[p] for p in position_properties ]
+        for p in position_properties:
+            header.append(self.headers[p])
+            if p == 'ptm_glycosylation':
+                header.append('glycosylation_subtype')
+
+        header += [self.headers['ptm_sources']]
         sequence_properties_cols_start = len(header)
 
         header += [ self.headers[p] for p in sequence_properties ]
@@ -197,12 +205,30 @@ class Table:
 
         for gi,p in enumerate(sequence.positions):
             base_row = [p.sequence_position]
+            ptm_sources_list = []
             for r in position_properties:
                 if r in p.properties:
                     val = p.properties[r].get_value_str()
                 else:
                     val = None
+
                 base_row.append(val)
+
+                if r == "ptm_glycosylation":
+                    str_subtypes = None
+                    if r in p.properties:
+                        subtypes = p.properties["ptm_glycosylation"].metadata["subtypes"]
+                        if len(subtypes) > 0:
+                            str_subtypes = ", ".join(subtypes)
+                    base_row.append(str_subtypes)
+
+            ptm_sources_list = []
+            for ptm_key in self.ptms.keys():
+                if ptm_key in p.properties:
+                    ptm_sources_list.extend([s.name for s in p.properties[ptm_key].sources])
+
+            ptm_sources_str = ",".join(sorted(set(ptm_sources_list))) if ptm_sources_list else None
+            base_row.append(ptm_sources_str)
             base_row.extend([None]*len(sequence_properties_col))
             base_row.append(p.wt_residue_type)
 
@@ -221,7 +247,7 @@ class Table:
             for m in mut_strings_order:
                 this_row = list(base_row)
                 this_row.append(p.mutations[m].mutated_residue_type)
-                this_row.append(",".join( [s.name for s in p.mutations[m].sources] ))
+                this_row.append(",".join([s.name for s in p.mutations[m].sources]))
                 for md in mutation_metadata:
                     md_values = []
                     try:
@@ -235,10 +261,13 @@ class Table:
                             md_values.append(this_value)
                             self.log.info(f"appending {single_md.get_value_str()}")
                         self.log.info(f"values to be joined {md}: {sorted(list(set(md_values)))}")
-                        if md not in ["clinvar_variant_id", "clinvar_classification", "clinvar_condition", "clinvar_review_status"]:
-                            md_str = ", ".join(sorted(set(map(str, md_values))))
+                        if "clinvar" in str(md):
+                            if "condition" in str(md):
+                                md_str = "|".join(map(str, md_values))
+                            else:
+                                md_str = ", ".join(map(str, md_values))
                         else:
-                            md_str = ", ".join(map(str, md_values))
+                            md_str = ", ".join(sorted(set(map(str, md_values))))
                     except KeyError:
                         md_str = None
                     this_row.append(md_str)

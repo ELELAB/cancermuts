@@ -52,20 +52,6 @@ else:
     print("No COSMIC mutations found for transcript:",
           seq.aliases.get('transcript_accession') or seq.aliases.get('ensembl_transcript_id') or "canonical")
 
-
-#print(seq.positions[819].mutations[0])
-#print(seq.positions[819].mutations[0].sources)
-#print(seq.positions[819].mutations[0].metadata)
-
-# annotate with REVEL using local database
-rl = RevelDatabase("/data/databases/REVEL/revel_with_transcript_ids")
-rl.add_metadata(seq)
-
-# print annotated mutation and REVEL score
-mut = seq.positions[819].mutations[0]
-print("Mutation:", mut)
-print("REVEL score:", mut.metadata.get('revel_score', []))
-
 # cBioPortal does not support non-canonical mutations
 cbioportal = cBioPortal()
 
@@ -77,13 +63,10 @@ except UnexpectedIsoformError:
 # Use ClinVar to retrieve non-canonical alternative isoform annotations
 clinvar = ClinVar()
 clinvar.add_mutations(seq, metadata=[
-    'clinvar_classification',
-    'clinvar_condition',
-    'clinvar_review_status',
-    'clinvar_variant_id',
-    'genomic_mutations',
-    'genomic_coordinates'
-])
+        'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status', 'genomic_mutations',
+        'clinvar_variant_id', 'genomic_coordinates', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_classification',
+        'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status', 
+        'clinvar_clinical_impact_classification'])
 
 is_cv = lambda m: m.metadata.get("clinvar_variant_id") is not None
 
@@ -107,6 +90,15 @@ if positions_with_cv:
         print("Last ClinVar mutation:", last_mut, "at position", last_pos.sequence_position)
 else:
     print("No ClinVar mutations found for refseq:", seq.aliases['refseq'])
+
+# annotate with REVEL using local database
+rl = RevelDatabase("/data/databases/REVEL/revel_with_transcript_ids")
+rl.add_metadata(seq)
+
+# print annotated mutation and REVEL score
+mut = seq.positions[819].mutations[0]
+print("Mutation:", mut)
+print("REVEL score:", mut.metadata.get('revel_score', []))
 
 # PhosphoSite does not support non-canonical isoforms
 ps = PhosphoSite('/data/databases/phosphosite/')

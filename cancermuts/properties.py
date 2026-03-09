@@ -1,6 +1,7 @@
     # metadata.py - properties handling for the cancermuts package
 # (c) 2018 Matteo Tiberti <matteo.tiberti@gmail.com>
 # (c) 2023 Katrine Meldgård <katrine@meldgaard.dk>
+# (c) 2026 Beatrice Drago
 # This file is part of cancermuts
 #
 # cancermuts is free software: you can redistribute it and/or modify
@@ -174,35 +175,22 @@ class SNitrosylationSite(PositionProperty):
     def get_value_str(self):
         return self.code
 
-class OGalNAcSite(PositionProperty):
-    description = "OGalNAc site"
-    header = "ogalnac_site"
-    category='ptm_ogalnac'
-    code = "O-GalNAc"
+class GlycosylationSite(PositionProperty):
+    description = "Glycosylation site"
+    header = "glycosylation_site"
+    category='ptm_glycosylation'
+    code = "Gly"
 
     def __init__(self, position, sources):
-        super(OGalNAcSite, self).__init__(  name="o-GalNAc Site",
+        super(GlycosylationSite, self).__init__(  name="Glycosylation Site",
                                                     position=position,
                                                     sources=sources,
                                                     values={},
-                                                    metadata={}  )
+                                                    metadata={"subtypes": []}  )
 
-    def get_value_str(self):
-        return self.code
-
-class OGlcNAcSite(PositionProperty):
-    description = "OGlcNAc site"
-    header = "oglcnac_site"
-    category='ptm_oglcnac'
-    code = "O-GlcNAc"
-
-
-    def __init__(self, position, sources):
-        super(OGlcNAcSite, self).__init__(  name="o-GlcNAc Site",
-                                                    position=position,
-                                                    sources=sources,
-                                                    values={},
-                                                    metadata={}  )
+    def add_subtype(self,subtype):
+        if subtype not in self.metadata["subtypes"]:
+            self.metadata["subtypes"].append(subtype)
 
     def get_value_str(self):
         return self.code
@@ -212,7 +200,6 @@ class SumoylationSite(PositionProperty):
     header = "sumoyylation_site"
     category='ptm_sumoylation'
     code = "Sumo"
-
 
     def __init__(self, position, sources):
         super(SumoylationSite, self).__init__(  name="Sumoylation Site",
@@ -253,7 +240,6 @@ class CleavageSite(PositionProperty):
 
     def get_value_str(self):
         return self.code
-
 
 class DisorderPropensity(PositionProperty):
     description = "Structural disorder"
@@ -306,8 +292,7 @@ position_properties_classes = {  'ptm_phosphorylation'            : Phosphorylat
                                  'ptm_methylation'                : MethylationSite,
                                  'ptm_acetylation'                : AcetylationSite,
 				                 'ptm_nitrosylation'              : SNitrosylationSite,
-                                 'ptm_ogalnac'                    : OGalNAcSite,
-                                 'ptm_oglcnac'                    : OGlcNAcSite,
+                                 'ptm_glycosylation'              : GlycosylationSite,
                                  'ptm_sumoylation'                : SumoylationSite,
                                  'ptm_ubiquitination'             : UbiquitinationSite,
                                  'ptm_cleavage'                   : CleavageSite,
