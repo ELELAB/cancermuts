@@ -154,22 +154,29 @@ class UniProt(DynamicSource, object):
         else:
             this_upid = upid
 
-        if isoform is not None:
-            self.log.info(f"Isoform requested: {isoform}")
+        canonical_isoform = None
 
-            url = f"https://rest.uniprot.org/uniprotkb/{this_upac}.json"
-            response = rq.get(url)
-            if not response.ok:
+        url = f"https://rest.uniprot.org/uniprotkb/{this_upac}.json"
+        response = rq.get(url)
+        if not response.ok:
+            if isoform is not None:
                 raise ValueError(f"Failed to fetch UniProt JSON entry for {this_upac}")
+            self.log.warning(f"Failed to fetch UniProt JSON entry for {this_upac}; falling back to base accession")
+            data = {}
+        else:
             try:
                 data = response.json()
             except Exception as e:
-                raise ValueError(f"Invalid JSON response from UniProt for {this_upac}: {str(e)}")
+                if isoform is not None:
+                    raise ValueError(f"Invalid JSON response from UniProt for {this_upac}: {str(e)}")
+                self.log.warning(f"Invalid JSON response from UniProt for {this_upac}: {str(e)}")
+                data = {}
 
-            if "comments" not in data:
-                raise ValueError(f"No 'comments' section found in UniProt entry for {this_upac}")
+        alt_prods = [x for x in data.get("comments", []) if x.get("commentType") == "ALTERNATIVE PRODUCTS"]
 
-            alt_prods = [x for x in data["comments"] if x["commentType"] == "ALTERNATIVE PRODUCTS"]
+        if isoform is not None:
+            self.log.info(f"Isoform requested: {isoform}")
+
             if not alt_prods:
                 raise ValueError(f"No alternative products found in UniProt entry for {this_upac}. Cannot resolve isoform '{isoform}'.")
 
@@ -177,9 +184,11 @@ class UniProt(DynamicSource, object):
             isoform_found = False
             try:
                 for prod in alt_prods:
-                    for iso in prod["isoforms"]:
-                        ids = iso["isoformIds"]
-                        status = iso["isoformSequenceStatus"]
+                    for iso in prod.get("isoforms", []):
+                        ids = iso.get("isoformIds", [])
+                        status = iso.get("isoformSequenceStatus")
+                        if status == "Displayed" and ids and canonical_isoform is None:
+                            canonical_isoform = ids[0]
                         if isoform in ids:
                             isoform_found = True
                             is_canonical = (status == "Displayed")
@@ -194,8 +203,28 @@ class UniProt(DynamicSource, object):
 
             fasta_id = isoform
         else:
-            fasta_id = this_upac
             is_canonical = True
+            if alt_prods:
+                try:
+                    for prod in alt_prods:
+                        for iso in prod.get("isoforms", []):
+                            ids = iso.get("isoformIds", [])
+                            status = iso.get("isoformSequenceStatus")
+                            if status == "Displayed" and ids:
+                                canonical_isoform = ids[0]
+                                break
+                        if canonical_isoform is not None:
+                            break
+                except KeyError:
+                    canonical_isoform = None
+
+            if canonical_isoform is not None:
+                isoform = canonical_isoform
+                fasta_id = isoform
+                self.log.info(f"No isoform provided; using canonical isoform {isoform}")
+            else:
+                fasta_id = this_upac
+                self.log.info(f"No canonical isoform found for {this_upac}; using base accession")
 
         this_entrez = self._get_aliases(this_upac, ['GeneID'])
 
@@ -209,9 +238,13 @@ class UniProt(DynamicSource, object):
             aliases = {'uniprot'     : this_upid,
                        'uniprot_acc' : this_upac }
         
-        transcript_lookup_id = isoform if isoform is not None else this_upac
-        ensembl_transcript = self._get_transcript_id(transcript_lookup_id)
+        if isoform is None or is_canonical:
+            transcript_lookup_id = this_upac
+        else:
+            transcript_lookup_id = isoform
         
+        ensembl_transcript = self._get_transcript_id(transcript_lookup_id)
+
         if ensembl_transcript:
             aliases['ensembl_transcript_id'] = ensembl_transcript
 
@@ -319,8 +352,7 @@ class UniProt(DynamicSource, object):
                 out[t] = results['to']
 
         return out
-
-
+    
 class cBioPortal(DynamicSource, object):
 
     default_strand = '+'
