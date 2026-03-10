@@ -155,75 +155,50 @@ class UniProt(DynamicSource, object):
         else:
             this_upid = upid
 
-        canonical_isoform = None
-
         url = f"https://rest.uniprot.org/uniprotkb/{this_upac}.json"
         response = rq.get(url)
         if not response.ok:
-            if isoform is not None:
-                raise ValueError(f"Failed to fetch UniProt JSON entry for {this_upac}")
-            self.log.warning(f"Failed to fetch UniProt JSON entry for {this_upac}; falling back to base accession")
-            data = {}
-        else:
-            try:
-                data = response.json()
-            except Exception as e:
-                if isoform is not None:
-                    raise ValueError(f"Invalid JSON response from UniProt for {this_upac}: {str(e)}")
-                self.log.warning(f"Invalid JSON response from UniProt for {this_upac}: {str(e)}")
-                data = {}
+            raise RuntimeError(f"Failed to fetch UniProt JSON entry for {this_upac}")
+        try:
+            data = response.json()
+        except Exception as e:
+            raise RuntimeError(f"Invalid JSON response from UniProt for {this_upac}: {str(e)}")
 
         alt_prods = [x for x in data.get("comments", []) if x.get("commentType") == "ALTERNATIVE PRODUCTS"]
+
+        isoform_map = {}
+        try:
+            for prod in alt_prods:
+                for iso in prod.get("isoforms", []):
+                    ids = iso.get("isoformIds", [])
+                    status = iso.get("isoformSequenceStatus")
+                    is_displayed = (status == "Displayed")
+
+                    for iso_id in ids:
+                        isoform_map[iso_id] = is_displayed
+        except KeyError as e:
+            raise ValueError(f"Missing expected field '{e.args[0]}' in ALTERNATIVE PRODUCTS for UniProt entry {this_upac}")
+
+        canonical_isoforms = [iso_id for iso_id, is_canonical in isoform_map.items() if is_canonical]
+        canonical_isoform = canonical_isoforms[0] if canonical_isoforms else None
 
         if isoform is not None:
             self.log.info(f"Isoform requested: {isoform}")
 
-            if not alt_prods:
-                raise ValueError(f"No alternative products found in UniProt entry for {this_upac}. Cannot resolve isoform '{isoform}'.")
-
-            is_canonical = False
-            isoform_found = False
-            try:
-                for prod in alt_prods:
-                    for iso in prod.get("isoforms", []):
-                        ids = iso.get("isoformIds", [])
-                        status = iso.get("isoformSequenceStatus")
-                        if status == "Displayed" and ids and canonical_isoform is None:
-                            canonical_isoform = ids[0]
-                        if isoform in ids:
-                            isoform_found = True
-                            is_canonical = (status == "Displayed")
-                            break
-                    if isoform_found:
-                        break
-            except KeyError as e:
-                raise ValueError(f"Missing expected field '{e.args[0]}' in ALTERNATIVE PRODUCTS for UniProt entry {this_upac}")
-
-            if not isoform_found:
+            if isoform not in isoform_map:
                 raise ValueError(f"Isoform {isoform} not listed in UniProt entry {this_upac}")
 
+            is_canonical = isoform_map[isoform]
             fasta_id = isoform
-        else:
-            is_canonical = True
-            if alt_prods:
-                try:
-                    for prod in alt_prods:
-                        for iso in prod.get("isoforms", []):
-                            ids = iso.get("isoformIds", [])
-                            status = iso.get("isoformSequenceStatus")
-                            if status == "Displayed" and ids:
-                                canonical_isoform = ids[0]
-                                break
-                        if canonical_isoform is not None:
-                            break
-                except KeyError:
-                    canonical_isoform = None
 
+        else:
             if canonical_isoform is not None:
                 isoform = canonical_isoform
+                is_canonical = True
                 fasta_id = isoform
                 self.log.info(f"No isoform provided; using canonical isoform {isoform}")
             else:
+                is_canonical = True
                 fasta_id = this_upac
                 self.log.info(f"No canonical isoform found for {this_upac}; using base accession")
 
