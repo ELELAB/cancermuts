@@ -180,13 +180,20 @@ class UniProt(DynamicSource, object):
             raise ValueError(f"Missing expected field '{e.args[0]}' in ALTERNATIVE PRODUCTS for UniProt entry {this_upac}")
 
         canonical_isoforms = [iso_id for iso_id, is_canonical in isoform_map.items() if is_canonical]
+
+        if len(canonical_isoforms) > 1:
+            raise RuntimeError(
+                f"More than one canonical isoform found for UniProt entry {this_upac}: "
+                f"{', '.join(canonical_isoforms)}"
+            )
+
         canonical_isoform = canonical_isoforms[0] if canonical_isoforms else None
 
         if isoform is not None:
             self.log.info(f"Isoform requested: {isoform}")
 
             if isoform not in isoform_map:
-                raise ValueError(f"Isoform {isoform} not listed in UniProt entry {this_upac}")
+                raise RuntimeError(f"Isoform {isoform} not listed in UniProt entry {this_upac}")
 
             is_canonical = isoform_map[isoform]
             fasta_id = isoform
