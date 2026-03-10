@@ -1957,13 +1957,13 @@ class dbPTM(DynamicSource, object):
                                         'ubiquitination'            : 'ptm_ubiquitination' }   
         self._ptm_types_to_files = {
             'acetylation'            : 'Acetylation',
-            'c_linked_glycosylation' : 'C-linked_Glycosylation',
             'methylation'            : 'Methylation',
+            'c_linked_glycosylation' : 'C-linked_Glycosylation',
             'n_linked_glycosylation' : 'N-linked_Glycosylation',
             'o_linked_glycosylation' : 'O-linked_Glycosylation',
-            'phosphorylation'        : 'Phosphorylation',
             's_linked_glycosylation' : 'S-linked_Glycosylation',
             's_nitrosylation'        : 'S-nitrosylation',
+            'phosphorylation'        : 'Phosphorylation',
             'sumoylation'            : 'Sumoylation',
             'ubiquitination'         : 'Ubiquitination'
         }
@@ -1975,49 +1975,48 @@ class dbPTM(DynamicSource, object):
 
         self._dbptm_data = {}
 
-        for ptm_type in self._ptm_types:
-            filename = database_files[ptm_type]        
-            filepath = os.path.join(self._database_dir, filename)        
-            df = pd.read_csv(filepath, sep="\t", header=None)        
-            df.columns = ["protein", "uniprot", "position", "ptm_type", "pmid", "sequence"]        
-            df["position"] = df["position"].astype(int)        
+        for ptm_type in self._ptm_types:        
+            filepath = os.path.join(self._database_dir, database_files[ptm_type])        
+            df = pd.read_csv(filepath, sep="\t", header=None, names=["protein", "uniprot", "position", "ptm_type", "pmid", "sequence"], dtype={"position":int})                       
             df = df[df["protein"].str.endswith("_HUMAN", na=False)]       
             self._dbptm_data[ptm_type] = df
 
-    def _parse_db_file(self, uniprot_ac):
-
-        sites = dict([(i, []) for i in self._ptm_types])
-    
-        for ptm in self._ptm_types:    
-            df = self._dbptm_data[ptm]    
-            df = df[df["uniprot"] == uniprot_ac]
-
-            if df.empty:
-                continue    
-            sites[ptm] = df["position"].tolist()
-    
-        return sites
-    
     def add_position_properties(self, sequence, properties=None):
-
+        
         if not sequence.is_canonical:
-            return
+            raise UnexpectedIsoformError("dbPTM annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
 
-        uniprot_ac = sequence.uniprot_ac
-        sites = self._parse_db_file(uniprot_ac)
+        for ptm in self._ptm_types:   
+            df = self._dbptm_data[ptm]    
+            df = df[df["uniprot"] == sequence.uniprot_ac]
 
-        for ptm in self._ptm_types:
-            for pos in sites[ptm]:
+            for pos in df['position']:
                 try:
                     site_seq_idx = sequence.seq2index(pos)
                     seq_pos = sequence.positions[site_seq_idx]
                 except:
                     self.log.warning("dbPTM site %s is outside the protein sequence; it will be skipped" %pos)
                     continue
-
+        
                 prop_name = self._ptm_types_to_classes[ptm]
-                prop = position_properties_classes[prop_name](sources=[self], position=seq_pos)
-                seq_pos.add_property(prop)
+
+                already_annotated = False
+                for prop in seq_pos.properties:
+                    if prop.get_name() == prop_name:
+                        prop.sources.append(self)
+                        if 'glycosylation' in ptm:
+                            prop.add_subtype(ptm)
+
+                        already_annotated = True
+
+                if not already_annotated:
+                    prop = position_properties_classes[prop_name](sources=[self], position=seq_pos)
+
+                    if 'glycosylation' in ptm:
+                        prop.add_subtype(ptm)
+
+                    seq_pos.add_property(prop)
+
 
 class MyVariant(DynamicSource, object):
     @logger_init
