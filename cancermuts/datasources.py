@@ -1941,7 +1941,7 @@ class PhosphoSite(DynamicSource, object):
 
 class GlyGen(StaticSource, object):
     @logger_init
-    def __init__(self, database_dir, database_file="0038_filtered.csv"):
+    def __init__(self, database_dir, database_file="human_proteoform_glycosylation_sites_uniprotkb.csv"):
         description = "GlyGen Dataset"
         super(GlyGen, self).__init__(name='GlyGen', version='2.10.1', description=description)
         
@@ -1949,22 +1949,23 @@ class GlyGen(StaticSource, object):
         self.database_file = database_file
 
         file_path = os.path.join(self.database_dir, self.database_file)
-        self.df = pd.read_csv(file_path)
+        self.database_df = pd.read_csv(file_path)
 
-    def _parse_db_file(self, protein_id):
-        protein_df = self.df[self.df['src_xref_id'] == protein_id]
-        protein_df["glycosylation_type"] = protein_df["glycosylation_type"].str.rstrip("-linked")
-        return protein_df
-    
     def add_position_properties(self, sequence):
-
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("GlyGen annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
+        
+        protein_df = self.database_df[self.database_df['uniprotkb_canonical_ac'] == sequence.isoform]
+        if protein_df.empty:
+            if sequence.uniprot_ac not in self.database_df['src_xref_id']:
+                raise UnexpectedIsoformError('GlyGen contains this protein, but the requested isoform is not present')
+            else:
+                return
 
-        records = self._parse_db_file(sequence.uniprot_ac)
-        for index, row in records.iterrows():
-            pos = row['glycosylation_site_uniprotkb']
-            idx = sequence.seq2index(pos)
+        protein_df["glycosylation_type"] = protein_df["glycosylation_type"].str.rstrip("-linked")
+
+        for index, row in protein_df.iterrows():
+            idx = sequence.seq2index(row['glycosylation_site_uniprotkb'])
 
             subtype = f"{row['glycosylation_type']}-{row['carb_name'].rstrip('.')}"
             position_obj = sequence.positions[idx]
@@ -1975,7 +1976,6 @@ class GlyGen(StaticSource, object):
                     prop.sources.append(self)
                     prop.add_subtype(subtype)
                     already_annotated = True
-                    property_obj = prop
 
             if not already_annotated:
                 property_obj = GlycosylationSite(position_obj, sources=[self])
@@ -1997,7 +1997,7 @@ class MyVariant(DynamicSource, object):
 
 
     def add_metadata(self, sequence, md_type=['revel_score']):
-        
+
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("MyVariant REVEL annotation only supports canonical isoforms. Please use a Sequence object for the canonical isoform.")
 
