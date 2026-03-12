@@ -1,5 +1,5 @@
 # import the UniProt data source class
-from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, COSMIC, MobiDB, MyVariant, RevelDatabase, ManualAnnotation, ClinVar
+from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, dbPTM, COSMIC, MobiDB, MyVariant, RevelDatabase, ManualAnnotation, ClinVar
 from cancermuts.exceptions import *
 from cancermuts.core import Mutation
 from cancermuts.metadata import GenomicMutation
@@ -107,6 +107,14 @@ try:
     ps.add_position_properties(seq)
 except UnexpectedIsoformError:
     print("PhosphoSite annotations will not be added, as a non-canonical isoform has been provided")
+
+# dbPTM does not support non-canonical isoforms
+db = dbPTM('/data/databases/dbPTM/')
+
+try:
+    db.add_position_properties(seq)
+except UnexpectedIsoformError:
+    print("dbPTM annotations will not be added, as a non-canonical isoform has been provided")
 
 # MobiDB does not suport non-canonical isoforms
 mdb = MobiDB()
