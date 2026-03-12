@@ -1983,6 +1983,13 @@ class dbPTM(DynamicSource, object):
             'ubiquitination'         : 'Ubiquitination'
         }
 
+        self._glyco_subtypes = {
+            'o_linked_glycosylation': 'O-Gly',
+            'n_linked_glycosylation': 'N-Gly',
+            'c_linked_glycosylation': 'C-Gly',
+            's_linked_glycosylation': 'S-Gly'
+        }
+
         self._database_dir = database_dir
 
         if database_files is None:
@@ -2015,22 +2022,27 @@ class dbPTM(DynamicSource, object):
         
                 prop_name = self._ptm_types_to_classes[ptm]
 
-                already_annotated = False
-                for prop in seq_pos.properties:
-                    if prop.get_name() == prop_name:
-                        prop.sources.append(self)
-                        if 'glycosylation' in ptm:
-                            prop.add_subtype(ptm)
+                if prop_name in seq_pos.properties:
+                    prop = seq_pos.properties[prop_name]
+                    prop.sources.append(self)
 
-                        already_annotated = True
-
-                if not already_annotated:
-                    prop = position_properties_classes[prop_name](sources=[self], position=seq_pos)
-
-                    if 'glycosylation' in ptm:
-                        prop.add_subtype(ptm)
-
+                else:
+                    prop = position_properties_classes[prop_name](
+                        sources=[self],
+                        position=seq_pos
+                    )
                     seq_pos.add_property(prop)
+
+                if ptm in self._glyco_subtypes:
+                    if self._glyco_subtypes[ptm] == "O-Gly":
+                        if "O-GalNAc" in prop.metadata["subtypes"] or "O-GlcNAc" in prop.metadata["subtypes"]:
+                            pass
+                        else:
+                            prop.add_subtype(self._glyco_subtypes[ptm])
+                    
+                    else:
+                        prop.add_subtype(self._glyco_subtypes[ptm])
+
 
 
 class MyVariant(DynamicSource, object):
