@@ -1972,7 +1972,7 @@ class GlyGen(StaticSource, object):
         
         protein_df = self.database_df[self.database_df['uniprotkb_canonical_ac'] == sequence.isoform]
         if protein_df.empty:
-            if sequence.uniprot_ac not in self.database_df['src_xref_id']:
+            if sequence.uniprot_ac in self.database_df['src_xref_id'].values:
                 raise UnexpectedIsoformError('GlyGen contains this protein, but the requested isoform is not present')
             else:
                 return
