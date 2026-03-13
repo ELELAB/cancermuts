@@ -23,6 +23,7 @@ mutations. At the moment it supports:
     * ELM - linear motifs
     * REVEL - pathogenicity prediction
     * Phosphosite - post-translational modifications
+    * GlyGen - glycosylation modifications
     * gnomAD - allele frequency
     * MobiDB - protein disorder
     * Manually curated annotations from csv files

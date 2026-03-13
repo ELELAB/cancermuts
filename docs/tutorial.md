@@ -616,7 +616,7 @@ order/disorder propensity from MobiDB.
 We import the relative data source class, similarly as what done previously:
 
 ```py
-from cancermuts.datasources import PhosphoSite, MobiDB
+from cancermuts.datasources import PhosphoSite, GlyGen, MobiDB
 ```
 
 #### Post-translational modifications with phosphosite
@@ -682,6 +682,19 @@ Once again, we can check the result:
 
 >>> seq.positions[28].properties
 {'ptm_phosphorylation': <PositionProperty Phosphorylation Site from PhosphoSite>}
+```
+
+#### Glycosylation annotations with GlyGen
+
+We can also annotate glycosylation sites using the GlyGen Human Glycosylation Sites (UniProtKB) dataset.
+GlyGen integrates glycoproteomics data from multiple experimental studies and provides curated information on experimentally observed glycosylation sites.
+
+To use GlyGen, a local copy of the dataset must be available (see the installation guide for details). In this tutorial we use a filtered version of the GlyGen dataset that contains only experimentally validated glycosylation sites.
+
+We first create the GlyGen data source object by specifying the location of the dataset file:
+
+```py
+>>> gg = GlyGen('/data/databases/GlyGen/')
 ```
 
 #### structured regions with MobiDB
