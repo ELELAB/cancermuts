@@ -640,7 +640,8 @@ class ClinvarReviewStatus(Metadata):
         'no interpretation for the single variant': 0,
         'no assertion criteria provided': 0,
         'no assertion provided': 0,
-        'no classification provided': 0
+        'no classification provided': 0,
+        'no classifications from unflagged records': 0
     }
 
     def __init__(self, source, status):
@@ -675,7 +676,8 @@ class ClinvarClinicalImpactReviewStatus(ClinvarReviewStatus):
         'criteria provided, single submitter': 1,
         'no assertion criteria provided': 0,
         'no classification provided': 0,
-        'no classification for the individual variant': 0
+        'no classification for the individual variant': 0,
+        'no classifications from unflagged records': 0
     }
 
 class ClinvarGermlineReviewStatus(ClinvarReviewStatus):
