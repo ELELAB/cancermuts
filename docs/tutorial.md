@@ -616,7 +616,7 @@ order/disorder propensity from MobiDB.
 We import the relative data source class, similarly as what done previously:
 
 ```py
-from cancermuts.datasources import PhosphoSite, MobiDB
+from cancermuts.datasources import PhosphoSite, GlyGen, MobiDB
 ```
 
 #### Post-translational modifications with phosphosite
@@ -683,6 +683,35 @@ Once again, we can check the result:
 >>> seq.positions[28].properties
 {'ptm_phosphorylation': <PositionProperty Phosphorylation Site from PhosphoSite>}
 ```
+
+#### Glycosylation annotations with GlyGen
+
+We can also annotate glycosylation sites using the GlyGen Human Glycosylation Sites (UniProtKB) dataset.
+GlyGen integrates glycoproteomics data from multiple experimental studies and provides curated information on experimentally observed glycosylation sites.
+
+To use GlyGen, a local copy of the dataset must be available (see the installation guide for details). In this tutorial we use a filtered version of the GlyGen dataset that contains only experimentally validated glycosylation sites.
+
+We first create the GlyGen data source object by specifying the location of the dataset file:
+
+```py
+>>> gg = GlyGen('/data/databases/GlyGen/')
+```
+Once the object is created we can add the position properties to our sequence object.
+
+GlyGen annotates glycosylation sites by adding a ptm_glycosylation property to the corresponding sequence positions. Each site is associated with a subtype that combines the glycosylation type (e.g. N, O) and the glycan name.
+
+If multiple glycosylation annotations are available for the same position, they are merged into a single property, and all subtypes are retained.
+
+We can inspect the result as follows:
+
+```py
+>>> seq.positions[45].properties
+{'ptm_glycosylation': <PositionProperty Glycosylation Site from GlyGen>}
+
+>>> seq.positions[45].properties['ptm_glycosylation'].metadata
+{'subtypes': ['N-GlcNAc', 'O-GalNAc']}
+```
+Only canonical isoforms are supported by the GlyGen datasource.
 
 #### structured regions with MobiDB
 
