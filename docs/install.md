@@ -191,9 +191,7 @@ Cancermuts, using the following steps:
 
 ### GlyGen
 
-If you intend to use GlyGen as a resource to annotate glycosylation
-modifications you should download GLY_000038 Human Glycosylation Sites (UniProtKB) dataset, so it can be used by
-Cancermuts, using the following steps:
+If you intend to use GlyGen as a resource to annotate glycosylation modifications you have to download GLY_000038 Human Glycosylation Sites (UniProtKB) dataset, the only GlyGen dataset supported by Cancermuts so far, using the following steps:
 
 1. head to the [GLY_000038 GlyGen website download page](https://data.glygen.org/GLY_000038)
 
@@ -201,6 +199,13 @@ Cancermuts, using the following steps:
 This dataset contains glycosylation site annotations mapped to UniProt canonical proteins, including the residue position, the type of glycosylation (for example N-linked or O-linked), and the glycan name.
 The dataset integrates information from multiple resources curated in GlyGen. While many entries originate from experimentally supported data, the dataset may also include annotations derived from integrated external databases and therefore not all entries correspond to direct experimental evidence.
 
-4. filter the 0038_Human Glycosylation Sites dataset by retaining only ECO_0000269, ECO_0000305 (with at least one PubMed reference) and ECO_0000312 (with at least one PDB reference), applying the filter per site + ECO group, in this way only entries correspond to experimental evidence will be considered
+4. (Optional) filter the 0038_Human Glycosylation Sites dataset to retain only entries supported by experimental evidence. This can be done by selecting entries with ECO codes:
+   - ECO_0000269
+   - ECO_0000305 (with at least one PubMed reference)
+   - ECO_0000312 (with at least one PDB reference)
+    
+   The filtering should be applied per site + ECO group.
+
+   This step is recommended if only high-confidence, experimentally validated glycosylation sites are desired. However, the Cancermuts GlyGen datasource works with both filtered and unfiltered datasets.
 
 5. Keep note of the location of this directory as it will come handy in the tutorial

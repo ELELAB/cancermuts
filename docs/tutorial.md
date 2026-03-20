@@ -696,6 +696,22 @@ We first create the GlyGen data source object by specifying the location of the 
 ```py
 >>> gg = GlyGen('/data/databases/GlyGen/')
 ```
+Once the object is created we can add the position properties to our sequence object.
+
+GlyGen annotates glycosylation sites by adding a ptm_glycosylation property to the corresponding sequence positions. Each site is associated with a subtype that combines the glycosylation type (e.g. N, O) and the glycan name.
+
+If multiple glycosylation annotations are available for the same position, they are merged into a single property, and all subtypes are retained.
+
+We can inspect the result as follows:
+
+```py
+>>> seq.positions[45].properties
+{'ptm_glycosylation': <PositionProperty Glycosylation Site from GlyGen>}
+
+>>> seq.positions[45].properties['ptm_glycosylation'].metadata
+{'subtypes': ['N-GlcNAc', 'O-GalNAc']}
+```
+Only canonical isoforms are supported by the GlyGen datasource.
 
 #### structured regions with MobiDB
 
