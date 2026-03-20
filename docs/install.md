@@ -188,3 +188,37 @@ Cancermuts, using the following steps:
     ```
 
 5. Keep note of the location of this directory as it will come handy in the tutorial
+
+### dbPTM
+
+If you intend to use dbPTM as a resource to annotate post-translational
+modifications you should download its data files so they can be used by
+Cancermuts, using the following steps:
+
+1. head to the [dbPTM website download page](https://biomics.lab.nycu.edu.tw/dbPTM/download.php)
+
+2. download the files containing the post-translational mutation data in a
+    folder of your choice. Depending on which PTM you're interested it, you
+    might need either (one or more, possibly all):
+    * Acetylation.gz
+    * Methylation.gz
+    * C-linked_Glycosylation.gz
+    * N-linked_Glycosylation.gz
+    * O-linked_Glycosylation.gz
+    * S-linked_Glycosylation.gz
+    * S-nitrosylation.gz
+    * Phosphorylation.gz
+    * Sumoylation.gz
+    * Ubiquitination.gz
+
+4. decompress and rename all the files, for instance using `tar` in Linux or macOS:
+    ```
+    for f in *gz; do
+        targz=${f%.gz}.tar.gz
+        mv $f $targz
+        tar xvf $targz
+    done
+    rm *.tar.gz
+    ```
+
+5. Keep note of the location of this directory as it will come handy in the tutorial

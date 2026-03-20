@@ -1953,6 +1953,98 @@ class PhosphoSite(DynamicSource, object):
                 if ptm == "O-GalNAc" or ptm == "O-GlcNAc":
                     property_obj.add_subtype(ptm)
 
+class dbPTM(DynamicSource, object):
+    @logger_init 
+    def __init__(self, database_dir, database_files=None): 
+        description = "dbPTM Database" 
+        super(dbPTM, self).__init__(name='dbPTM', version='2025', description=description) 
+
+        self._ptm_types = ["acetylation", "c_linked_glycosylation", "methylation", "n_linked_glycosylation", "o_linked_glycosylation", "phosphorylation", "s_linked_glycosylation", "s_nitrosylation", "sumoylation", "ubiquitination"]
+        self._ptm_types_to_classes = {  'acetylation'               : 'ptm_acetylation',
+                                        'methylation'               : 'ptm_methylation',
+                                        'c_linked_glycosylation'    : 'ptm_glycosylation',
+                                        'n_linked_glycosylation'    : 'ptm_glycosylation',
+                                        'o_linked_glycosylation'    : 'ptm_glycosylation',
+                                        's_linked_glycosylation'    : 'ptm_glycosylation',
+                                        's_nitrosylation'           : 'ptm_nitrosylation',
+                                        'phosphorylation'           : 'ptm_phosphorylation',
+                                        'sumoylation'               : 'ptm_sumoylation',
+                                        'ubiquitination'            : 'ptm_ubiquitination' }   
+        self._ptm_types_to_files = {
+            'acetylation'            : 'Acetylation',
+            'methylation'            : 'Methylation',
+            'c_linked_glycosylation' : 'C-linked_Glycosylation',
+            'n_linked_glycosylation' : 'N-linked_Glycosylation',
+            'o_linked_glycosylation' : 'O-linked_Glycosylation',
+            's_linked_glycosylation' : 'S-linked_Glycosylation',
+            's_nitrosylation'        : 'S-nitrosylation',
+            'phosphorylation'        : 'Phosphorylation',
+            'sumoylation'            : 'Sumoylation',
+            'ubiquitination'         : 'Ubiquitination'
+        }
+
+        self._glyco_subtypes = {
+            'o_linked_glycosylation': 'O-Gly',
+            'n_linked_glycosylation': 'N-Gly',
+            'c_linked_glycosylation': 'C-Gly',
+            's_linked_glycosylation': 'S-Gly'
+        }
+
+        self._database_dir = database_dir
+
+        if database_files is None:
+            database_files = self._ptm_types_to_files
+
+        self._dbptm_data = {}
+
+        for ptm_type in self._ptm_types:        
+            filepath = os.path.join(self._database_dir, database_files[ptm_type])        
+            df = pd.read_csv(filepath, sep="\t", header=None, names=["protein", "uniprot", "position", "ptm_type", "pmid", "sequence"], dtype={"position":int})                       
+            df = df[df["protein"].str.endswith("_HUMAN", na=False)]       
+            self._dbptm_data[ptm_type] = df
+
+    def add_position_properties(self, sequence, properties=None):
+        
+        if not sequence.is_canonical:
+            raise UnexpectedIsoformError("dbPTM annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
+
+        for ptm in self._ptm_types:   
+            df = self._dbptm_data[ptm]    
+            df = df[df["uniprot"] == sequence.uniprot_ac]
+
+            for pos in df['position']:
+                try:
+                    site_seq_idx = sequence.seq2index(pos)
+                    seq_pos = sequence.positions[site_seq_idx]
+                except:
+                    self.log.warning("dbPTM site %s is outside the protein sequence; it will be skipped" %pos)
+                    continue
+        
+                prop_name = self._ptm_types_to_classes[ptm]
+
+                if prop_name in seq_pos.properties:
+                    prop = seq_pos.properties[prop_name]
+                    prop.sources.append(self)
+
+                else:
+                    prop = position_properties_classes[prop_name](
+                        sources=[self],
+                        position=seq_pos
+                    )
+                    seq_pos.add_property(prop)
+
+                if ptm in self._glyco_subtypes:
+                    if self._glyco_subtypes[ptm] == "O-Gly":
+                        if "O-GalNAc" in prop.metadata["subtypes"] or "O-GlcNAc" in prop.metadata["subtypes"]:
+                            pass
+                        else:
+                            prop.add_subtype(self._glyco_subtypes[ptm])
+                    
+                    else:
+                        prop.add_subtype(self._glyco_subtypes[ptm])
+
+
+
 class MyVariant(DynamicSource, object):
     @logger_init
     def __init__(self):

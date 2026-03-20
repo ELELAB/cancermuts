@@ -632,13 +632,13 @@ location of the database files:
 >>> ps = PhosphoSite('/data/databases/phosphosite/')
 ```
 
-by default, Cancermuts expect the file names in the database to be the default
+by default, Cancermuts expects the file names in the database to be the default
 ones. However it's possible to specify the file name for each post-translational
 modifications by supplying the `database_files` argument, which should be a
 dictionary associating each PTM to a file name:
 
 ```py
->>> my_databse_files = {  'acetylation'     : 'my_Acetylation_site_dataset',
+>>> my_database_files = {  'acetylation'     : 'my_Acetylation_site_dataset',
                           'methylation'     : 'my_Methylation_site_dataset',
                            ... }
 ```
@@ -682,6 +682,69 @@ Once again, we can check the result:
 
 >>> seq.positions[28].properties
 {'ptm_phosphorylation': <PositionProperty Phosphorylation Site from PhosphoSite>}
+```
+
+#### Post-translational modifications with dbPTM
+
+We will annotate post-translational modifications identified in experiments from
+the dbPTM database (https://biomics.lab.nycu.edu.tw/dbPTM/). In order to do so we need a local copy of the
+dbPTM dataset - please see the instructions in the installation guide.
+
+We first create the dbPTM data source object. We will need to supply the
+location of the database files:
+
+```py
+>>> db = dbPTM('/data/databases/dbPTM/')
+```
+
+by default, Cancermuts expects the file names in the database to be the default
+ones (e.g. Phosphorylation, Acetylation, N-linked_Glycosylation, etc.). However it's possible to specify the file name for each post-translational modifications by supplying the `database_files` argument, which should be a dictionary associating each PTM to a file name:
+
+```py
+>>> my_database_files = {   'acetylation'            : 'my_Acetylation',
+                            'methylation'            : 'my_Methylation',
+                            'phosphorylation'        : 'my_Phosphorylation',
+                            'o_linked_glycosylation' : 'my_O-linked_Glycosylation'
+                           ... }
+```
+The keys of the dictionaries should be the options supported by the dbPTM datasource (see `cancermuts.datasources.dbPTM._ptm_types`).
+
+Once the object is created we can add the position properties to our sequence
+object. 
+The dbPTM datasource currently supports the following PTM annotations:
+
+| Keyword | Description |
+| ------- | ----------- |
+| `acetylation` | Acetylation |
+| `methylation` | Methylation |
+| `o_linked_glycosylation` | O-linked glycosylation |
+| `n_linked_glycosylation` | N-linked glycosylation |
+| `c_linked_glycosylation` | C-linked glycosylation |
+| `s_linked_glycosylation` | S-linked glycosylation |
+| `s_nitrosylation` | S-nitrosylation |
+| `phosphorylation` | Phosphorylation |
+| `sumoylation` | Sumoylation |
+| `ubiquitination` | Ubiquitination |
+
+For glycosylation sites, dbPTM provides the glycosylation type, which is stored as a subtype in the glycosylation property:
+
+| Glycosylation type     | Stored subtype |
+| ---------------------- | -------------- |
+| O-linked glycosylation | `O-Gly`        |
+| N-linked glycosylation | `N-Gly`        |
+| C-linked glycosylation | `C-Gly`        |
+| S-linked glycosylation | `S-Gly`        |
+
+If a glycosylation site is already annotated with a more specific subtype (for example O-GalNAc or O-GlcNAc from PhosphoSite), the generic O-Gly subtype from dbPTM is not added in order to avoid redundant information.
+
+Once again, we can check the result:
+
+```py
+>>> seq.positions[18].properties
+{'ptm_glycosylation': <PositionProperty Glycosylation Site from dbPTM>}
+
+>>> seq.positions[42].properties
+{'ptm_phosphorylation': <PositionProperty Phosphorylation Site from dbPTM>}
 ```
 
 #### structured regions with MobiDB
