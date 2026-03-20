@@ -211,9 +211,14 @@ Cancermuts, using the following steps:
     * Sumoylation.gz
     * Ubiquitination.gz
 
-4. decompress all the files, for instance using `gzip` in Linux or macOS:
+4. decompress and rename all the files, for instance using `tar` in Linux or macOS:
     ```
-    for f in *.gz; do gunzip -d $f; done
+    for f in *gz; do
+        targz=${f%.gz}.tar.gz
+        mv $f $targz
+        tar xvf $targz
+    done
+    rm *.tar.gz
     ```
 
 5. Keep note of the location of this directory as it will come handy in the tutorial

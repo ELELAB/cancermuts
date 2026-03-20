@@ -687,7 +687,7 @@ Once again, we can check the result:
 #### Post-translational modifications with dbPTM
 
 We will annotate post-translational modifications identified in experiments from
-the dbPTM database. In order to do so we need a local copy of the
+the dbPTM database (https://biomics.lab.nycu.edu.tw/dbPTM/). In order to do so we need a local copy of the
 dbPTM dataset - please see the instructions in the installation guide.
 
 We first create the dbPTM data source object. We will need to supply the
@@ -707,7 +707,7 @@ ones (e.g. Phosphorylation, Acetylation, N-linked_Glycosylation, etc.). However 
                             'o_linked_glycosylation' : 'my_O-linked_Glycosylation'
                            ... }
 ```
-The keys of the dictionaries should be the options supported by the dbPTM datasource.
+The keys of the dictionaries should be the options supported by the dbPTM datasource (see `cancermuts.datasources.dbPTM._ptm_types`).
 
 Once the object is created we can add the position properties to our sequence
 object. 
