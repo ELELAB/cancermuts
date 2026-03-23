@@ -109,7 +109,7 @@ except UnexpectedIsoformError:
     print("PhosphoSite annotations will not be added, as a non-canonical isoform has been provided")
 
 # GlyGen does not support non-canonical isoforms
-gg = GlyGen('/data/databases/GlyGen/')
+gg = GlyGen('/data/databases/GlyGen/', database_file='human_proteoform_glycosylation_sites_uniprotkb_filtered.csv')
 
 try:
     gg.add_position_properties(seq)

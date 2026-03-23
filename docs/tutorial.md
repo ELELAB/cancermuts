@@ -691,10 +691,10 @@ GlyGen integrates glycoproteomics data from multiple experimental studies and pr
 
 To use GlyGen, a local copy of the dataset must be available (see the installation guide for details). In this tutorial we use a filtered version of the GlyGen dataset that contains only experimentally validated glycosylation sites.
 
-We first create the GlyGen data source object by specifying the location of the dataset file:
+We first create the GlyGen data source object by specifying the location of the dataset file, and its filename, as we will be using a filtered version of the original database:
 
 ```py
->>> gg = GlyGen('/data/databases/GlyGen/')
+>>> gg = GlyGen('/data/databases/GlyGen/', database_file='human_proteoform_glycosylation_sites_uniprotkb_filtered.csv')
 ```
 Once the object is created we can add the position properties to our sequence object.
 
