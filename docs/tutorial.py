@@ -99,7 +99,7 @@ print(seq.positions[64].mutations[0].metadata['gnomad_exome_allele_frequency'])
 
 print(seq.positions[64].mutations[0].metadata['gnomad_genome_allele_frequency'])
 
-from cancermuts.datasources import PhosphoSite, MobiDB
+from cancermuts.datasources import PhosphoSite, GlyGen, MobiDB
 
 # add annotations from PhosphoSite
 ps = PhosphoSite('/data/databases/phosphosite/')
@@ -108,6 +108,10 @@ ps.add_position_properties(seq)
 print(seq.positions[4].properties)
 
 print(seq.positions[28].properties)
+
+# add annotations from GlyGen
+gg = GlyGen('/data/databases/GlyGen/', database_file='human_proteoform_glycosylation_sites_uniprotkb_filtered.csv')
+gg.add_position_properties(seq, )
 
 # add annotations from MobiDB
 mdb = MobiDB()
