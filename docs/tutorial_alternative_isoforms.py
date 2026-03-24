@@ -1,5 +1,6 @@
 # import the UniProt data source class
-from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, dbPTM, COSMIC, MobiDB, MyVariant, RevelDatabase, ManualAnnotation, ClinVar
+
+from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, dbPTM, GlyGen, COSMIC, MobiDB, MyVariant, RevelDatabase, ManualAnnotation, ClinVar
 from cancermuts.exceptions import *
 from cancermuts.core import Mutation
 from cancermuts.metadata import GenomicMutation
@@ -115,6 +116,14 @@ try:
     db.add_position_properties(seq)
 except UnexpectedIsoformError:
     print("dbPTM annotations will not be added, as a non-canonical isoform has been provided")
+
+# GlyGen does not support non-canonical isoforms
+gg = GlyGen('/data/databases/GlyGen/', database_file='human_proteoform_glycosylation_sites_uniprotkb_filtered.csv')
+
+try:
+    gg.add_position_properties(seq)
+except UnexpectedIsoformError:
+    print("GlyGen annotations will not be added, as a non-canonical isoform has been provided")
 
 # MobiDB does not suport non-canonical isoforms
 mdb = MobiDB()

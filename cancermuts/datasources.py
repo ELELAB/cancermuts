@@ -106,6 +106,7 @@ class DynamicSource(Source, object):
 
     def __init__(self, *args, **kwargs):
         super(DynamicSource, self).__init__(*args, **kwargs)
+
 class StaticSource(Source, object):
     """Base class for implementing static data sources. Static data sources
     are local to the system in use and need to be provided manually. They
@@ -2043,7 +2044,48 @@ class dbPTM(DynamicSource, object):
                     else:
                         prop.add_subtype(self._glyco_subtypes[ptm])
 
+class GlyGen(StaticSource, object):
+    @logger_init
+    def __init__(self, database_dir, database_file="human_proteoform_glycosylation_sites_uniprotkb.csv"):
+        description = "GlyGen Dataset"
+        super(GlyGen, self).__init__(name='GlyGen', version='2.10.1', description=description)
+        
+        self.database_dir = database_dir
+        self.database_file = database_file
 
+        file_path = os.path.join(self.database_dir, self.database_file)
+        self.database_df = pd.read_csv(file_path)
+
+    def add_position_properties(self, sequence):
+        if not sequence.is_canonical:
+            raise UnexpectedIsoformError("GlyGen annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
+        
+        protein_df = self.database_df[self.database_df['uniprotkb_canonical_ac'] == sequence.isoform]
+        if protein_df.empty:
+            if sequence.uniprot_ac in self.database_df['src_xref_id'].values:
+                raise UnexpectedIsoformError('GlyGen contains this protein, but the requested isoform is not present')
+            else:
+                return
+
+        protein_df["glycosylation_type"] = protein_df["glycosylation_type"].str.rstrip("-linked")
+
+        for index, row in protein_df.iterrows():
+            idx = sequence.seq2index(row['glycosylation_site_uniprotkb'])
+
+            subtype = f"{row['glycosylation_type']}-{row['carb_name'].rstrip('.')}"
+            position_obj = sequence.positions[idx]
+
+            already_annotated = False
+            for prop in position_obj.properties:
+                if isinstance(prop, GlycosylationSite):
+                    prop.sources.append(self)
+                    prop.add_subtype(subtype)
+                    already_annotated = True
+
+            if not already_annotated:
+                property_obj = GlycosylationSite(position_obj, sources=[self])
+                property_obj.add_subtype(subtype)
+                position_obj.add_property(property_obj)
 
 class MyVariant(DynamicSource, object):
     @logger_init
