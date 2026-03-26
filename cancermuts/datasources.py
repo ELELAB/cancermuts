@@ -2035,14 +2035,22 @@ class dbPTM(DynamicSource, object):
                     seq_pos.add_property(prop)
 
                 if ptm in self._glyco_subtypes:
-                    if self._glyco_subtypes[ptm] == "O-Gly":
-                        if "O-GalNAc" in prop.metadata["subtypes"] or "O-GlcNAc" in prop.metadata["subtypes"]:
-                            pass
-                        else:
-                            prop.add_subtype(self._glyco_subtypes[ptm])
-                    
-                    else:
-                        prop.add_subtype(self._glyco_subtypes[ptm])
+
+                    new_subtype = self._glyco_subtypes[ptm]
+                    existing_subtypes = [
+                        st for st in prop.metadata.get("subtypes", [])
+                        if isinstance(st, str) and "-" in st
+                    ]
+
+                    base = new_subtype.split("-")[0]
+
+                    has_specific = any(
+                        st.startswith(base + "-") and st != new_subtype
+                        for st in existing_subtypes
+                    )
+
+                    if not has_specific and new_subtype not in existing_subtypes:
+                        prop.add_subtype(new_subtype)
 
 class GlyGen(StaticSource, object):
     @logger_init
