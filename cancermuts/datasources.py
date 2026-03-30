@@ -2037,11 +2037,7 @@ class dbPTM(DynamicSource, object):
                 if ptm in self._glyco_subtypes:
 
                     new_subtype = self._glyco_subtypes[ptm]
-                    existing_subtypes = [
-                        st for st in prop.metadata.get("subtypes", [])
-                        if isinstance(st, str) and "-" in st
-                    ]
-
+                    existing_subtypes = prop.metadata.get("subtypes", [])
                     base = new_subtype.split("-")[0]
 
                     has_specific = any(
