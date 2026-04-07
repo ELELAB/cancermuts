@@ -35,7 +35,7 @@ from Bio.PDB.Polypeptide import three_to_index, index_to_one
 from Bio import SeqIO
 import numpy as np
 import pandas as pd
-from .core import Sequence, Mutation
+from .core import Sequence, ProteinVariant
 from .properties import *
 from .metadata import *
 from .log import *
@@ -420,9 +420,9 @@ class cBioPortal(DynamicSource, object):
                 self.log.warning(f"for mutation {m}, residue {wt} is {position.wt_residue_type} in wild-type sequence; it will be skipped")
                 continue
 
-            mutation_obj = Mutation(sequence.positions[site_seq_idx],
-                                    mut,
-                                    [self])
+            mutation_obj = ProteinVariant(sequence=sequence, start=num, end=num, ref=wt, alt=mut, 
+                                          variant_type="substitution", sources=[self])
+
             for md in metadata:
                 mutation_obj.metadata[md] = []
                 for mi in mutation_indices:
@@ -432,7 +432,7 @@ class cBioPortal(DynamicSource, object):
                         mutation_obj.metadata[md].append(this_md)
 
             self.log.debug("adding mutation %s" % str(mutation_obj))
-            sequence.positions[site_seq_idx].add_mutation(mutation_obj)
+            sequence.add_variant(mutation_obj)
 
     def _get_cancer_types(self):
         self.log.info("fetching cancer types")
@@ -1423,7 +1423,8 @@ class ClinVar(DynamicSource, object):
                 continue
 
             # Create mutation:
-            mutation = Mutation(position, alt_aa, [self])
+            mutation = ProteinVariant(sequence=sequence, start=pos, end=pos, ref=ref_aa, alt=alt_aa,
+                          variant_type="substitution", sources=[self])
 
             # Store metadata:
 
@@ -1543,7 +1544,7 @@ class ClinVar(DynamicSource, object):
                         mutation.metadata[md] = [metadata_classes[md](self, value)]
 
             self.log.debug("adding mutation %s" % str(mutation))
-            mutation.sequence_position.add_mutation(mutation)
+            sequence.add_variant(mutation)
 
         return {
             "variants_to_check": df_strange,
@@ -1842,9 +1843,8 @@ class COSMIC(DynamicSource, object):
 
             mutation_indices = [i for i, x in enumerate(mutations) if x == m]
 
-            mutation_obj = Mutation(sequence.positions[site_seq_idx],
-                                    mut,
-                                    [self])
+            mutation_obj = ProteinVariant(sequence=sequence, start=num, end=num, ref=wt, alt=mut, 
+                                          variant_type="substitution", sources=[self])
             for md in metadata:
                 mutation_obj.metadata[md] = []
                 for mi in mutation_indices:
@@ -1852,7 +1852,7 @@ class COSMIC(DynamicSource, object):
                         tmp_md = [self] + out_metadata[md][mi]
                         this_md = metadata_classes[md](*tmp_md)
                         mutation_obj.metadata[md].append(this_md)
-            position.add_mutation(mutation_obj)
+            sequence.add_variant(mutation_obj)
 
 class PhosphoSite(DynamicSource, object):
     @logger_init
@@ -2123,10 +2123,9 @@ class MyVariant(DynamicSource, object):
             except KeyError:
                 self.log.warning("MyVariant doesn't support metadata type %s" % md_type)
 
-        for pos in sequence.positions:
-            for mut in pos.mutations:
-                for add_this_metadata in metadata_functions:
-                    add_this_metadata(mut)
+        for var in sequence.variants:
+            for add_this_metadata in metadata_functions:
+                add_this_metadata(var)
 
 
     def _get_revel(self, mutation):
@@ -2191,19 +2190,19 @@ class MyVariant(DynamicSource, object):
                 self.log.info(f"No residue information was found in variant definition {idx_this_aa}")
                 continue
 
-            if not mutation.sequence_position.wt_residue_type == this_hit_ref:
+            if not mutation.ref == this_hit_ref:
                 self.log.info(f"Reference residue in revel does not correspond in variant definition {idx_this_aa}")
                 continue
 
-            if not mutation.sequence_position.sequence_position == this_hit_pos:
+            if not mutation.start == this_hit_pos:
                 try:
-                    if not mutation.sequence_position.sequence_position in [ int(a) for a in this_hit_pos ]:
+                    if not mutation.start in [ int(a) for a in this_hit_pos ]:
                         raise TypeError
                 except:
                     self.log.info(f"Sequence position in revel does not correspond for in variant definition {idx_this_aa}")
                     continue
 
-            if mutation.mutated_residue_type != this_hit_alt:
+            if mutation.alt != this_hit_alt:
                 self.log.info(f"Protein mutation in revel does not correspond for this in variant definition {idx_this_aa}")
                 continue
 
@@ -2401,13 +2400,12 @@ class RevelDatabase(StaticSource, object):
         "REVEL annotation cannot proceed.")
 
         mutations = []
-        for pos in sequence.positions:
-            for mut in pos.mutations:
-                gms = mut.metadata.get('genomic_mutations', [])
-                if not gms:
-                    self.log.debug(f"[REVEL] No genomic mutation available for {mut}; skipping.")
-                    continue
-                mutations.append((mut, gms, transcript_id))
+        for var in sequence.variants:
+            gms = var.metadata.get('genomic_mutations', [])
+            if not gms:
+                self.log.debug(f"[REVEL] No genomic mutation available for {var}; skipping.")
+                continue
+            mutations.append((var, gms, transcript_id))
 
         self._get_revel(mutations)
 
@@ -2480,17 +2478,17 @@ class RevelDatabase(StaticSource, object):
                     mutation_cache[gm] = ()
                     continue
 
-                aa_mismatches = df_filtered[df_filtered["aaref"] != mutation.sequence_position.wt_residue_type]
+                aa_mismatches = df_filtered[df_filtered["aaref"] != mutation.ref]
                 if not aa_mismatches.empty:
                     self.log.warning(f"[REVEL] Amino acid reference mismatch for {mutation}: expected "
-                        f"{mutation.sequence_position.wt_residue_type}, got {set(aa_mismatches['aaref'])} "
+                        f"{mutation.ref}, got {set(aa_mismatches['aaref'])} "
                         f"at chr={gm.chr}, pos={gm.get_coord()} (transcript {transcript_id})")
                     mutation_cache[gm] = ()
                     continue
 
-                df_final = df_filtered[df_filtered["aaalt"] == mutation.mutated_residue_type]
+                df_final = df_filtered[df_filtered["aaalt"] == mutation.alt]
                 if df_final.empty:
-                    self.log.warning(f"[REVEL] No match with expected alt amino acid {mutation.mutated_residue_type} "
+                    self.log.warning(f"[REVEL] No match with expected alt amino acid {mutation.alt} "
                         f"for {mutation} at chr={gm.chr}, pos={gm.get_coord()}")
                     mutation_cache[gm] = ()
                     continue
@@ -2513,8 +2511,8 @@ class RevelDatabase(StaticSource, object):
                         parsed_scores.append(score)
                         self.log.info(
                             f"[REVEL] Match for {mutation}: chr={gm.chr}, pos={gm.get_coord()}, "
-                            f"ref={gm.ref}, alt={gm.alt}, aaref={mutation.sequence_position.wt_residue_type}, "
-                            f"aaalt={mutation.mutated_residue_type}, transcript={transcript_id}, score={score}")
+                            f"ref={gm.ref}, alt={gm.alt}, aaref={mutation.ref}, "
+                            f"aaalt={mutation.alt}, transcript={transcript_id}, score={score}")
                     except ValueError:
                         self.log.warning(f"[REVEL] Could not parse REVEL score '{score_str}' for {mutation}")
 
@@ -2820,21 +2818,20 @@ class gnomAD(DynamicSource, object):
 
         self.log.debug("collected metadata functions: %s" % ', '.join([i for i in metadata_functions.__repr__()]))
 
-        for pos in sequence.positions:
-            for mut in pos.mutations:
-                for i,add_this_metadata in enumerate(metadata_functions):
-                    mut.metadata[md_types[i]] = []
+        for var in sequence.variants:
+            for i,add_this_metadata in enumerate(metadata_functions):
+                var.metadata[md_types[i]] = []
 
-                if not 'genomic_mutations' in mut.metadata:
-                    self.log.warning("no genomic mutation data available for gnomAD, mutation %s. It will be skipped" % mut)
-                    continue
-                elif mut.metadata['genomic_mutations'] is None or len(mut.metadata['genomic_mutations']) == 0:
-                    self.log.warning("no genomic mutation data available for gnomAD, mutation %s. It will be skipped" % mut)
-                    continue
+            if not 'genomic_mutations' in var.metadata:
+                self.log.warning("no genomic mutation data available for gnomAD, mutation %s. It will be skipped" % var)
+                continue
+            elif var.metadata['genomic_mutations'] is None or len(var.metadata['genomic_mutations']) == 0:
+                self.log.warning("no genomic mutation data available for gnomAD, mutation %s. It will be skipped" % var)
+                continue
 
-                for i,add_this_metadata in enumerate(metadata_functions):
-                    self.log.debug("adding metadata %s to %s" % (md_types[i], mut))
-                    add_this_metadata(mut, gene_id)
+            for i,add_this_metadata in enumerate(metadata_functions):
+                self.log.debug("adding metadata %s to %s" % (md_types[i], var))
+                add_this_metadata(var, gene_id)
 
     def _get_exome_allele_freq(self, mutation, gene_id):
         self.log.info("getting exome allele frequency")
@@ -3464,9 +3461,8 @@ class ManualAnnotation(StaticSource):
                         out_metadata['genomic_mutations'][mi] = out_metadata['genomic_mutations'][mi][0:2]
                 mutation_indices.extend(new_mut_ind)
 
-            mutation_obj = Mutation(sequence.positions[site_seq_idx],
-                                    mut,
-                                    [self])
+            mutation_obj = ProteinVariant(sequence=sequence, start=num, end=num, ref=wt, alt=mut, 
+                                          variant_type="substitution", sources=[self])
 
             #Adding mutation to mutation object
             for md in metadata:
@@ -3476,7 +3472,7 @@ class ManualAnnotation(StaticSource):
                         tmp_md = [self] + out_metadata[md][mi]
                         this_md = metadata_classes[md](*tmp_md)
                         mutation_obj.metadata[md].append(this_md)
-            position.add_mutation(mutation_obj)
+            sequence.add_variant(mutation_obj)
 
 
     def add_position_properties(self, sequence, prop=_supported_position_properties):
