@@ -1453,17 +1453,23 @@ class ClinVar(DynamicSource, object):
                         out_metadata[rs_key].append(rs_dict[xml_key])
                     else:
                         out_metadata[rs_key].append(None)
-
+            valid_gms = []
+            for gm in data["genomic_annotations_obj"].values():
+                if gm.chr is None or not (gm.is_snv or gm.is_insdel or gm.is_inversion):
+                    self.log.warning(
+                        f"ClinVar ID {clinvar_id}: genomic annotation '{gm.definition}' for {gm.genome_build} "
+                        f"is not in the expected for missense variant format and will not be added to genomic metadata")
+                    continue
+                valid_gms.append(gm)
             if "genomic_mutations" in metadata:
-                out_metadata["genomic_mutations"].append(list(data["genomic_annotations_obj"].values()))
+                out_metadata["genomic_mutations"].append(valid_gms)
             if "genomic_coordinates" in metadata:
                 out_metadata["genomic_coordinates"].append([
-                [gm.genome_build, gm.chr,
-                 gm.coord if gm.is_snv else gm.coord_start,
-                 gm.coord if gm.is_snv else gm.coord_end,
-                 gm.ref if gm.is_snv else gm.substitution]
-                 for gm in data["genomic_annotations_obj"].values()
-                ])
+                    [gm.genome_build, gm.chr,
+                     gm.coord if gm.is_snv else gm.coord_start,
+                     gm.coord if gm.is_snv else gm.coord_end,
+                     gm.ref if gm.is_snv else gm.substitution]
+                    for gm in valid_gms])
             if "clinvar_variant_id" in metadata:
                 out_metadata["clinvar_variant_id"].append(clinvar_id)
 
