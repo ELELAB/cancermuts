@@ -30,11 +30,13 @@ import logging
 from .metadata import *
 from .properties import *
 from .log import logger_init
+import re
+import pandas as pd
 
 class Sequence(object):
     """The most fundamental class of Cancermuts, this class starts from a
-    protein sequence definition. It acts as a collection of ordered 
-    `SequencePosition` objects and protein variant objects.
+    protein sequence definition. It acts as a collection of protein variant objects
+    and properties.
 
     Parameters
     ----------
@@ -51,9 +53,9 @@ class Sequence(object):
     Attributes
     ----------
     source : :obj:`cancermuts.datasources.Datasource`
-        Source from where the protein sequence is downloaded from
+        Source from where the protein sequence is downloaded
     gene_id : :obj:`int`, optional
-        gene name to which the sequence to be downloaded belongs to
+        gene name to which the sequence to be downloaded belongs
     sequence : :obj:`str`
         protein sequence as obtained from the data source
     sequence_numbering : :obj:`list of int`
@@ -87,15 +89,11 @@ class Sequence(object):
             self.aliases = aliases
         
         self.aliases["uniprot_acc"] = self.uniprot_ac
+        self.variants = VariantRegister()
         self.source = source
         self.sequence = sequence
-        self.variants = []
-        self.positions = []
-        self.sequence_numbering = []
+        self.sequence_numbering = list(range(1, len(self.sequence) + 1))
         self.properties = {}
-        for i,p in enumerate(self.sequence):
-            self.positions.append(SequencePosition(p, i+1))
-            self.sequence_numbering.append(i+1)
 
     def index2seq(self, idx):
         """
@@ -132,10 +130,10 @@ class Sequence(object):
         return self.sequence_numbering.index(seqn)
 
     def __iter__(self):
-        return iter(self.positions)
+        return iter(zip(self.sequence_numbering, self.sequence))
 
     def __repr__(self):
-        return f"<Sequence gene_id={self.gene_id}, uniprot_ac={self.uniprot_ac}, isoform={self.isoform}, is_canonical={self.is_canonical}, source={self.source.name}, {len(self.positions)} positions>"
+        return f"<Sequence gene_id={self.gene_id}, uniprot_ac={self.uniprot_ac}, isoform={self.isoform}, is_canonical={self.is_canonical}, source={self.source.name}, {len(self.sequence)} positions>"
 
     def add_property(self, prop):
         """
@@ -158,6 +156,15 @@ class Sequence(object):
             add_type = "new category"
             self.log.debug("adding property %s to sequence of %s (%s)" % (str(prop), self.gene_id, add_type))
 
+    def _variant_wt_check(self, var):
+        if self.sequence[var.start - 1] != var.start_res:
+            raise ValueError(f"WT mismatch for {var.hgvs}: expected {var.start_res} at "
+                             f"position {var.start}, got {self.sequence[var.start - 1]}")
+
+        if self.sequence[var.end - 1] != var.end_res:
+            raise ValueError(f"WT mismatch for {var.hgvs}: expected {var.end_res} at "
+                             f"position {var.end}, got {self.sequence[var.end - 1]}")
+
     def add_variant(self, var):
         """
         Adds variant to a :obj:`Sequence` object. If the variant is already present, 
@@ -169,64 +176,28 @@ class Sequence(object):
         var : :obj:`cancermuts.core.ProteinVariant`
             new ProteinVariant object to be added to the Sequence
         """
-
-        if var not in self.variants:
-
-            self.variants.append(var)
+        self._variant_wt_check(var)
+        if var.hgvs not in self.variants:
+            self.variants.add_variant(var)
             self.log.info("Adding variant %s to sequence %s" % (str(var), self.__repr__()))
         else:
             self.log.info("Variant %s already in sequence %s; will just add sources and metadata" % (str(var), self.__repr__()))
-            idx = self.variants.index(var)
-            self.variants[idx].sources.extend(var.sources)
+            existing = self.variants[var.hgvs]
+            existing.sources.extend(var.sources)
+
             for k in var.metadata:
-                if k in self.variants[idx].metadata:
-                    self.variants[idx].metadata[k].extend(var.metadata[k])
+                if k in existing.metadata:
+                    existing.metadata[k].extend(var.metadata[k])
                     self.log.debug("    metadata %s was extended" % k)
                 else:
-                    self.variants[idx].metadata[k] = var.metadata[k]
+                    existing.metadata[k] = var.metadata[k]
                     self.log.debug("    metadata %s was added anew" % k)
-
-
-class SequencePosition(object):
-    """This class describes a certain sequence position in a protein.
-    SequencePositions belong to a Sequence object and represent
-    the wild-type residue at a given sequence coordinate.
-
-    Attributes
-    ----------
-    source : :obj:`cancermuts.datasources.Datasource`
-    wt_residue_type : :obj:`str`
-        single-letter code wild-type residue for this position
-    sequence_position : :obj:`int`
-        number corresponding to the sequence position for this position
-    """
-    description = 'Position'
-    header = "aa_position"
-    @logger_init
-    def __init__(self, wt_residue_type, sequence_position):
-        """Constructor for the SequencePosition class.
-
-        Parameters
-        ----------
-        wt_residue_type : :obj:`str`
-            single-letter code wild-type residue for this position
-        sequence_position : :obj:`int`
-            number corresponding to the sequence position for this position
-        """
-
-        self.wt_residue_type = wt_residue_type
-        self.sequence_position = sequence_position
-
-    def __repr__(self):
-        return "<SequencePosition, residue %s at position %d>" % (self.wt_residue_type, self.sequence_position)
 
 class ProteinVariant(object):
     """This class describes in-frame protein variants on a reference sequence.
 
         Attributes
         ----------
-        sequence : :obj:`cancermuts.core.Sequence`
-            sequence to which this variant belongs
         start : :obj:`int`
             1-based start coordinate on the protein sequence
         end : :obj:`int`
@@ -235,9 +206,10 @@ class ProteinVariant(object):
             reference amino-acid sequence
         alt : :obj:`str`
             altered amino-acid sequence
-        variant_type: :obj:`str`
-            Type of protein variant. Supported values currently include
-            ``"substitution"``, ``"deletion"``, ``"insertion"``, and ``"delins"``.
+        start_res : :obj:`str`
+            Wild-type amino-acid at the start coordinate
+        end_res : :obj:`str`
+            Wild-type amino-acid at the end coordinate
         sources : :obj:`list` of :obj:`cancermuts.datasources.Datasource`
             sources the variant was derived from
         metadata : :obj:`dict`
@@ -245,13 +217,12 @@ class ProteinVariant(object):
     """
 
     @logger_init
-    def __init__(self, sequence, start, end, ref, alt, variant_type, sources=None, metadata=None):
+    def __init__(self, start, end, ref, alt, start_res,
+                 end_res, sources=None, metadata=None):
         """Constructor for the ProteinVariant class.
         
         Parameters
         ----------
-        sequence : :obj:`cancermuts.core.Sequence`
-            sequence to which this variant belongs
         start : :obj:`int`
             1-based start coordinate on the protein sequence
         end : :obj:`int`
@@ -260,21 +231,22 @@ class ProteinVariant(object):
             reference amino-acid sequence
         alt : :obj:`str`
             altered amino-acid sequence
-        variant_type: :obj:`str`
-            Type of protein variant. Supported values currently include
-            ``"substitution"``, ``"deletion"``, ``"insertion"``, and ``"delins"``.
+        start_res : :obj:`str`
+            Wild-type amino-acid at the start coordinate
+        end_res : :obj:`str`
+            Wild-type amino-acid at the end coordinate
         sources : :obj:`list` of :obj:`cancermuts.datasources.Datasource`
             sources the variant was derived from
         metadata : :obj:`dict`
             Dictionary encoding variant-associated metadata.
 
         """
-        self.sequence = sequence
         self.start = start
         self.end = end
         self.ref = ref
         self.alt = alt
-        self.variant_type = variant_type
+        self.start_res = start_res
+        self.end_res = end_res
         if sources is None:
             self.sources = []
         else:
@@ -284,19 +256,46 @@ class ProteinVariant(object):
         else:
             self.metadata = metadata
 
+        self.variant_type
+
+    @property
+    def variant_type(self):
+        if (self.start == self.end and len(self.ref) == len(self.alt) == 1
+            and self.ref != self.alt):
+            return "substitution"
+        elif self.ref != "" and self.alt == "":
+            return "deletion"
+        elif self.ref == "" and self.alt != "":
+            return "insertion"
+        elif self.ref != "" and self.alt == self.ref:
+            return "duplication"
+        elif self.ref != "" and self.alt != "":
+            return "delins"
+        else:
+            raise ValueError(f"Cannot determine variant type from start={self.start}, "
+                             f"end={self.end}, ref='{self.ref}', alt='{self.alt}'")
+
+    @property
+    def hgvs(self):
+        return f"p.{self}"
+
     def __str__(self):
         if self.variant_type == "substitution":
-            return "%s%d%s" % (self.ref, self.start, self.alt)
+            return "%s%d%s" % (self.start_res, self.start, self.alt)
         elif self.variant_type == "deletion":
             if self.start == self.end:
-                return "%s%ddel" % (self.ref, self.start)
-            return "%s%d_%ddel" % (self.ref, self.start, self.end)
+                return "%s%ddel" % (self.start_res, self.start)
+            return "%s%d_%s%ddel" % (self.start_res, self.start, self.end_res, self.end)
         elif self.variant_type == "insertion":
-            return "%d_%dins%s" % (self.start, self.end, self.alt)
+            return "%s%d_%s%dins%s" % (self.start_res, self.start, self.end_res, self.end, self.alt)
+        elif self.variant_type == "duplication":
+            if self.start == self.end:
+                return "%s%ddup" % (self.start_res, self.start)
+            return "%s%d_%s%ddup" % (self.start_res, self.start, self.end_res, self.end)
         elif self.variant_type == "delins":
-            return "%s%d_%ddelins%s" % (self.ref, self.start, self.end, self.alt)
-        else:
-            raise TypeError("Unsupported variant type %s" % self.variant_type)
+            if self.start == self.end:
+                return "%s%ddelins%s" % (self.start_res, self.start, self.alt)
+            return "%s%d_%s%ddelins%s" % (self.start_res, self.start, self.end_res, self.end, self.alt)
 
     def __repr__(self):
         return "<%s %s from %s>" % (self.__class__.__name__, str(self),
@@ -304,9 +303,131 @@ class ProteinVariant(object):
     def __eq__(self, other):
         if not isinstance(other, ProteinVariant):
             return False
-        return (self.sequence == other.sequence and
-                self.start == other.start and
+        return (self.start == other.start and
                 self.end == other.end and
                 self.ref == other.ref and
                 self.alt == other.alt and
-                self.variant_type == other.variant_type)
+                self.start_res == other.start_res and
+                self.end_res == other.end_res)
+
+class VariantRegister:
+    """
+    Thin abstraction layer over a dictionary storing ProteinVariant objects
+    with their HGVS one-letter string representation as key.
+    """
+    _substitution_format = re.compile(r"^[A-Z]\d+[A-Z]$")
+    _deletion_format = re.compile(r"^[A-Z]\d+del$|^[A-Z]\d+_[A-Z]\d+del$")
+    _insertion_format = re.compile(r"^[A-Z]\d+_[A-Z]\d+ins[A-Z]+$")
+    _duplication_format = re.compile(r"^[A-Z]\d+dup$|^[A-Z]\d+_[A-Z]\d+dup$")
+    _delins_format = re.compile(r"^[A-Z]\d+delins[A-Z]+$|^[A-Z]\d+_[A-Z]\d+delins[A-Z]+$")
+
+    def __init__(self):
+        self._register = {}
+
+    def add_variant(self, variant):
+        """
+        Add a ProteinVariant to the register.
+
+        Parameters
+        ----------
+        variant : :obj:`cancermuts.core.ProteinVariant`
+            Variant to be added to the register.
+        """
+        if not isinstance(variant, ProteinVariant):
+            raise TypeError("VariantRegister only accepts ProteinVariant objects, "
+                           f"got {type(variant)}")
+        hgvs = variant.hgvs
+        if hgvs in self._register:
+            raise ValueError(f"Variant {hgvs} already present in register")
+        self._register[hgvs] = variant
+
+    def _is_valid_variant_string(self, item):
+        return (re.match(self._substitution_format, item)
+                or re.match(self._deletion_format, item)
+                or re.match(self._insertion_format, item)
+                or re.match(self._duplication_format, item)
+                or re.match(self._delins_format, item))
+
+    def __getitem__(self, item):
+        """
+        Retrieve a variant from the register by one-letter or HGVS one-letter string.
+
+        Parameters
+        ----------
+        item : :obj:`str`
+            Variant string in one-letter format (e.g. ``H39F``) or HGVS format
+            (e.g. ``p.H39F``).
+
+        Returns
+        -------
+        :obj:`cancermuts.core.ProteinVariant`
+            The corresponding stored variant.
+        """
+        if item.startswith("p."):
+            bare_item = item[2:]
+            if self._is_valid_variant_string(bare_item):
+                item_hgvs = item
+            else:
+                raise KeyError(f"Unsupported variant format: {item}")
+        elif self._is_valid_variant_string(item):
+            item_hgvs = "p." + item
+        else:
+            raise KeyError(f"Unsupported variant format: {item}")
+
+        return self._register[item_hgvs]
+
+    def _sorted_variants(self):
+        return sorted(self._register.values(),
+        key=lambda var: (var.start, var.end, var.variant_type, var.ref, var.alt))
+
+    def __iter__(self):
+        """
+        Iterate over ordered stored variants.
+        """
+        return iter(self._sorted_variants())
+
+    def __contains__(self, item):
+        return item in self._register
+
+    def get_variant_table(self, variant_types=None):
+        """
+        Return a pandas DataFrame containing the ordered variants stored in the register.
+
+        Parameters
+        ----------
+        variant_types : :obj:`str` or iterable of :obj:`str`, optional
+            Variant type to include in the output. If provided, only variants whose
+            ``variant_type`` matches one of the specified values are returned.
+            If None, all variants are included.
+
+        Returns
+        -------
+        :obj:`pandas.DataFrame`
+            DataFrame with one row per variant
+        """
+
+        variants = self._sorted_variants()
+        if variant_types is not None:
+            if isinstance(variant_types, str):
+                variant_types = {variant_types}
+            else:
+                variant_types = set(variant_types)
+
+            variants = [v for v in variants if v.variant_type in variant_types]
+
+        variant_dictionary = {"variant": [],
+                              "variant_type": [],
+                              "position": [],
+                              "end": [],
+                              "ref": [],
+                              "alt": []}
+
+        for v in variants:
+            variant_dictionary["position"].append(v.start)
+            variant_dictionary["end"].append(v.end)
+            variant_dictionary["ref"].append(v.ref)
+            variant_dictionary["alt"].append(v.alt)
+            variant_dictionary["variant_type"].append(v.variant_type)
+            variant_dictionary["variant"].append(str(v))
+
+        return pd.DataFrame(variant_dictionary)
