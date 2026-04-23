@@ -1,7 +1,6 @@
 # import the UniProt data source class
 from cancermuts.datasources import UniProt
 
-
 # create the corresponding uniprot object
 up = UniProt()
 
@@ -21,13 +20,12 @@ seq.aliases["refseq"] = "NP_073729"
 print(seq.sequence)
 
 # the seq.positions attribute is an ordered list of the protein positions:
-seq.positions[0:3]
+print(seq.positions[0:3])
 
 # import data sources classes
 from cancermuts.datasources import cBioPortal, COSMIC, ClinVar
 
 # add mutations from cBioPortal
-
 cb = cBioPortal()
 
 cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
@@ -42,29 +40,40 @@ print(seq.positions[64].mutations[0].mutated_residue_type)
 print(seq.positions[38].mutations[0].metadata)
 
 # add mutations from COSMIC
-cosmic = COSMIC(targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
-				screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
-				classification_database_file='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
-				database_encoding='latin1', lazy_load_db=True)
-cosmic.add_mutations(seq,
-					 genome_assembly_version='GRCh38',
-					 metadata=['genomic_coordinates', 'genomic_mutations',
-					 			'cancer_site', 'cancer_histology'])
+cosmic = COSMIC(
+    targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
+    screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
+    classification_database_file='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
+    database_encoding='latin1',
+    lazy_load_db=True
+)
+cosmic.add_mutations(
+    seq,
+    genome_assembly_version='GRCh38',
+    metadata=['genomic_coordinates', 'genomic_mutations', 'cancer_site', 'cancer_histology']
+)
 
 # let's check them out
 print(seq.positions[64].mutations[0])
-
 print(seq.positions[64].mutations[0].sources)
-
 print(seq.positions[64].mutations[0].metadata)
 
 # add mutations from ClinVar
 clinvar = ClinVar()
 clinvar.add_mutations(seq, metadata=[
-        'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status', 'genomic_mutations',
-        'clinvar_variant_id', 'genomic_coordinates', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_classification',
-        'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status', 
-        'clinvar_clinical_impact_classification'])
+    'clinvar_germline_classification',
+    'clinvar_germline_condition',
+    'clinvar_germline_review_status',
+    'genomic_mutations',
+    'clinvar_variant_id',
+    'genomic_coordinates',
+    'clinvar_oncogenicity_condition',
+    'clinvar_oncogenicity_classification',
+    'clinvar_oncogenicity_review_status',
+    'clinvar_clinical_impact_condition',
+    'clinvar_clinical_impact_review_status',
+    'clinvar_clinical_impact_classification'
+])
 
 # Check ClinVar Variant
 print(seq.positions[14].mutations)
@@ -85,21 +94,21 @@ print(seq.positions[64].mutations[0].metadata['revel_score'])
 from cancermuts.datasources import gnomAD
 
 gnomad = gnomAD(version='2.1')
-gnomad.add_metadata(seq, md_type=['gnomad_exome_allele_frequency',
-	                              'gnomad_genome_allele_frequency'])
+gnomad.add_metadata(seq, md_type=[
+    'gnomad_exome_allele_frequency',
+    'gnomad_genome_allele_frequency'
+])
 
 print(seq.positions[64].mutations[0].metadata['gnomad_exome_allele_frequency'])
-
 print(seq.positions[64].mutations[0].metadata['gnomad_genome_allele_frequency'])
 
-from cancermuts.datasources import PhosphoSite, dbPTM, GlyGen, MobiDB
+from cancermuts.datasources import PhosphoSite, dbPTM, GlyGen, MobiDB, NetPhos
 
 # add annotations from PhosphoSite
 ps = PhosphoSite('/data/databases/phosphosite/')
 ps.add_position_properties(seq)
 
 print(seq.positions[4].properties)
-
 print(seq.positions[28].properties)
 
 # add annotations from dbPTM
@@ -110,20 +119,22 @@ db.add_position_properties(seq)
 gg = GlyGen('/data/databases/GlyGen/', database_file='human_proteoform_glycosylation_sites_uniprotkb_filtered.csv')
 gg.add_position_properties(seq)
 
+# add annotations from NetPhos
+np = NetPhos('/data/user/shared_projects/netphos_proteomewide/netphos_human_isoforms/raw')
+np.add_position_properties(seq)
+
 # add annotations from MobiDB
 mdb = MobiDB()
 mdb.add_position_properties(seq)
 
 print(seq.positions[0].properties['mobidb_disorder_propensity'])
-
 print(seq.positions[10].properties['mobidb_disorder_propensity'])
 
 # add annotations from ELM
 from cancermuts.datasources import ELMPredictions
 
 elm = ELMPredictions()
-elm.add_sequence_properties(seq,
-			    exclude_elm_classes="MOD_.")
+elm.add_sequence_properties(seq, exclude_elm_classes="MOD_.")
 
 print(seq.properties)
 print(seq.properties['linear_motif'][0].type)
