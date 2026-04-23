@@ -616,10 +616,10 @@ order/disorder propensity from MobiDB.
 We import the relative data source class, similarly as what done previously:
 
 ```py
-from cancermuts.datasources import PhosphoSite, GlyGen, MobiDB
+from cancermuts.datasources import PhosphoSite, dbPTM, NetPhos, GlyGen, MobiDB
 ```
 
-#### Post-translational modifications with phosphosite
+#### Post-translational modifications with PhosphoSite
 
 We will annotate post-translational modifications identified in experiments from
 the PhosphoSite Plus database. In order to do so we need a local copy of the
@@ -746,6 +746,54 @@ Once again, we can check the result:
 >>> seq.positions[42].properties
 {'ptm_phosphorylation': <PositionProperty Phosphorylation Site from dbPTM>}
 ```
+
+#### Predicted phosphorylation sites with NetPhos
+
+We can also annotate predicted phosphorylation sites using a local **NetPhos**
+dataset. In contrast to PhosphoSite and dbPTM, which provide experimentally
+derived PTM annotations, NetPhos provides **predicted phosphorylation sites**.
+
+Cancermuts imports these predictions as regular phosphorylation position
+properties (`ptm_phosphorylation`).
+
+We first create the NetPhos data source object. We need to supply the location
+of the directory containing the NetPhos output files:
+
+```py
+>>> np = NetPhos('/data/user/shared_projects/netphos_proteomewide/netphos_human_isoforms/raw')
+```
+
+Each sequence is matched to a local NetPhos file. For canonical sequences,
+Cancermuts uses the UniProt accession (for example `Q9C0C7.netphos.txt`),
+whereas for non-canonical isoforms it uses the isoform identifier
+(for example `Q9C0C7-2.netphos.txt`).
+
+By default, NetPhos annotations are added for residues of type `S`, `T`, or `Y`
+when the predicted score is higher than `0.5`.
+
+Once the object is created, we can add the position properties to our sequence
+object:
+
+```py
+>>> np.add_position_properties(seq)
+```
+
+Optionally, since NetPhos currently only supports phosphorylation, the
+`properties` argument can also be specified explicitly:
+
+```py
+>>> np.add_position_properties(seq, properties=['phosphorylation'])
+```
+
+Once again, we can check the result:
+
+```py
+>>> seq.positions[51].properties
+{'ptm_phosphorylation': <PositionProperty Phosphorylation Site from NetPhos>}
+```
+
+In this case, the phosphorylation annotation was added from a NetPhos prediction
+rather than from an experimental PTM database.
 
 #### Glycosylation annotations with GlyGen
 
