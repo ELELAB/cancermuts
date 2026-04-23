@@ -120,7 +120,7 @@ gg = GlyGen('/data/databases/GlyGen/', database_file='human_proteoform_glycosyla
 gg.add_position_properties(seq)
 
 # add annotations from NetPhos
-np = NetPhos('/data/user/shared_projects/netphos_proteomewide/netphos_human_isoforms/raw')
+np = NetPhos('/data/databases/netphos_human_proteome/netphos_human_isoforms/raw/')
 np.add_position_properties(seq)
 
 # add annotations from MobiDB

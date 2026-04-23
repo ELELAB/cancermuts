@@ -141,7 +141,7 @@ except UnexpectedIsoformError:
     print("GlyGen annotations will not be added, as a non-canonical isoform has been provided")
 
 # NetPhos supports non-canonical isoforms through isoform-specific local files
-np = NetPhos('/data/user/shared_projects/netphos_proteomewide/netphos_human_isoforms/raw')
+np = NetPhos('/data/databases/netphos_human_proteome/netphos_human_isoforms/raw/')
 np.add_position_properties(seq)
 
 # MobiDB does not support non-canonical isoforms
