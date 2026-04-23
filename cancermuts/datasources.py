@@ -201,11 +201,11 @@ class UniProt(DynamicSource, object):
 
         else:
             if canonical_isoform is not None:
+                isoform = canonical_isoform
                 is_canonical = True
                 fasta_id = isoform
                 self.log.info(f"No isoform provided; using canonical isoform {isoform}")
             else:
-                canonical_isoform = this_upac
                 is_canonical = True
                 fasta_id = this_upac
                 self.log.info(f"No canonical isoform found for {this_upac}; using base accession")
