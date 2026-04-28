@@ -32,6 +32,7 @@ from .properties import *
 from .log import logger_init
 import re
 import pandas as pd
+from Bio.SeqUtils import seq3
 
 class Sequence(object):
     """The most fundamental class of Cancermuts, this class starts from a
@@ -95,21 +96,6 @@ class Sequence(object):
         self.sequence_numbering = list(range(1, len(self.sequence) + 1))
         self.properties = {}
 
-    def index2seq(self, idx):
-        """
-        Returns the sequence numbering corresponding to the `idx`-th
-        residue, starting from 0. usually this corresponds to idx+1.
-
-        Parameters
-        ----------
-        idx : :obj:`int`
-            0-index position in the protein sequence
-
-        Returns
-        ----------
-        i:obj:`int`
-            sequence number corresponding to the idx-th position
-        """
 
     def seq2index(self, seqn):
         """
@@ -157,13 +143,12 @@ class Sequence(object):
             self.log.debug("adding property %s to sequence of %s (%s)" % (str(prop), self.gene_id, add_type))
 
     def _variant_wt_check(self, var):
-        if self.sequence[var.start - 1] != var.start_res:
-            raise ValueError(f"WT mismatch for {var.hgvs}: expected {var.start_res} at "
-                             f"position {var.start}, got {self.sequence[var.start - 1]}")
-
-        if self.sequence[var.end - 1] != var.end_res:
-            raise ValueError(f"WT mismatch for {var.hgvs}: expected {var.end_res} at "
-                             f"position {var.end}, got {self.sequence[var.end - 1]}")
+        if var.start < 1 or var.end > len(self.sequence):
+            raise ValueError(f"Variant {var.hgvs} is outside sequence bounds: "
+                             f"{var.start}-{var.end} for sequence of length {len(self.sequence)}")
+        if self.sequence[var.start - 1:var.end] != var.ref:
+            raise ValueError(f"WT mismatch for {var.hgvs}: expected {var.ref} at "
+                              f"{var.start}-{var.end}, got {self.sequence[var.start - 1:var.end]}")
 
     def add_variant(self, var):
         """
@@ -206,10 +191,6 @@ class ProteinVariant(object):
             reference amino-acid sequence
         alt : :obj:`str`
             altered amino-acid sequence
-        start_res : :obj:`str`
-            Wild-type amino-acid at the start coordinate
-        end_res : :obj:`str`
-            Wild-type amino-acid at the end coordinate
         sources : :obj:`list` of :obj:`cancermuts.datasources.Datasource`
             sources the variant was derived from
         metadata : :obj:`dict`
@@ -217,8 +198,7 @@ class ProteinVariant(object):
     """
 
     @logger_init
-    def __init__(self, start, end, ref, alt, start_res,
-                 end_res, sources=None, metadata=None):
+    def __init__(self, start, end, ref, alt, sources=None, metadata=None):
         """Constructor for the ProteinVariant class.
         
         Parameters
@@ -231,10 +211,6 @@ class ProteinVariant(object):
             reference amino-acid sequence
         alt : :obj:`str`
             altered amino-acid sequence
-        start_res : :obj:`str`
-            Wild-type amino-acid at the start coordinate
-        end_res : :obj:`str`
-            Wild-type amino-acid at the end coordinate
         sources : :obj:`list` of :obj:`cancermuts.datasources.Datasource`
             sources the variant was derived from
         metadata : :obj:`dict`
@@ -245,8 +221,6 @@ class ProteinVariant(object):
         self.end = end
         self.ref = ref
         self.alt = alt
-        self.start_res = start_res
-        self.end_res = end_res
         if sources is None:
             self.sources = []
         else:
@@ -261,14 +235,14 @@ class ProteinVariant(object):
     @property
     def variant_type(self):
         if (self.start == self.end and len(self.ref) == len(self.alt) == 1
-            and self.ref != self.alt):
-            return "substitution"
+        and self.ref != self.alt):
+            return "missense"
         elif self.ref != "" and self.alt == "":
             return "deletion"
-        elif self.ref == "" and self.alt != "":
+        elif (self.ref != "" and self.alt != ""
+        and len(self.alt) > len(self.ref)
+        and self.ref == self.alt[0] + self.alt[-1]):
             return "insertion"
-        elif self.ref != "" and self.alt == self.ref:
-            return "duplication"
         elif self.ref != "" and self.alt != "":
             return "delins"
         else:
@@ -277,25 +251,21 @@ class ProteinVariant(object):
 
     @property
     def hgvs(self):
-        return f"p.{self}"
-
-    def __str__(self):
-        if self.variant_type == "substitution":
-            return "%s%d%s" % (self.start_res, self.start, self.alt)
+        if self.variant_type == "missense":
+            return "p.%s%d%s" % (seq3(self.ref), self.start, seq3(self.alt))
         elif self.variant_type == "deletion":
             if self.start == self.end:
-                return "%s%ddel" % (self.start_res, self.start)
-            return "%s%d_%s%ddel" % (self.start_res, self.start, self.end_res, self.end)
+                return "p.%s%ddel" % (seq3(self.ref), self.start)
+            return "p.%s%d_%s%ddel" % (seq3(self.ref[0]), self.start, seq3(self.ref[-1]), self.end)
         elif self.variant_type == "insertion":
-            return "%s%d_%s%dins%s" % (self.start_res, self.start, self.end_res, self.end, self.alt)
-        elif self.variant_type == "duplication":
-            if self.start == self.end:
-                return "%s%ddup" % (self.start_res, self.start)
-            return "%s%d_%s%ddup" % (self.start_res, self.start, self.end_res, self.end)
+            return "p.%s%d_%s%dins%s" % (seq3(self.ref[0]), self.start, seq3(self.ref[-1]), self.end, seq3(self.alt[1:-1]))
         elif self.variant_type == "delins":
             if self.start == self.end:
-                return "%s%ddelins%s" % (self.start_res, self.start, self.alt)
-            return "%s%d_%s%ddelins%s" % (self.start_res, self.start, self.end_res, self.end, self.alt)
+                return "p.%s%ddelins%s" % (seq3(self.ref), self.start, seq3(self.alt))
+            return "p.%s%d_%s%ddelins%s" % (seq3(self.ref[0]), self.start, seq3(self.ref[-1]), self.end, seq3(self.alt))
+
+    def __str__(self):
+        return self.hgvs
 
     def __repr__(self):
         return "<%s %s from %s>" % (self.__class__.__name__, str(self),
@@ -306,20 +276,32 @@ class ProteinVariant(object):
         return (self.start == other.start and
                 self.end == other.end and
                 self.ref == other.ref and
-                self.alt == other.alt and
-                self.start_res == other.start_res and
-                self.end_res == other.end_res)
+                self.alt == other.alt)
 
 class VariantRegister:
     """
     Thin abstraction layer over a dictionary storing ProteinVariant objects
-    with their HGVS one-letter string representation as key.
+    with their HGVS string representation as key.
     """
-    _substitution_format = re.compile(r"^[A-Z]\d+[A-Z]$")
-    _deletion_format = re.compile(r"^[A-Z]\d+del$|^[A-Z]\d+_[A-Z]\d+del$")
-    _insertion_format = re.compile(r"^[A-Z]\d+_[A-Z]\d+ins[A-Z]+$")
-    _duplication_format = re.compile(r"^[A-Z]\d+dup$|^[A-Z]\d+_[A-Z]\d+dup$")
-    _delins_format = re.compile(r"^[A-Z]\d+delins[A-Z]+$|^[A-Z]\d+_[A-Z]\d+delins[A-Z]+$")
+    _aa1 = r"[ACDEFGHIKLMNPQRSTVWY]"
+    _aa3 = r"(?:Ala|Arg|Asn|Asp|Cys|Gln|Glu|Gly|His|Ile|Leu|Lys|Met|Phe|Pro|Ser|Thr|Trp|Tyr|Val|Ter)"
+
+    _mavisp_formats = [rf"{_aa1}\d+{_aa1}",
+                       rf"{_aa1}\d+del",
+                       rf"{_aa1}\d+_{_aa1}\d+del",
+                       rf"{_aa1}\d+_{_aa1}\d+ins{_aa1}+",
+                       rf"{_aa1}\d+delins{_aa1}+",
+                       rf"{_aa1}\d+_{_aa1}\d+delins{_aa1}+"]
+
+    _hgvs_formats = [rf"p\.{_aa3}\d+{_aa3}",
+                     rf"p\.{_aa3}\d+del",
+                     rf"p\.{_aa3}\d+_{_aa3}\d+del",
+                     rf"p\.{_aa3}\d+_{_aa3}\d+ins(?:{_aa3})+",
+                     rf"p\.{_aa3}\d+delins(?:{_aa3})+",
+                     rf"p\.{_aa3}\d+_{_aa3}\d+delins(?:{_aa3})+"]
+
+    _mavisp_format = re.compile(rf"({'|'.join(_mavisp_formats)})")
+    _hgvs_format = re.compile(rf"({'|'.join(_hgvs_formats)})")
 
     def __init__(self):
         self._register = {}
@@ -341,40 +323,38 @@ class VariantRegister:
             raise ValueError(f"Variant {hgvs} already present in register")
         self._register[hgvs] = variant
 
-    def _is_valid_variant_string(self, item):
-        return (re.match(self._substitution_format, item)
-                or re.match(self._deletion_format, item)
-                or re.match(self._insertion_format, item)
-                or re.match(self._duplication_format, item)
-                or re.match(self._delins_format, item))
+    def _is_valid_mavisp_string(self, item):
+        return self._mavisp_format.fullmatch(item) is not None
+
+    def _is_valid_hgvs_string(self, item):
+        return self._hgvs_format.fullmatch(item) is not None
+    
+    def _mavisp2hgvs(self, item):
+        item = re.sub(r"([A-Z])(\d+)", lambda m: f"{seq3(m.group(1))}{m.group(2)}", item)
+        item = re.sub(r"(ins|delins)([A-Z]+)$", lambda m: f"{m.group(1)}{seq3(m.group(2))}", item)
+        item = re.sub(r"(\d+)([A-Z])$", lambda m: f"{m.group(1)}{seq3(m.group(2))}", item)
+        return f"p.{item}"
 
     def __getitem__(self, item):
         """
-        Retrieve a variant from the register by one-letter or HGVS one-letter string.
+        Retrieve a variant from the register by one-letter or HGVS string.
 
         Parameters
         ----------
         item : :obj:`str`
-            Variant string in one-letter format (e.g. ``H39F``) or HGVS format
-            (e.g. ``p.H39F``).
+            Variant string in MAVISp one-letter format (e.g. ``H39F``) or HGVS protein format
+            (e.g. ``p.His39Phe``).
 
         Returns
         -------
         :obj:`cancermuts.core.ProteinVariant`
             The corresponding stored variant.
         """
-        if item.startswith("p."):
-            bare_item = item[2:]
-            if self._is_valid_variant_string(bare_item):
-                item_hgvs = item
-            else:
-                raise KeyError(f"Unsupported variant format: {item}")
-        elif self._is_valid_variant_string(item):
-            item_hgvs = "p." + item
-        else:
-            raise KeyError(f"Unsupported variant format: {item}")
-
-        return self._register[item_hgvs]
+        if self._is_valid_hgvs_string(item):
+            return self._register[item]
+        elif self._is_valid_mavisp_string(item):
+            return self._register[self._mavisp2hgvs(item)]
+        raise KeyError(f"Unsupported variant format: {item}")
 
     def _sorted_variants(self):
         return sorted(self._register.values(),
@@ -387,7 +367,11 @@ class VariantRegister:
         return iter(self._sorted_variants())
 
     def __contains__(self, item):
-        return item in self._register
+        try:
+            self[item]
+            return True
+        except KeyError:
+            return False
 
     def get_variant_table(self, variant_types=None):
         """
