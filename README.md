@@ -24,6 +24,7 @@ mutations. At the moment it supports:
     * REVEL - pathogenicity prediction
     * Phosphosite - post-translational modifications
     * dbPTM - post-translational modifications
+    * NetPhos - post-translational modifications
     * GlyGen - glycosylation modifications
     * gnomAD - allele frequency
     * MobiDB - protein disorder
