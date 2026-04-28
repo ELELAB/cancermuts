@@ -2065,11 +2065,9 @@ class NetPhos(StaticSource, object):
         self.valid_residues = {"S", "T", "Y"}
 
     def _get_database_file(self, sequence):
-        file_name = (
-            f"{sequence.uniprot_ac}.netphos.txt"
+        file_name = (f"{sequence.uniprot_ac}.netphos.txt"
             if sequence.is_canonical
-            else f"{sequence.isoform}.netphos.txt"
-        )
+            else f"{sequence.isoform}.netphos.txt")
 
         file_path = os.path.join(self.database_dir, file_name)
 
@@ -2107,9 +2105,7 @@ class NetPhos(StaticSource, object):
                     try:
                         score = float(parts[5])
                     except Exception:
-                        self.log.warning(
-                            f"could not parse score in {file_path}: {line.strip()}"
-                        )
+                        self.log.warning(f"could not parse score in {file_path}: {line.strip()}")
                         continue
 
                     if residue_type not in self.valid_residues:
@@ -2142,30 +2138,21 @@ class NetPhos(StaticSource, object):
                 site_seq_idx = sequence.seq2index(site)
                 position = sequence.positions[site_seq_idx]
             except Exception:
-                self.log.warning(
-                    f"NetPhos site {site_label} is outside the protein sequence; it will be skipped"
-                )
+                self.log.warning(f"NetPhos site {site_label} is outside the protein sequence; it will be skipped")
                 continue
 
             if position.wt_residue_type != wt:
-                self.log.warning(
-                    f"for NetPhos site {site_label}, residue {wt} is "
-                    f"{position.wt_residue_type} in wild-type sequence; it will be skipped"
-                )
+                self.log.warning(f"for NetPhos site {site_label}, residue {wt} is "
+                    f"{position.wt_residue_type} in wild-type sequence; it will be skipped")
                 continue
 
             if prop_name in position.properties:
                 prop = position.properties[prop_name]
                 if self not in prop.sources:
                     prop.sources.append(self)
-                self.log.info(
-                    f"site {site_label} already annotated as phosphorylation; source will be added"
-                )
+                self.log.info(f"site {site_label} already annotated as phosphorylation; source will be added")
             else:
-                prop = position_properties_classes[prop_name](
-                    sources=[self],
-                    position=position,
-                )
+                prop = position_properties_classes[prop_name](sources=[self], position=position)
                 position.add_property(prop)
                 self.log.info(f"adding {site_label} to site {prop.name}")
 
