@@ -148,7 +148,14 @@ class Sequence(object):
                              f"{var.start}-{var.end} for sequence of length {len(self.sequence)}")
         if self.sequence[var.start - 1:var.end] != var.ref:
             raise ValueError(f"WT mismatch for {var.hgvs}: expected {var.ref} at "
-                              f"{var.start}-{var.end}, got {self.sequence[var.start - 1:var.end]}")
+                             f"{var.start}-{var.end}, got {self.sequence[var.start - 1:var.end]}")
+        if var.variant_type == "insertion":
+            right_pos = var.start + 1
+            if right_pos > len(self.sequence):
+                raise ValueError(f"Variant {var.hgvs} is outside sequence bounds")
+            if self.sequence[right_pos - 1] != var.alt[-1]:
+                raise ValueError(f"WT mismatch for {var.hgvs}: expected right flank {var.alt[-1]} at "
+                                 f"position {right_pos}, got {self.sequence[right_pos - 1]}")
 
     def add_variant(self, var):
         """
@@ -239,11 +246,12 @@ class ProteinVariant(object):
             return "missense"
         elif self.ref != "" and self.alt == "":
             return "deletion"
-        elif (self.ref != "" and self.alt != ""
-        and len(self.alt) > len(self.ref)
-        and self.ref == self.alt[0] + self.alt[-1]):
+        elif (self.start == self.end
+        and len(self.ref) == 1
+        and len(self.alt) > 2
+        and self.ref == self.alt[0]):
             return "insertion"
-        elif self.ref != "" and self.alt != "":
+        elif self.ref != "" and self.alt != "" and self.ref != self.alt:
             return "delins"
         else:
             raise ValueError(f"Cannot determine variant type from start={self.start}, "
@@ -258,7 +266,7 @@ class ProteinVariant(object):
                 return "p.%s%ddel" % (seq3(self.ref), self.start)
             return "p.%s%d_%s%ddel" % (seq3(self.ref[0]), self.start, seq3(self.ref[-1]), self.end)
         elif self.variant_type == "insertion":
-            return "p.%s%d_%s%dins%s" % (seq3(self.ref[0]), self.start, seq3(self.ref[-1]), self.end, seq3(self.alt[1:-1]))
+            return "p.%s%d_%s%dins%s" % (seq3(self.ref), self.start, seq3(self.alt[-1]), self.start + 1, seq3(self.alt[1:-1]))
         elif self.variant_type == "delins":
             if self.start == self.end:
                 return "p.%s%ddelins%s" % (seq3(self.ref), self.start, seq3(self.alt))
