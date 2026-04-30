@@ -247,7 +247,6 @@ class ProteinVariant(object):
         elif self.ref != "" and self.alt == "":
             return "deletion"
         elif (self.start == self.end
-        and len(self.ref) == 1
         and len(self.alt) > 2
         and self.ref == self.alt[0]):
             return "insertion"
