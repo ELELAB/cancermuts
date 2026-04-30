@@ -414,14 +414,11 @@ class cBioPortal(DynamicSource, object):
                 self.log.warning(f"mutation {m} is outside the protein sequence; it will be skipped")
                 continue
 
-            position = sequence.positions[site_seq_idx]
-
-            if position.wt_residue_type != wt:
-                self.log.warning(f"for mutation {m}, residue {wt} is {position.wt_residue_type} in wild-type sequence; it will be skipped")
+            if sequence.sequence[site_seq_idx] != wt:
+                self.log.warning(f"for mutation {m}, residue {wt} is {sequence.sequence[site_seq_idx]} in wild-type sequence; it will be skipped")
                 continue
 
-            mutation_obj = ProteinVariant(sequence=sequence, start=num, end=num, ref=wt, alt=mut, 
-                                          variant_type="substitution", sources=[self])
+            mutation_obj = ProteinVariant(start=num, end=num, ref=wt, alt=mut, sources=[self])
 
             for md in metadata:
                 mutation_obj.metadata[md] = []
@@ -1414,17 +1411,13 @@ class ClinVar(DynamicSource, object):
                 self.log.warning(f"mutation {one_letter_mut} is outside the protein sequence; it will be skipped")
                 continue
 
-            position = sequence.positions[site_idx]
-            if position.wt_residue_type != ref_aa:
-                self.log.warning(
-                    f"Error with ClinVar ID {clinvar_id}: Ref AA mismatch at position {pos} "
-                    f"(expected {ref_aa}, found {position.wt_residue_type})"
-                )
+            if sequence.sequence[site_idx] != ref_aa:
+                self.log.warning(f"Error with ClinVar ID {clinvar_id}: Ref AA mismatch at position {pos} "
+                                 f"(expected {ref_aa}, found {sequence.sequence[site_idx]})")
                 continue
 
             # Create mutation:
-            mutation = ProteinVariant(sequence=sequence, start=pos, end=pos, ref=ref_aa, alt=alt_aa,
-                          variant_type="substitution", sources=[self])
+            mutation = ProteinVariant(start=pos, end=pos, ref=ref_aa, alt=alt_aa, sources=[self])
 
             # Store metadata:
 
@@ -1835,16 +1828,13 @@ class COSMIC(DynamicSource, object):
                 self.log.warning(f"mutation {m} is outside the protein sequence; it will be skipped")
                 continue
 
-            position = sequence.positions[site_seq_idx]
-
-            if position.wt_residue_type != wt:
-                self.log.warning("for mutation %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
+            if sequence.sequence[site_seq_idx] != wt:
+                self.log.warning("for mutation %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, sequence.sequence[site_seq_idx]))
                 continue
 
             mutation_indices = [i for i, x in enumerate(mutations) if x == m]
 
-            mutation_obj = ProteinVariant(sequence=sequence, start=num, end=num, ref=wt, alt=mut, 
-                                          variant_type="substitution", sources=[self])
+            mutation_obj = ProteinVariant(start=num, end=num, ref=wt, alt=mut, sources=[self])
             for md in metadata:
                 mutation_obj.metadata[md] = []
                 for mi in mutation_indices:
@@ -3439,10 +3429,8 @@ class ManualAnnotation(StaticSource):
                 self.log.warning(f"mutation {m} is outside the protein sequence; it will be skipped")
                 continue
 
-            position = sequence.positions[site_seq_idx]
-
-            if position.wt_residue_type != wt:
-                self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, num, position.wt_residue_type))
+            if sequence.sequence[site_seq_idx] != wt:
+                self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, num, sequence.sequence[site_seq_idx]))
                 continue
 
             mutation_indices = [i for i, x in enumerate(mutations) if x == m]
@@ -3461,8 +3449,7 @@ class ManualAnnotation(StaticSource):
                         out_metadata['genomic_mutations'][mi] = out_metadata['genomic_mutations'][mi][0:2]
                 mutation_indices.extend(new_mut_ind)
 
-            mutation_obj = ProteinVariant(sequence=sequence, start=num, end=num, ref=wt, alt=mut, 
-                                          variant_type="substitution", sources=[self])
+            mutation_obj = ProteinVariant(start=num, end=num, ref=wt, alt=mut, sources=[self])
 
             #Adding mutation to mutation object
             for md in metadata:
