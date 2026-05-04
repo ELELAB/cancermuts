@@ -1896,7 +1896,7 @@ class PhosphoSite(DynamicSource, object):
 
         return sites
 
-    def add_position_properties(self, sequence, properties=None):
+    def add_sequence_properties(self, sequence, properties=None):
 
         if not sequence.is_canonical:
             raise UnexpectedIsoformError(
@@ -1920,25 +1920,24 @@ class PhosphoSite(DynamicSource, object):
                     self.log.warning("PTM site %s is outside the protein sequence; it will be skipped" % m)
                     continue
 
-                position = sequence.positions[site_seq_idx]
-                if position.wt_residue_type != wt:
-                    self.log.warning("for PTM %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
+                if sequence.sequence[site_seq_idx] != wt:
+                    self.log.warning("for PTM %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, sequence.sequence[site_seq_idx]))
                     continue
 
                 already_annotated = False
-                for prop in position.properties:
-                    if isinstance(prop, position_properties_classes[self._ptm_types_to_classes[ptm]]):
-                        prop.sources.append(self)
-                        self.log.info("site %s already annotated as %s; source will be added" % (m, position_properties_classes[ptm].name))
-
-                        already_annotated = True
-                        property_obj = prop
+                if self._ptm_types_to_classes[ptm] in sequence.properties:
+                    for prop in sequence.properties[self._ptm_types_to_classes[ptm]]:
+                        if prop.positions == [site]:
+                            if self not in prop.sources:
+                                prop.sources.append(self)
+                            self.log.info("site %s already annotated as %s; source will be added" % (m, self._ptm_types_to_classes[ptm]))
+                            already_annotated = True
+                            property_obj = prop
 
                 if not already_annotated:
-                    property_obj = position_properties_classes[self._ptm_types_to_classes[ptm]](  sources=[self],
-                                                        position=sequence.positions[site_seq_idx]
-                                                        )
-                    position.add_property(property_obj)
+                    property_obj = sequence_properties_classes[self._ptm_types_to_classes[ptm]](  sources=[self],
+                                                        positions=[site] )
+                    sequence.add_property(property_obj)
                     self.log.info("adding %s to site %s" % (m, property_obj.name))
 
                 if ptm == "O-GalNAc" or ptm == "O-GlcNAc":
@@ -1994,40 +1993,48 @@ class dbPTM(DynamicSource, object):
             df = df[df["protein"].str.endswith("_HUMAN", na=False)]       
             self._dbptm_data[ptm_type] = df
 
-    def add_position_properties(self, sequence, properties=None):
+    def add_sequence_properties(self, sequence, properties=None):
         
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("dbPTM annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
 
-        for ptm in self._ptm_types:   
+        if properties is None:
+            properties = self._ptm_types
+
+        for ptm in properties:
             df = self._dbptm_data[ptm]    
             df = df[df["uniprot"] == sequence.uniprot_ac]
 
             for pos in df['position']:
+                site = int(pos)
                 try:
-                    site_seq_idx = sequence.seq2index(pos)
-                    seq_pos = sequence.positions[site_seq_idx]
+                    sequence.seq2index(site)
                 except:
-                    self.log.warning("dbPTM site %s is outside the protein sequence; it will be skipped" %pos)
+                    self.log.warning("dbPTM site %s is outside the protein sequence; it will be skipped" %site)
                     continue
         
                 prop_name = self._ptm_types_to_classes[ptm]
 
-                if prop_name in seq_pos.properties:
-                    prop = seq_pos.properties[prop_name]
-                    prop.sources.append(self)
+                already_annotated = False
+                if prop_name in sequence.properties:
+                    for prop in sequence.properties[prop_name]:
+                        if prop.positions == [site]:
+                            if self not in prop.sources:
+                                prop.sources.append(self)
+                            already_annotated = True
+                            property_obj = prop
 
-                else:
-                    prop = position_properties_classes[prop_name](
+                if not already_annotated:
+                    property_obj = sequence_properties_classes[prop_name](
                         sources=[self],
-                        position=seq_pos
+                        positions=[site]
                     )
-                    seq_pos.add_property(prop)
+                    sequence.add_property(property_obj)
 
                 if ptm in self._glyco_subtypes:
 
                     new_subtype = self._glyco_subtypes[ptm]
-                    existing_subtypes = prop.metadata.get("subtypes", [])
+                    existing_subtypes = property_obj.metadata.get("subtypes", [])
                     base = new_subtype.split("-")[0]
 
                     has_specific = any(
@@ -2036,7 +2043,7 @@ class dbPTM(DynamicSource, object):
                     )
 
                     if not has_specific and new_subtype not in existing_subtypes:
-                        prop.add_subtype(new_subtype)
+                        property_obj.add_subtype(new_subtype)
 
 class GlyGen(StaticSource, object):
     @logger_init
@@ -2050,7 +2057,7 @@ class GlyGen(StaticSource, object):
         file_path = os.path.join(self.database_dir, self.database_file)
         self.database_df = pd.read_csv(file_path)
 
-    def add_position_properties(self, sequence):
+    def add_sequence_properties(self, sequence):
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("GlyGen annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
         
@@ -2062,24 +2069,26 @@ class GlyGen(StaticSource, object):
                 return
 
         protein_df["glycosylation_type"] = protein_df["glycosylation_type"].str.rstrip("-linked")
+        prop_name = GlycosylationSite.category
 
         for index, row in protein_df.iterrows():
-            idx = sequence.seq2index(row['glycosylation_site_uniprotkb'])
-
+            site = int(row['glycosylation_site_uniprotkb'])
             subtype = f"{row['glycosylation_type']}-{row['carb_name'].rstrip('.')}"
-            position_obj = sequence.positions[idx]
+
 
             already_annotated = False
-            for prop in position_obj.properties:
-                if isinstance(prop, GlycosylationSite):
-                    prop.sources.append(self)
-                    prop.add_subtype(subtype)
-                    already_annotated = True
+            if prop_name in sequence.properties:
+                for prop in sequence.properties[prop_name]:
+                    if prop.positions == [site]:
+                        if self not in prop.sources:
+                            prop.sources.append(self)
+                        prop.add_subtype(subtype)
+                        already_annotated = True
 
             if not already_annotated:
-                property_obj = GlycosylationSite(position_obj, sources=[self])
+                property_obj = GlycosylationSite(positions=[site], sources=[self])
                 property_obj.add_subtype(subtype)
-                position_obj.add_property(property_obj)
+                sequence.add_property(property_obj)
 
 class MyVariant(DynamicSource, object):
     @logger_init
@@ -2618,7 +2627,8 @@ class ELMPredictions(DynamicSource, object):
 
             this_positions = []
             for p in range(d[1],d[2]+1):
-                this_positions.append(sequence.positions[sequence.seq2index(p)])
+                sequence.seq2index(p)
+                this_positions.append(p)
 
             property_obj = sequence_properties_classes['linear_motif']  (sources=[self],
                                                                          positions=this_positions,
@@ -2698,7 +2708,8 @@ class ggetELMPredictions(StaticSource, object):
 
             this_positions = []
             for p in range(r['motif_start_in_query'], r['motif_end_in_query']+1):
-                this_positions.append(sequence.positions[sequence.seq2index(p)])
+                sequence.seq2index(p)
+                this_positions.append(p)
 
             property_obj = sequence_properties_classes['linear_motif']  (sources=[self],
                                                                          positions=this_positions,
@@ -3182,7 +3193,7 @@ class MobiDB(DynamicSource):
         self._data_cache = {}
         self._supported_properties = { 'mobidb_disorder_propensity' : self._get_mobidb_disorder_predictions }
 
-    def add_position_properties(self, sequence, prop=['mobidb_disorder_propensity'], use_alias='uniprot_acc'):
+    def add_sequence_properties(self, sequence, prop=['mobidb_disorder_propensity'], use_alias='uniprot_acc'):
 
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("MobiDB position annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
@@ -3213,13 +3224,16 @@ class MobiDB(DynamicSource):
 
         assignments = self._get_mobidb_disorder_predictions_assignments(sequence, *args, **kwargs)
 
-        if len(assignments) != len(sequence.positions):
+        if len(assignments) != len(sequence.sequence_numbering):
             self.log.error("Error in the assignment of predictions: length of MobiDB structure assignment and sequence don't match")
             return False
 
         for i,a in enumerate(assignments):
-            sequence.positions[i].properties['mobidb_disorder_propensity'] = position_properties_classes['mobidb_disorder_propensity'](sequence.positions[i], [self], a)
-
+            property_obj = sequence_properties_classes['mobidb_disorder_propensity'](
+                positions=[i+1],
+                sources=[self],
+                disorder_state=a)
+            sequence.add_property(property_obj)
 
     def _get_mobidb_disorder_predictions_assignments(self, sequence, *args, **kwargs):
         if 'use_alias' in kwargs:
@@ -3267,7 +3281,7 @@ class MobiDB(DynamicSource):
                         'homology-disorder-priority': homology_disorder_data,
                         'prediction-disorder-priority': predicted_disorder_data}
 
-        assignments = [None for p in sequence.positions]
+        assignments = [None for p in sequence.sequence_numbering]
 
         # If specified data is available, annotate sequence accordingly
         for dis_term in disorder_types:
@@ -3318,8 +3332,7 @@ class ManualAnnotation(StaticSource):
     _expected_cols = ['name', 'site', 'type', 'function', 'reference']
     _metadata_cols = ['genomic_mutations']
     _ptm_keywords = ['ptm_cleavage', 'ptm_phosphorylation', 'ptm_ubiquitination', 'ptm_acetylation', 'ptm_sumoylation', 'ptm_nitrosylation', 'ptm_methylation']
-    _supported_position_properties = _ptm_keywords
-    _supported_sequence_properties = ['linear_motif', 'structure']
+    _supported_sequence_properties = ['linear_motif', 'structure'] + _ptm_keywords
     _supported_mutation            = ['mutation']
     _mut_prot_parse = 'p.{wt:3l}{position:d}{mut:3l}'
 
@@ -3365,7 +3378,7 @@ class ManualAnnotation(StaticSource):
         self.log.info("Parsed file:")
         self.log.info('\n{0}'.format(str(self._df)))
 
-        all_properties = set(self._supported_position_properties + self._supported_sequence_properties + self._supported_mutation)
+        all_properties = set(self._supported_sequence_properties + self._supported_mutation)
 
         diff = set(df['type']).difference(all_properties)
         if len(diff) > 0:
@@ -3462,30 +3475,6 @@ class ManualAnnotation(StaticSource):
             sequence.add_variant(mutation_obj)
 
 
-    def add_position_properties(self, sequence, prop=_supported_position_properties):
-
-        if self._df is None:
-            return
-
-        tmp_df = self._df[ self._df.apply(lambda x: x['type'] in self._supported_position_properties, axis=1) ]
-
-        for idx, row in tmp_df.iterrows():
-
-            try:
-                this_position = sequence.positions[sequence.seq2index(int(row['site']))]
-            except:
-                self.log.error("position property refers to a position outside of the sequence")
-
-            property_obj = position_properties_classes[row['type']](sources=[self],
-                                                                    position=this_position)
-
-            property_obj.metadata['function']  = row['function']
-            property_obj.metadata['reference'] = row['reference']
-
-            this_position.add_property(property_obj)
-
-            self.log.info("added %s from row %d" % (row['type'], idx+1))
-
     def add_sequence_properties(self, sequence, prop=_supported_sequence_properties):
 
         if self._df is None:
@@ -3495,25 +3484,28 @@ class ManualAnnotation(StaticSource):
 
         for idx,row in tmp_df.iterrows():
             if '-' in row['site']:
-                tmp = list(map(int, row['site'].split("-")))
-                try:
-                    assert(len(tmp) == 2)
-                    assert(int(tmp[0]) <= int(tmp[1]))
-                except AssertionError:
-                    self.log.error("line %d range in site column must be specified as 'from-to' (ex 10-15)" % (idx+1))
-                positions = tuple(range(tmp[0], tmp[1]+1))
+                    tmp = list(map(int, row['site'].split("-")))
+                    try:
+                        assert(len(tmp) == 2)
+                        assert(int(tmp[0]) <= int(tmp[1]))
+                    except AssertionError:
+                        self.log.error("line %d range in site column must be specified as 'from-to' (ex 10-15)" % (idx+1))
+                    positions = list(range(tmp[0], tmp[1]+1))
             else:
-                positions = ( int(row['site']) )
+                positions = [ int(row['site']) ]
 
             try:
-                positions = [ sequence.positions[sequence.seq2index(p)] for p in positions ]
+                for p in positions:
+                    sequence.seq2index(p)
             except:
-                self.log.warning("position property %s is outside the protein sequence; it will be skipped" % row['type'])
+                self.log.warning("sequence property %s is outside the protein sequence; it will be skipped" % row['type'])
                 continue
 
-            property_obj = sequence_properties_classes[row['type']](sources=[self],
-                                                                    positions=positions,
-                                                                    name=row['name'])
+            if row['type'] in self._ptm_keywords:
+                property_obj = sequence_properties_classes[row['type']](sources=[self], positions=positions)
+            else:
+                property_obj = sequence_properties_classes[row['type']](sources=[self], positions=positions,
+                                                                        name=row['name'])
 
             property_obj.metadata['function']  = row['function']
             property_obj.metadata['reference'] = row['reference']
