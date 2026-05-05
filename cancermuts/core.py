@@ -21,7 +21,7 @@
 Core cancermuts classes --- :mod:`cancermuts.core`
 ================================================================
 core classes that define the basic framework to handle a sequence
-and its mutations.
+and its variants.
 
 """
 
@@ -30,12 +30,14 @@ import logging
 from .metadata import *
 from .properties import *
 from .log import logger_init
+import re
+import pandas as pd
+from Bio.SeqUtils import seq3
 
 class Sequence(object):
     """The most fundamental class of Cancermuts, this class starts from a
-    protein sequence definition. It acts as a collection of ordered 
-    `SequencePosition` objects which depend on the specific
-    sequence itself.
+    protein sequence definition. It acts as a collection of protein variant objects
+    and properties.
 
     Parameters
     ----------
@@ -52,9 +54,9 @@ class Sequence(object):
     Attributes
     ----------
     source : :obj:`cancermuts.datasources.Datasource`
-        Source from where the protein sequence is downloaded from
+        Source from where the protein sequence is downloaded
     gene_id : :obj:`int`, optional
-        gene name to which the sequence to be downloaded belongs to
+        gene name to which the sequence to be downloaded belongs
     sequence : :obj:`str`
         protein sequence as obtained from the data source
     sequence_numbering : :obj:`list of int`
@@ -88,30 +90,11 @@ class Sequence(object):
             self.aliases = aliases
         
         self.aliases["uniprot_acc"] = self.uniprot_ac
+        self.variants = VariantRegister()
         self.source = source
         self.sequence = sequence
-        self.positions = []
-        self.sequence_numbering = []
+        self.sequence_numbering = list(range(1, len(self.sequence) + 1))
         self.properties = {}
-        for i,p in enumerate(self.sequence):
-            self.positions.append(SequencePosition(p, i+1))
-            self.sequence_numbering.append(i+1)
-
-    def index2seq(self, idx):
-        """
-        Returns the sequence numbering corresponding to the `idx`-th
-        residue, starting from 0. usually this corresponds to idx+1.
-
-        Parameters
-        ----------
-        idx : :obj:`int`
-            0-index position in the protein sequence
-
-        Returns
-        ----------
-        i:obj:`int`
-            sequence number corresponding to the idx-th position
-        """
 
 
     def seq2index(self, seqn):
@@ -133,10 +116,10 @@ class Sequence(object):
         return self.sequence_numbering.index(seqn)
 
     def __iter__(self):
-        return iter(self.positions)
+        return iter(zip(self.sequence_numbering, self.sequence))
 
     def __repr__(self):
-        return f"<Sequence gene_id={self.gene_id}, uniprot_ac={self.uniprot_ac}, isoform={self.isoform}, is_canonical={self.is_canonical}, source={self.source.name}, {len(self.positions)} positions>"
+        return f"<Sequence gene_id={self.gene_id}, uniprot_ac={self.uniprot_ac}, isoform={self.isoform}, is_canonical={self.is_canonical}, source={self.source.name}, {len(self.sequence)} positions>"
 
     def add_property(self, prop):
         """
@@ -159,151 +142,92 @@ class Sequence(object):
             add_type = "new category"
             self.log.debug("adding property %s to sequence of %s (%s)" % (str(prop), self.gene_id, add_type))
 
+    def _variant_wt_check(self, var):
+        if var.start < 1 or var.end > len(self.sequence):
+            raise ValueError(f"Variant {var.hgvs} is outside sequence bounds: "
+                             f"{var.start}-{var.end} for sequence of length {len(self.sequence)}")
+        if self.sequence[var.start - 1:var.end] != var.ref:
+            raise ValueError(f"WT mismatch for {var.hgvs}: expected {var.ref} at "
+                             f"{var.start}-{var.end}, got {self.sequence[var.start - 1:var.end]}")
+        if var.variant_type == "insertion":
+            right_pos = var.start + 1
+            if right_pos > len(self.sequence):
+                raise ValueError(f"Variant {var.hgvs} is outside sequence bounds")
+            if self.sequence[right_pos - 1] != var.alt[-1]:
+                raise ValueError(f"WT mismatch for {var.hgvs}: expected right flank {var.alt[-1]} at "
+                                 f"position {right_pos}, got {self.sequence[right_pos - 1]}")
 
-class SequencePosition(object):
-    """This class describe a certain sequence position in a protein.
-    SequencePositions usually belong to a Sequence object.
-    It is possible to annotate a Sequence position with either a Mutation
-    or a PositionProperty.
-
-    Attributes
-    ----------
-    source : :obj:`cancermuts.datasources.Datasource`
-    wt_residue_type : :obj:`str`
-        single-letter code wild-type residue for this position
-    sequence_position : :obj:`int`
-        number corresponding to the sequence position for this position
-    mutations : :obj:`list` of `cancermuts.core.Mutation` objects
-        list of mutations for this sequence position (if any)
-    properties : :obj:`dict`
-        dictionary encoding position properties. This dictionary needs to have
-        :obj:`str` as key and `cancermuts.properties.PositionProperty` as value.
-    """
-    description = 'Position'
-    header = "aa_position"
-    @logger_init
-    def __init__(self, wt_residue_type, sequence_position, mutations=None, properties=None):
-        """Constructor for the SequencePosition class.
+    def add_variant(self, var):
+        """
+        Adds variant to a :obj:`Sequence` object. If the variant is already present, 
+        source and metadata will be added to the already-present variant. Otherwise
+        the variant is added as new.
 
         Parameters
         ----------
-        wt_residue_type : :obj:`str`
-            single-letter code wild-type residue for this position
-        sequence_position : :obj:`int`
-            number corresponding to the sequence position for this position
-        mutations : :obj:`list` of `cancermuts.core.Mutation` objects or None
-            list of mutations for this sequence position to be added
-        properties : :obj:`dict` or :obj:`None`
-            dictionary encoding position properties. This dictionary needs to have
-            :obj:`str` as key and `cancermuts.properties.PositionProperty` as value.
+        var : :obj:`cancermuts.core.ProteinVariant`
+            new ProteinVariant object to be added to the Sequence
         """
-
-
-        self.wt_residue_type = wt_residue_type
-        self.sequence_position = sequence_position
-        if mutations is None:
-            self.mutations = []
+        self._variant_wt_check(var)
+        if var.hgvs not in self.variants:
+            self.variants.add_variant(var)
+            self.log.info("Adding variant %s to sequence %s" % (str(var), self.__repr__()))
         else:
-            self.mutations = mutations
-        if properties is None:
-            self.properties = {} # static properties for position (dependent of WT residue)
-        else:
-            self.properties = properties
+            self.log.info("Variant %s already in sequence %s; will just add sources and metadata" % (str(var), self.__repr__()))
+            existing = self.variants[var.hgvs]
+            existing.sources.extend(var.sources)
 
-    def add_mutation(self, mut):
-        """
-        Adds mutation to a :obj:`SequencePosition` object. If the mutation (in
-        terms of amino-acid substitution) is already present, source and 
-        metadata will be added to the already-present mutation. Otherwise
-        the mutation is added anew.
-
-        Parameters
-        ----------
-        mut : :obj:`cancermuts.core.Mutation`
-            new Mutation object to be added to the SequencePosition
-        """
-
-        if mut not in self.mutations:
-
-            #print "appendo da capo"
-            self.mutations.append(mut)
-            #print self.mutations[-1].metadata
-            self.log.info("Adding mutation %s to position %s" % (str(mut), self.__repr__()))
-        else:
-            self.log.info("Mutation %s already in position %s; will just add sources and metadata" % (str(mut), self.__repr__()))
-            pos = self.mutations.index(mut)
-            self.mutations[pos].sources.extend(mut.sources)
-            for k in mut.metadata:
-                if k in self.mutations[pos].metadata:
-                    self.mutations[pos].metadata[k].extend(mut.metadata[k])
+            for k in var.metadata:
+                if k in existing.metadata:
+                    existing.metadata[k].extend(var.metadata[k])
                     self.log.debug("    metadata %s was extended" % k)
                 else:
-                    self.mutations[pos].metadata[k] = mut.metadata[k]
+                    existing.metadata[k] = var.metadata[k]
                     self.log.debug("    metadata %s was added anew" % k)
 
-    def add_property(self, prop):
-        """
-        Adds position property to a :obj:`SequencePosition` object. If a
-        property of the same category is already present, it will be overwritten.
-        Otherwise, the property is just added to the object.
+class ProteinVariant(object):
+    """This class describes in-frame protein variants on a reference sequence.
 
-        Parameters
+        Attributes
         ----------
-        prop : :obj:`cancermuts.properties.PositionProperty`
-            new Mutation object to be added to the SequencePosition
-        """
-
-        if prop.category in self.properties:
-            self.log.info("property %s was replaced with %s" % (self.properties[prop.category], prop))
-        else:
-            self.log.info("added property %s" % str(prop))
-
-        self.properties[prop.category] = prop
-
-    def __repr__(self):
-        return "<SequencePosition, residue %s at position %d>" % (self.wt_residue_type, self.sequence_position)
-
-
-class Mutation(object):
-    """This class describe a missense mutation as amino-acid replacement.
-
-    Attributes
-    ----------
-    sequence_position : :obj:`cancermuts.core.SequencePosition`
-        `SequencePosition` object to which this mutation belongs, corresponding
-        to the residue that is mutated
-    sources : :obj:`list` of :obj:`cancermuts.datasources.Datasource`
-        source the mutation was derived from
-    mutated_residue_type : :obj:`str`
-        single-letter code for the mutated residue type for this position
-    mutations : :obj:`list` of `cancermuts.core.Mutation` objects
-        list of mutations for this sequence position (if any)
-    properties : :obj:`dict`
-        dictionary encoding position properties. This dictionary needs to have
-        :obj:`str` as key and `cancermuts.properties.PositionProperty` as value.
+        start : :obj:`int`
+            1-based start coordinate on the protein sequence
+        end : :obj:`int`
+            1-based end coordinate on the protein sequence
+        ref : :obj:`str`
+            reference amino-acid sequence
+        alt : :obj:`str`
+            altered amino-acid sequence
+        sources : :obj:`list` of :obj:`cancermuts.datasources.Datasource`
+            sources the variant was derived from
+        metadata : :obj:`dict`
+            Dictionary encoding variant-associated metadata.
     """
 
     @logger_init
-    def __init__(self, sequence_position, mutated_residue_type, sources=None, metadata=None):
-        """Constructor for the Mutation class.
-
+    def __init__(self, start, end, ref, alt, sources=None, metadata=None):
+        """Constructor for the ProteinVariant class.
+        
         Parameters
         ----------
-        sequence_position : :obj:`cancermuts.core.SequencePosition`
-            `SequencePosition` object to which this mutation belongs, corresponding
-            to the residue that is mutated
-            single-letter code wild-type residue for this position
-        mutated_residue_type : :obj:`str`
-            single-letter code for the mutated residue type for this position
+        start : :obj:`int`
+            1-based start coordinate on the protein sequence
+        end : :obj:`int`
+            1-based end coordinate on the protein sequence
+        ref : :obj:`str`
+            reference amino-acid sequence
+        alt : :obj:`str`
+            altered amino-acid sequence
         sources : :obj:`list` of :obj:`cancermuts.datasources.Datasource`
-            list of one or more sources the mutation was derived from
-        metadata : :obj:`dict` or :obj:`None`
-            dictionary encoding position properties. This dictionary needs to have
-            :obj:`str` as key and `cancermuts.properties.PositionProperty` as value.
-        """
+            sources the variant was derived from
+        metadata : :obj:`dict`
+            Dictionary encoding variant-associated metadata.
 
-        self.sequence_position = sequence_position
-        self.mutated_residue_type = mutated_residue_type
+        """
+        self.start = start
+        self.end = end
+        self.ref = ref
+        self.alt = alt
         if sources is None:
             self.sources = []
         else:
@@ -313,14 +237,188 @@ class Mutation(object):
         else:
             self.metadata = metadata
 
-    def __eq__(self, other):
-        return self.sequence_position == other.sequence_position and self.mutated_residue_type == other.mutated_residue_type
-    def __repr__(self):
-        return "<Mutation %s%d%s from %s>" % (self.sequence_position.wt_residue_type, 
-                                            self.sequence_position.sequence_position, 
-                                            self.mutated_residue_type,
-                                            ",".join([s.name for s in self.sources]))
+        self.variant_type
+
+    @property
+    def variant_type(self):
+        if (self.start == self.end and len(self.ref) == len(self.alt) == 1
+        and self.ref != self.alt):
+            return "missense"
+        elif self.ref != "" and self.alt == "":
+            return "deletion"
+        elif (self.start == self.end
+        and len(self.alt) > 2
+        and self.ref == self.alt[0]):
+            return "insertion"
+        elif self.ref != "" and self.alt != "" and self.ref != self.alt:
+            return "delins"
+        else:
+            raise ValueError(f"Cannot determine variant type from start={self.start}, "
+                             f"end={self.end}, ref='{self.ref}', alt='{self.alt}'")
+
+    @property
+    def hgvs(self):
+        if self.variant_type == "missense":
+            return "p.%s%d%s" % (seq3(self.ref), self.start, seq3(self.alt))
+        elif self.variant_type == "deletion":
+            if self.start == self.end:
+                return "p.%s%ddel" % (seq3(self.ref), self.start)
+            return "p.%s%d_%s%ddel" % (seq3(self.ref[0]), self.start, seq3(self.ref[-1]), self.end)
+        elif self.variant_type == "insertion":
+            return "p.%s%d_%s%dins%s" % (seq3(self.ref), self.start, seq3(self.alt[-1]), self.start + 1, seq3(self.alt[1:-1]))
+        elif self.variant_type == "delins":
+            if self.start == self.end:
+                return "p.%s%ddelins%s" % (seq3(self.ref), self.start, seq3(self.alt))
+            return "p.%s%d_%s%ddelins%s" % (seq3(self.ref[0]), self.start, seq3(self.ref[-1]), self.end, seq3(self.alt))
+
     def __str__(self):
-        return "%s%d%s" % ( self.sequence_position.wt_residue_type, 
-                            self.sequence_position.sequence_position, 
-                            self.mutated_residue_type )
+        return self.hgvs
+
+    def __repr__(self):
+        return "<%s %s from %s>" % (self.__class__.__name__, str(self),
+                                    ", ".join([s.name for s in self.sources]))         
+    def __eq__(self, other):
+        if not isinstance(other, ProteinVariant):
+            return False
+        return (self.start == other.start and
+                self.end == other.end and
+                self.ref == other.ref and
+                self.alt == other.alt)
+
+class VariantRegister:
+    """
+    Thin abstraction layer over a dictionary storing ProteinVariant objects
+    with their HGVS string representation as key.
+    """
+    _aa1 = r"[ACDEFGHIKLMNPQRSTVWY]"
+    _aa3 = r"(?:Ala|Arg|Asn|Asp|Cys|Gln|Glu|Gly|His|Ile|Leu|Lys|Met|Phe|Pro|Ser|Thr|Trp|Tyr|Val|Ter)"
+
+    _mavisp_formats = [rf"{_aa1}\d+{_aa1}",
+                       rf"{_aa1}\d+del",
+                       rf"{_aa1}\d+_{_aa1}\d+del",
+                       rf"{_aa1}\d+_{_aa1}\d+ins{_aa1}+",
+                       rf"{_aa1}\d+delins{_aa1}+",
+                       rf"{_aa1}\d+_{_aa1}\d+delins{_aa1}+"]
+
+    _hgvs_formats = [rf"p\.{_aa3}\d+{_aa3}",
+                     rf"p\.{_aa3}\d+del",
+                     rf"p\.{_aa3}\d+_{_aa3}\d+del",
+                     rf"p\.{_aa3}\d+_{_aa3}\d+ins(?:{_aa3})+",
+                     rf"p\.{_aa3}\d+delins(?:{_aa3})+",
+                     rf"p\.{_aa3}\d+_{_aa3}\d+delins(?:{_aa3})+"]
+
+    _mavisp_format = re.compile(rf"({'|'.join(_mavisp_formats)})")
+    _hgvs_format = re.compile(rf"({'|'.join(_hgvs_formats)})")
+
+    def __init__(self):
+        self._register = {}
+
+    def add_variant(self, variant):
+        """
+        Add a ProteinVariant to the register.
+
+        Parameters
+        ----------
+        variant : :obj:`cancermuts.core.ProteinVariant`
+            Variant to be added to the register.
+        """
+        if not isinstance(variant, ProteinVariant):
+            raise TypeError("VariantRegister only accepts ProteinVariant objects, "
+                           f"got {type(variant)}")
+        hgvs = variant.hgvs
+        if hgvs in self._register:
+            raise ValueError(f"Variant {hgvs} already present in register")
+        self._register[hgvs] = variant
+
+    def _is_valid_mavisp_string(self, item):
+        return self._mavisp_format.fullmatch(item) is not None
+
+    def _is_valid_hgvs_string(self, item):
+        return self._hgvs_format.fullmatch(item) is not None
+    
+    def _mavisp2hgvs(self, item):
+        item = re.sub(r"([A-Z])(\d+)", lambda m: f"{seq3(m.group(1))}{m.group(2)}", item)
+        item = re.sub(r"(ins|delins)([A-Z]+)$", lambda m: f"{m.group(1)}{seq3(m.group(2))}", item)
+        item = re.sub(r"(\d+)([A-Z])$", lambda m: f"{m.group(1)}{seq3(m.group(2))}", item)
+        return f"p.{item}"
+
+    def __getitem__(self, item):
+        """
+        Retrieve a variant from the register by one-letter or HGVS string.
+
+        Parameters
+        ----------
+        item : :obj:`str`
+            Variant string in MAVISp one-letter format (e.g. ``H39F``) or HGVS protein format
+            (e.g. ``p.His39Phe``).
+
+        Returns
+        -------
+        :obj:`cancermuts.core.ProteinVariant`
+            The corresponding stored variant.
+        """
+        if self._is_valid_hgvs_string(item):
+            return self._register[item]
+        elif self._is_valid_mavisp_string(item):
+            return self._register[self._mavisp2hgvs(item)]
+        raise KeyError(f"Unsupported variant format: {item}")
+
+    def _sorted_variants(self):
+        return sorted(self._register.values(),
+        key=lambda var: (var.start, var.end, var.variant_type, var.ref, var.alt))
+
+    def __iter__(self):
+        """
+        Iterate over ordered stored variants.
+        """
+        return iter(self._sorted_variants())
+
+    def __contains__(self, item):
+        try:
+            self[item]
+            return True
+        except KeyError:
+            return False
+
+    def get_variant_table(self, variant_types=None):
+        """
+        Return a pandas DataFrame containing the ordered variants stored in the register.
+
+        Parameters
+        ----------
+        variant_types : :obj:`str` or iterable of :obj:`str`, optional
+            Variant type to include in the output. If provided, only variants whose
+            ``variant_type`` matches one of the specified values are returned.
+            If None, all variants are included.
+
+        Returns
+        -------
+        :obj:`pandas.DataFrame`
+            DataFrame with one row per variant
+        """
+
+        variants = self._sorted_variants()
+        if variant_types is not None:
+            if isinstance(variant_types, str):
+                variant_types = {variant_types}
+            else:
+                variant_types = set(variant_types)
+
+            variants = [v for v in variants if v.variant_type in variant_types]
+
+        variant_dictionary = {"variant": [],
+                              "variant_type": [],
+                              "position": [],
+                              "end": [],
+                              "ref": [],
+                              "alt": []}
+
+        for v in variants:
+            variant_dictionary["position"].append(v.start)
+            variant_dictionary["end"].append(v.end)
+            variant_dictionary["ref"].append(v.ref)
+            variant_dictionary["alt"].append(v.alt)
+            variant_dictionary["variant_type"].append(v.variant_type)
+            variant_dictionary["variant"].append(str(v))
+
+        return pd.DataFrame(variant_dictionary)

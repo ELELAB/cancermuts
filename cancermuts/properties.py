@@ -34,6 +34,9 @@ class SequenceProperty(object):
         else:
             self.positions = positions
 
+        if not isinstance(self.positions, list):
+            raise TypeError("positions must be a list of 1-based residue numbers")
+
         if sources is None:
             self.sources = []
         else:
@@ -49,28 +52,10 @@ class SequenceProperty(object):
 
     def __repr__(self):
         sources_str = ", ".join([x.name for x in self.sources])
-        return "<SequenceProperty %s from %s, positions %s>" % (self.name, sources_str, ",".join([str(s.sequence_position) for s in self.positions]))
+        positions_str = ",".join([str(pos) for pos in self.positions])
 
-class PositionProperty(object):
-    def __init__(self, name, position, sources=None, values=None, metadata=None):
-        self.name = name
-        self.position = position
-        if sources is None:
-            self.sources = []
-        else:
-            self.sources = sources
-        if values is None:
-            self.values = []
-        else:
-            self.values = values
-        if metadata is None:
-            self.metadata = {}
-        else:
-            self.metadata = metadata
+        return "<SequenceProperty %s from %s, positions %s>" % (self.name, sources_str, positions_str)
 
-    def __repr__(self):
-        sources_str = ", ".join([x.name for x in self.sources])
-        return "<PositionProperty %s from %s>" % (self.name, sources_str)
 
 class LinearMotif(SequenceProperty):
     description = "Residue part of a linear motif"
@@ -82,12 +67,12 @@ class LinearMotif(SequenceProperty):
                                                     positions=positions,
                                                     sources=sources,
                                                     values=None,
-                                                    metadata=None  )
+                                                    metadata=None )
         self.type = name
         self.id = id
 
     def get_value_str(self):
-        return f'{self.type} ({self.id}), {self.positions[ 0].sequence_position}-{self.positions[-1].sequence_position}, {",".join(s.name for s in self.sources)}'
+        return f'{self.type} ({self.id}), {self.positions[ 0]}-{self.positions[-1]}, {",".join(s.name for s in self.sources)}'
 
 
 class Structure(SequenceProperty):
@@ -105,21 +90,21 @@ class Structure(SequenceProperty):
 
     def get_value_str(self):
         return "%s, %d-%d, %s" % (    self.type,
-                                      self.positions[ 0].sequence_position,
-                                      self.positions[-1].sequence_position,
+                                      self.positions[ 0],
+                                      self.positions[-1],
                                       ",".join(s.name for s in self.sources))
 
 
 
-class PhosphorylationSite(PositionProperty):
+class PhosphorylationSite(SequenceProperty):
     description = "Phosphorylation site"
     header = "phosphorylation_site"
     category="ptm_phosphorylation"
     code = "P"
 
-    def __init__(self, position, sources):
+    def __init__(self, positions, sources):
         super(PhosphorylationSite, self).__init__(  name="Phosphorylation Site",
-                                                    position=position,
+                                                    positions=positions,
                                                     sources=sources,
                                                     values={},
                                                     metadata={}  )
@@ -127,15 +112,15 @@ class PhosphorylationSite(PositionProperty):
     def get_value_str(self):
         return self.code
 
-class MethylationSite(PositionProperty):
+class MethylationSite(SequenceProperty):
     description = "Methylation site"
     header = "methylation_site"
     category="ptm_methylation"
     code = "Me"
 
-    def __init__(self, position, sources):
+    def __init__(self, positions, sources):
         super(MethylationSite, self).__init__(  name="Methylation Site",
-                                                    position=position,
+                                                    positions=positions,
                                                     sources=sources,
                                                     values={},
                                                     metadata={}  )
@@ -143,15 +128,15 @@ class MethylationSite(PositionProperty):
     def get_value_str(self):
         return self.code
 
-class AcetylationSite(PositionProperty):
+class AcetylationSite(SequenceProperty):
     description = "Acetylation site"
     header = "acetylation_site"
     category='ptm_acetylation'
     code = 'Ac'
 
-    def __init__(self, position, sources):
+    def __init__(self, positions, sources):
         super(AcetylationSite, self).__init__(  name="Acetylation Site",
-                                                    position=position,
+                                                    positions=positions,
                                                     sources=sources,
                                                     values={},
                                                     metadata={}  )
@@ -159,15 +144,15 @@ class AcetylationSite(PositionProperty):
     def get_value_str(self):
         return self.code
 
-class SNitrosylationSite(PositionProperty):
+class SNitrosylationSite(SequenceProperty):
     description = "S-Nitrosylation site"
     header = "s-nitrosylation_site"
     category='ptm_nitrosylation'
     code = "SN"
 
-    def __init__(self, position, sources):
+    def __init__(self, positions, sources):
         super(SNitrosylationSite, self).__init__(  name="S-Nytrosilation site",
-                                                    position=position,
+                                                    positions=positions,
                                                     sources=sources,
                                                     values={},
                                                     metadata={}  )
@@ -175,15 +160,15 @@ class SNitrosylationSite(PositionProperty):
     def get_value_str(self):
         return self.code
 
-class GlycosylationSite(PositionProperty):
+class GlycosylationSite(SequenceProperty):
     description = "Glycosylation site"
     header = "glycosylation_site"
     category='ptm_glycosylation'
     code = "Gly"
 
-    def __init__(self, position, sources):
+    def __init__(self, positions, sources):
         super(GlycosylationSite, self).__init__(  name="Glycosylation Site",
-                                                    position=position,
+                                                    positions=positions,
                                                     sources=sources,
                                                     values={},
                                                     metadata={"subtypes": []}  )
@@ -195,45 +180,45 @@ class GlycosylationSite(PositionProperty):
     def get_value_str(self):
         return self.code
 
-class SumoylationSite(PositionProperty):
+class SumoylationSite(SequenceProperty):
     description = "Sumoylation site"
     header = "sumoyylation_site"
     category='ptm_sumoylation'
     code = "Sumo"
 
-    def __init__(self, position, sources):
+    def __init__(self, positions, sources):
         super(SumoylationSite, self).__init__(  name="Sumoylation Site",
-                                                    position=position,
+                                                    positions=positions,
                                                     sources=sources,
                                                     values={},
                                                     metadata={}  )
     def get_value_str(self):
         return self.code
 
-class UbiquitinationSite(PositionProperty):
+class UbiquitinationSite(SequenceProperty):
     description = "Ubiquitination site"
     header = "ubiquitination_site"
     category='ptm_ubiquitination'
     code = 'Ubq'
 
-    def __init__(self, position, sources):
+    def __init__(self, positions, sources):
         super(UbiquitinationSite, self).__init__(  name="Ubiquitination Site",
-                                                    position=position,
+                                                    positions=positions,
                                                     sources=sources,
                                                     values={},
                                                     metadata={}  )
     def get_value_str(self):
         return self.code
 
-class CleavageSite(PositionProperty):
+class CleavageSite(SequenceProperty):
     description = "Caspase cleavage site"
     header = "cleavage_site"
     category='ptm_cleavage'
     code = 'C'
 
-    def __init__(self, position, sources):
+    def __init__(self, positions, sources):
         super(CleavageSite, self).__init__(  name="Caspase cleavage site",
-                                                    position=position,
+                                                    positions=positions,
                                                     sources=sources,
                                                     values={},
                                                     metadata={}  )
@@ -241,15 +226,14 @@ class CleavageSite(PositionProperty):
     def get_value_str(self):
         return self.code
 
-class DisorderPropensity(PositionProperty):
+class DisorderPropensity(SequenceProperty):
     description = "Structural disorder"
     header = "disorder_propensity"
     category = 'disorder_propensity'
 
-#   def __init__(self, name, category, position, sources=None, values=None, metadata=None):
-    def __init__(self, position, sources, disorder_state):
+    def __init__(self, positions, sources, disorder_state):
         super(DisorderPropensity, self).__init__(name="Disorder Propensity",
-                                                 position=position,
+                                                 positions=positions,
                                                  sources=sources,
                                                  values={},
                                                  metadata={})
@@ -268,27 +252,27 @@ class DisorderPropensity(PositionProperty):
         return self.__repr__()
 
     def __eq__(self, other):
-        return self.source == other.source and \
+        return self.sources == other.sources and \
                self.disorder_propensity == other.disorder_propensity
 
     def __hash__(self):
-        return hash((self.source, self.disorder_propensity))
+        return hash((self.sources, self.disorder_propensity))
 
 class Structured(DisorderPropensity):
-    def __init__(self, position, sources):
+    def __init__(self, positions, sources):
         super(Ordered, self).__init__(name="Disorder Propensity",
-                                                 position=position,
+                                                 positions=positions,
                                                  sources=sources,
                                                  disorder_state='S')
 
 class Disordered(DisorderPropensity):
-    def __init__(self, position, sources):
+    def __init__(self, positions, sources):
         super(Ordered, self).__init__(name="Disorder Propensity",
-                                                 position=position,
+                                                 positions=positions,
                                                  sources=sources,
                                                  disorder_state='D')
 
-position_properties_classes = {  'ptm_phosphorylation'            : PhosphorylationSite,
+sequence_properties_classes = {  'ptm_phosphorylation'            : PhosphorylationSite,
                                  'ptm_methylation'                : MethylationSite,
                                  'ptm_acetylation'                : AcetylationSite,
 				                 'ptm_nitrosylation'              : SNitrosylationSite,
@@ -296,9 +280,7 @@ position_properties_classes = {  'ptm_phosphorylation'            : Phosphorylat
                                  'ptm_sumoylation'                : SumoylationSite,
                                  'ptm_ubiquitination'             : UbiquitinationSite,
                                  'ptm_cleavage'                   : CleavageSite,
-                                 'mobidb_disorder_propensity'     : DisorderPropensity
-                              }
-
-sequence_properties_classes = {  'linear_motif'                   : LinearMotif,
-                                 'structure'            : Structure
+                                 'mobidb_disorder_propensity'     : DisorderPropensity,
+                                 'linear_motif'                   : LinearMotif,
+                                 'structure'                      : Structure
                               }
