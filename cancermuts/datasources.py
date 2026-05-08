@@ -57,7 +57,8 @@ from requests.adapters import HTTPAdapter
 import gget
 from io import StringIO
 import xmltodict
-
+import fcntl
+import threading
 
 if sys.version_info[0] >= 3:
     unicode = str
@@ -629,6 +630,7 @@ class cBioPortal(DynamicSource, object):
         return mutations, out_metadata
 
 class ClinVar(DynamicSource, object):
+    _ncbi_rate_lock = threading.Lock()
 
     # ClinVar Metadata
     _clinvar_supported_metadata = [
@@ -636,9 +638,52 @@ class ClinVar(DynamicSource, object):
         'clinvar_variant_id', 'genomic_coordinates', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_classification',
         'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status', 'clinvar_clinical_impact_classification']
     @logger_init
-    def __init__(self):
+    def __init__(self, ncbi_requests_per_second=2.0, ncbi_rate_limit_lock_file="/tmp/cancermuts_ncbi_rate_limit.lock"):
         description = "ClinVar mutation database"
         super(ClinVar, self).__init__(name='ClinVar', version='', description=description)
+
+        self._ncbi_min_interval = 1.0 / float(ncbi_requests_per_second)
+        self._ncbi_rate_limit_lock_file = ncbi_rate_limit_lock_file
+        self._session = rq.Session()
+
+    def _open_ncbi_lock_file(self):
+        path = self._ncbi_rate_limit_lock_file
+        try:
+            return open(path, "r+")
+        except FileNotFoundError:
+            try:
+                fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o666)
+                os.fchmod(fd, 0o666)
+                return os.fdopen(fd, "r+")
+            except FileExistsError:
+                return open(path, "r+")
+
+    def _ncbi_throttle(self):
+        """
+        Restrict NCBI E-utilities requests across jobs running
+        on the same server.
+        """
+        with self._ncbi_rate_lock:
+            with self._open_ncbi_lock_file() as lock_fh:
+                fcntl.flock(lock_fh, fcntl.LOCK_EX)
+                lock_fh.seek(0)
+                content = lock_fh.read().strip()
+                try:
+                    last_request_time = float(content)
+                except ValueError:
+                    last_request_time = 0.0
+
+                now = time.time()
+                elapsed = max(0.0, now - last_request_time)
+                wait = self._ncbi_min_interval - elapsed
+
+                if wait > 0:
+                    time.sleep(wait)
+                lock_fh.seek(0)
+                lock_fh.truncate()
+                lock_fh.write(str(time.time()))
+                lock_fh.flush()
+                fcntl.flock(lock_fh, fcntl.LOCK_UN)
 
     def _melting_dictionary(self, variants_annotation, add_method=False):
         '''
@@ -722,9 +767,10 @@ class ClinVar(DynamicSource, object):
         delay = 3
         while attempts < max_retries:
             try:
-                response = rq.get(URL)
-            except:
-                self.log.warning(f"An error occurred during the ClinVar database query."
+                self._ncbi_throttle()
+                response = self._session.get(URL, timeout=(10, 60))
+            except Exception as e:
+                self.log.warning(f"An error occurred during the ClinVar database query: {type(e).__name__}: {e}. "
                       f" Will try again in {delay} seconds (attempt {attempts+1}/{max_retries})")
                 attempts +=1
                 time.sleep(delay)
