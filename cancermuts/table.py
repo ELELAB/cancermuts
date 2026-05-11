@@ -222,8 +222,10 @@ class Table:
     def _ptm_sources_at_position(self, sequence, position):
         ptm_sources_list = []
         for ptm_key in self.ptms.keys():
-            for prop in sequence.properties_at_position(position, ptm_key):
-                ptm_sources_list.extend([s.name for s in prop.sources])
+            properties_at_pos = sequence.properties_at_position(position, ptm_key)
+            if ptm_key in properties_at_pos:
+                for prop in properties_at_pos[ptm_key]:
+                    ptm_sources_list.extend([s.name for s in prop.sources])
         ptm_sources_str = ",".join(sorted(set(ptm_sources_list))) if ptm_sources_list else None
         return ptm_sources_str
 
@@ -254,7 +256,11 @@ class Table:
             row = [position, residue]
 
             for property_name in sequence_properties:
-                properties = sequence.properties_at_position(position, property_name)
+                properties_at_pos = sequence.properties_at_position(position, property_name)
+                if property_name in properties_at_pos:
+                    properties = properties_at_pos[property_name]
+                else:
+                    properties = []
                 row.append(self._format_property_values(properties))
                 if property_name == 'ptm_glycosylation':
                     row.append(self._format_glycosylation_subtypes(properties))
