@@ -185,6 +185,31 @@ class Sequence(object):
                     existing.metadata[k] = var.metadata[k]
                     self.log.debug("    metadata %s was added anew" % k)
 
+    def properties_at_position(self, position, property_name=None):
+        """
+        If property_name is provided, return a dict of properties mapped
+        to the property category.
+        If property_name is None, return all property categories with their
+        properties.
+        """
+
+        if property_name is not None:
+            if property_name not in sequence_properties_classes:
+                raise ValueError(f"Unknown property_name: {property_name}")
+            if property_name not in self.properties:
+                properties_to_check = {property_name: []}
+            else:
+                properties_to_check = {property_name: self.properties[property_name]}
+        else:
+            properties_to_check = self.properties
+
+        properties = {}
+        for this_property_name, props in properties_to_check.items():
+            matching_props = [prop for prop in props if position in prop.positions]
+            if matching_props:
+                properties[this_property_name] = matching_props
+        return properties
+
 class ProteinVariant(object):
     """This class describes in-frame protein variants on a reference sequence.
 
@@ -380,7 +405,7 @@ class VariantRegister:
         except KeyError:
             return False
 
-    def get_variant_table(self, variant_types=None):
+    def get_variant_table(self, variant_types=None, metadata=[], metadata_formatter=None):
         """
         Return a pandas DataFrame containing the ordered variants stored in the register.
 
@@ -390,6 +415,10 @@ class VariantRegister:
             Variant type to include in the output. If provided, only variants whose
             ``variant_type`` matches one of the specified values are returned.
             If None, all variants are included.
+        metadata : iterable of :obj:`str`, optional
+            Metadata fields to include as additional columns.
+        metadata_formatter : callable, optional
+            Function used to format metadata values before adding them to the table.
 
         Returns
         -------
@@ -403,22 +432,39 @@ class VariantRegister:
                 variant_types = {variant_types}
             else:
                 variant_types = set(variant_types)
-
+            invalid_var_types = variant_types - {"missense", "delins", "insertion", "deletion"}
+            if invalid_var_types:
+                raise ValueError(f"Invalid variant type(s): {invalid_var_types}")
             variants = [v for v in variants if v.variant_type in variant_types]
 
-        variant_dictionary = {"variant": [],
+        variant_dictionary = {"variant_hgvs": [],
+                              "variant_start": [],
+                              "variant_end": [],
+                              "variant_ref": [],
+                              "variant_alt": [],
                               "variant_type": [],
-                              "position": [],
-                              "end": [],
-                              "ref": [],
-                              "alt": []}
+                              "sources": []}
+
+        for md in metadata:
+            variant_dictionary[md] = []
 
         for v in variants:
-            variant_dictionary["position"].append(v.start)
-            variant_dictionary["end"].append(v.end)
-            variant_dictionary["ref"].append(v.ref)
-            variant_dictionary["alt"].append(v.alt)
+            variant_dictionary["variant_hgvs"].append(v.hgvs)
+            variant_dictionary["variant_start"].append(v.start)
+            variant_dictionary["variant_end"].append(v.end)
+            variant_dictionary["variant_ref"].append(v.ref)
+            variant_dictionary["variant_alt"].append(v.alt)
             variant_dictionary["variant_type"].append(v.variant_type)
-            variant_dictionary["variant"].append(str(v))
+
+            source_names = sorted({source.name for source in v.sources})
+            variant_dictionary["sources"].append(",".join(source_names) if source_names else None)
+            for md in metadata:
+                if md in v.metadata:
+                    values = v.metadata[md]
+                else:
+                    values = None
+                if metadata_formatter is not None:
+                    values = metadata_formatter(values, md)
+                variant_dictionary[md].append(values)
 
         return pd.DataFrame(variant_dictionary)

@@ -150,7 +150,7 @@ class Table:
         ptms = {}
         ptm_codes = {}
 
-        for k,v in iteritems(position_properties_classes):
+        for k,v in iteritems(sequence_properties_classes):
             headers[k] = v.header
             if 'ptm' in v.category:
                 ptms[k] = v.header
@@ -158,15 +158,16 @@ class Table:
 
         headers['ptm_sources'] = 'ptm_sources'
 
-        for k,v in iteritems(sequence_properties_classes):
-            headers[k] = v.header
-
         for k,v in iteritems(metadata_classes):
             headers[k] = v.header
 
-        headers['position']    = SequencePosition.header
-        headers['wt']          = 'ref_aa'
-        headers['mutated']     = 'alt_aa'
+        headers['position'] = 'aa_position'
+        headers['variant_hgvs'] = 'variant_hgvs'
+        headers['variant_start'] = 'variant_start'
+        headers['variant_end'] = 'variant_end'
+        headers['variant_type'] = 'variant_type'
+        headers['wt'] = 'ref_aa'
+        headers['mutated'] = 'alt_aa'
         headers['mut_sources'] = 'sources'
 
         self.headers = headers
@@ -176,157 +177,130 @@ class Table:
         if not set(self.ptms.keys()).issubset(set(self.ptm_colors.keys())):
             self.log.warning("not enough colors specified for ptms to plot")
 
+    def _format_metadata_values(self, values, metadata_key):
+        if values is None:
+            return None
+        md_values = []
+        for single_md in values:
+            if single_md is None:
+                continue
+            this_value = single_md.get_value_str()
+            if this_value is None or this_value != this_value:  # hacky check for np.nan
+                continue
+            md_values.append(this_value)
+        if "clinvar" in str(metadata_key):
+            if "condition" in str(metadata_key):
+                md_str = "|".join(map(str, md_values))
+            else:
+                md_str = ", ".join(map(str, md_values))
+        else:
+            md_str = ", ".join(sorted(set(map(str, md_values))))
+        return md_str
 
+    def _format_property_values(self, properties):
+        values = []
+        for prop in properties:
+            value = prop.get_value_str()
+            if value is None or value != value:
+                continue
+            if value not in values:
+                values.append(value)
+        if len(values) == 0:
+            return None
+        return "|".join(map(str, values))
 
-    def to_dataframe(self, sequence, mutation_metadata=["cancer_study", "cancer_type", "genomic_coordinates", "genomic_mutations", "revel_score", "cancer_site", "cancer_histology",'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency',
-                                                        'gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency', 'clinvar_variant_id', 'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status',
-                                                        'clinvar_oncogenicity_classification', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_classification', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status'],
-                        position_properties=['ptm_phosphorylation','ptm_methylation','ptm_ubiquitination','ptm_cleavage','ptm_nitrosylation','ptm_acetylation', 'ptm_sumoylation','ptm_glycosylation', 'mobidb_disorder_propensity'],
-                        sequence_properties=['linear_motif', 'structure']):
+    def _format_glycosylation_subtypes(self, properties):
+        subtypes = []
+        for prop in properties:
+            for subtype in prop.metadata["subtypes"]:
+                if subtype not in subtypes:
+                    subtypes.append(subtype)
+        if len(subtypes) == 0:
+            return None
+        return ", ".join(subtypes)
 
-        rows = []
+    def _ptm_sources_at_position(self, sequence, position):
+        ptm_sources_list = []
+        for ptm_key in self.ptms.keys():
+            properties_at_pos = sequence.properties_at_position(position, ptm_key)
+            if ptm_key in properties_at_pos:
+                for prop in properties_at_pos[ptm_key]:
+                    ptm_sources_list.extend([s.name for s in prop.sources])
+        ptm_sources_str = ",".join(sorted(set(ptm_sources_list))) if ptm_sources_list else None
+        return ptm_sources_str
 
-        header =  [ self.headers['position'] ]
-        for p in position_properties:
-            header.append(self.headers[p])
-            if p == 'ptm_glycosylation':
+    def to_dataframe(self, sequence, mutation_metadata=['cancer_study', 'cancer_type', 'genomic_coordinates', 'genomic_mutations', 'revel_score', 'cancer_site', 'cancer_histology',
+                                                        'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency',
+                                                        'gnomad_popmax_exome_allele_frequency', 'gnomad_popmax_genome_allele_frequency',
+                                                        'clinvar_variant_id', 'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status',
+                                                        'clinvar_oncogenicity_classification', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_review_status',
+                                                        'clinvar_clinical_impact_classification', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status'],
+                    sequence_properties=['ptm_phosphorylation', 'ptm_methylation', 'ptm_ubiquitination', 'ptm_cleavage', 'ptm_nitrosylation',
+                                         'ptm_acetylation', 'ptm_sumoylation', 'ptm_glycosylation',
+                                         'mobidb_disorder_propensity', 'linear_motif', 'structure']):
+
+        position_rows = []
+
+        mutation_metadata = list(mutation_metadata)
+        sequence_properties = list(sequence_properties)
+
+        position_header = [self.headers['position'], "_residue_ref"]
+        for property_name in sequence_properties:
+            position_header.append(self.headers[property_name])
+            if property_name == 'ptm_glycosylation':
+                position_header.append('glycosylation_subtype')
+
+        position_header.append(self.headers['ptm_sources'])
+
+        for position, residue in sequence:
+            row = [position, residue]
+
+            for property_name in sequence_properties:
+                properties_at_pos = sequence.properties_at_position(position, property_name)
+                if property_name in properties_at_pos:
+                    properties = properties_at_pos[property_name]
+                else:
+                    properties = []
+                row.append(self._format_property_values(properties))
+                if property_name == 'ptm_glycosylation':
+                    row.append(self._format_glycosylation_subtypes(properties))
+            row.append(self._ptm_sources_at_position(sequence, position))
+            position_rows.append(row)
+
+        position_df = pd.DataFrame(position_rows, columns=position_header)
+        variant_df = sequence.variants.get_variant_table(metadata=mutation_metadata,
+                                                         metadata_formatter=self._format_metadata_values)
+
+        metadata_rename = {}
+        for md in mutation_metadata:
+            metadata_rename[md] = self.headers[md]
+        variant_df = variant_df.rename(columns=metadata_rename)
+        df = position_df.merge(variant_df, how='left',
+                                           left_on=self.headers['position'],
+                                           right_on=self.headers['variant_start'],
+                                           sort=False)
+
+        df[self.headers['wt']] = df['variant_ref']
+        df[self.headers['mutated']] = df['variant_alt']
+        df[self.headers['wt']] = df[self.headers['wt']].fillna(df["_residue_ref"])
+
+        header = [self.headers['position'],
+                  self.headers['wt'],
+                  self.headers['mutated'],
+                  self.headers['variant_hgvs'],
+                  self.headers['variant_start'],
+                  self.headers['variant_end'],
+                  self.headers['variant_type'],
+                  self.headers['mut_sources']]
+
+        for property_name in sequence_properties:
+            header.append(self.headers[property_name])
+            if property_name == 'ptm_glycosylation':
                 header.append('glycosylation_subtype')
-
-        header += [self.headers['ptm_sources']]
-        sequence_properties_cols_start = len(header)
-
-        header += [ self.headers[p] for p in sequence_properties ]
-        sequence_properties_col = list(range(sequence_properties_cols_start, len(header)))
-        header += [self.headers['wt'], self.headers['mutated'], self.headers['mut_sources']]
+        header.append(self.headers['ptm_sources'])
         for md in mutation_metadata:
             header.append(self.headers[md])
-
-        positions_mutlist = []
-
-        for gi,p in enumerate(sequence.positions):
-            base_row = [p.sequence_position]
-            ptm_sources_list = []
-            for r in position_properties:
-                if r in p.properties:
-                    val = p.properties[r].get_value_str()
-                else:
-                    val = None
-
-                base_row.append(val)
-
-                if r == "ptm_glycosylation":
-                    str_subtypes = None
-                    if r in p.properties:
-                        subtypes = p.properties["ptm_glycosylation"].metadata["subtypes"]
-                        if len(subtypes) > 0:
-                            str_subtypes = ", ".join(subtypes)
-                    base_row.append(str_subtypes)
-
-            ptm_sources_list = []
-            for ptm_key in self.ptms.keys():
-                if ptm_key in p.properties:
-                    ptm_sources_list.extend([s.name for s in p.properties[ptm_key].sources])
-
-            ptm_sources_str = ",".join(sorted(set(ptm_sources_list))) if ptm_sources_list else None
-            base_row.append(ptm_sources_str)
-            base_row.extend([None]*len(sequence_properties_col))
-            base_row.append(p.wt_residue_type)
-
-            mut_strings = [str(m) for m in p.mutations]
-            mut_strings_order = sorted(list(range(len(mut_strings))), key=mut_strings.__getitem__)
-
-            if len(mut_strings_order) == 0:
-                this_row = list(base_row)
-                this_row.append(None)
-                this_row.append(None)
-                this_row.extend([None]*len(mutation_metadata))
-                positions_mutlist.append(gi)
-                rows.append(this_row)
-                continue
-
-            for m in mut_strings_order:
-                this_row = list(base_row)
-                this_row.append(p.mutations[m].mutated_residue_type)
-                this_row.append(",".join([s.name for s in p.mutations[m].sources]))
-                for md in mutation_metadata:
-                    md_values = []
-                    try:
-                        self.log.info(f"mutation {p.mutations[m]}")
-                        for single_md in p.mutations[m].metadata[md]:
-                            if single_md is None:
-                                continue
-                            this_value = single_md.get_value_str()
-                            if this_value is None or this_value != this_value: # hacky check for np.nan
-                                continue
-                            md_values.append(this_value)
-                            self.log.info(f"appending {single_md.get_value_str()}")
-                        self.log.info(f"values to be joined {md}: {sorted(list(set(md_values)))}")
-                        if "clinvar" in str(md):
-                            if "condition" in str(md):
-                                md_str = "|".join(map(str, md_values))
-                            else:
-                                md_str = ", ".join(map(str, md_values))
-                        else:
-                            md_str = ", ".join(sorted(set(map(str, md_values))))
-                    except KeyError:
-                        md_str = None
-                    this_row.append(md_str)
-                positions_mutlist.append(gi)
-                rows.append(this_row)
-
-        df = pd.DataFrame(rows, columns=header)
-
-        this_col = df.pop(self.headers['wt'])
-        df.insert(1, self.headers['wt'], this_col)
-
-        this_col = df.pop(self.headers['mutated'])
-        df.insert(2, self.headers['mutated'], this_col)
-
-        positions = df[ self.headers['position'] ]
-
-        property_cols = dict()
-
-        properties_series = dict()
-
-        delenda = []
-        for pidx, property_name in enumerate(sequence_properties):
-            if property_name not in sequence.properties:
-                #property_cols[property_name] = [ None ] * len(positions)
-                delenda.append(property_name)
-                self.log.warning("property %s not found in data; it won't be annotated" % property_name)
-                continue
-            elif sequence.properties[property_name][0].category == 'linear_motif':
-                property_cols[property_name] = dict( [ (i, list()) for i in list(set(positions)) ] )
-            elif sequence.properties[property_name][0].category == 'structure':
-                property_cols[property_name] = dict( [ (i, list()) for i in list(set(positions)) ] )
-
-        for d in delenda:
-            sequence_properties.remove(d)
-
-        for pidx, property_name in enumerate(sequence_properties):
-            props = sequence.properties[property_name]
-            for p in props:
-                if p.category == 'linear_motif':
-                    for pos in p.positions:
-                        property_cols[property_name][pos.sequence_position].append(p.get_value_str())
-                if p.category == 'structure':
-                    for pos in p.positions:
-                        property_cols[property_name][pos.sequence_position].append(p.get_value_str())
-
-        for pidx, property_name in enumerate(sequence_properties):
-            properties_series[property_name] = []
-
-            if p.category == 'linear_motif':
-                for pos in positions:
-                    properties_series[property_name].append("|".join(property_cols[property_name][pos]))
-                df[self.headers[property_name]] = properties_series[property_name]
-
-            if p.category == 'structure':
-                for pos in positions:
-                    properties_series[property_name].append("|".join(property_cols[property_name][pos]))
-                df[self.headers[property_name]] = properties_series[property_name]
-
-        return df
+        return df[header]
 
     def _splice_metatable(self, df, section_size=100):
         # position ranges are left and right-inclusive
@@ -413,7 +387,17 @@ class Table:
         all_positions = sorted(list(set(df_m[self.headers['position']])))
         for p in all_positions:
             this_muts = df_m[df_m[self.headers['position']] == p]
-            this_muts_str = ", ".join(["%s%d%s" % tuple(v) for v in this_muts[[self.headers['wt'], self.headers['position'], self.headers['mutated']]].values])
+            labels = []
+            for _, row in this_muts.iterrows():
+                if self.headers['variant_hgvs'] in this_muts.columns:
+                    variant = row[self.headers['variant_hgvs']]
+                    if pd.notna(variant) and variant != "":
+                        labels.append(str(variant))
+                        continue
+                labels.append("%s%d%s" % (row[self.headers['wt']],
+                                          row[self.headers['position']],
+                                          row[self.headers['mutated']]))
+            this_muts_str = ", ".join(labels)
             ax.text(p, next(ladder), this_muts_str, horizontalalignment='center', verticalalignment='center')
 
         if revel_cutoff:
