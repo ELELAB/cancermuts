@@ -1447,17 +1447,23 @@ class ClinVar(DynamicSource, object):
                         out_metadata[rs_key].append(rs_dict[xml_key])
                     else:
                         out_metadata[rs_key].append(None)
-
+            valid_gms = []
+            for gm in data["genomic_annotations_obj"].values():
+                if gm.chr is None or not (gm.is_snv or gm.is_insdel or gm.is_inversion):
+                    self.log.warning(
+                        f"ClinVar ID {clinvar_id}: genomic annotation '{gm.definition}' for {gm.genome_build} "
+                        f"is not in the expected for missense variant format and will not be added to genomic metadata")
+                    continue
+                valid_gms.append(gm)
             if "genomic_mutations" in metadata:
-                out_metadata["genomic_mutations"].append(list(data["genomic_annotations_obj"].values()))
+                out_metadata["genomic_mutations"].append(valid_gms)
             if "genomic_coordinates" in metadata:
                 out_metadata["genomic_coordinates"].append([
-                [gm.genome_build, gm.chr,
-                 gm.coord if gm.is_snv else gm.coord_start,
-                 gm.coord if gm.is_snv else gm.coord_end,
-                 gm.ref if gm.is_snv else gm.substitution]
-                 for gm in data["genomic_annotations_obj"].values()
-                ])
+                    [gm.genome_build, gm.chr,
+                     gm.coord if gm.is_snv else gm.coord_start,
+                     gm.coord if gm.is_snv else gm.coord_end,
+                     gm.ref if gm.is_snv else gm.substitution]
+                    for gm in valid_gms])
             if "clinvar_variant_id" in metadata:
                 out_metadata["clinvar_variant_id"].append(clinvar_id)
 
@@ -2044,6 +2050,108 @@ class dbPTM(DynamicSource, object):
 
                     if not has_specific and new_subtype not in existing_subtypes:
                         property_obj.add_subtype(new_subtype)
+
+class NetPhos(StaticSource, object):
+    @logger_init
+    def __init__(self, database_dir, score_threshold=0.5):
+        description = "NetPhos predicted phosphorylation sites"
+        super(NetPhos, self).__init__(name='NetPhos', version='1.0', description=description)
+
+        self.database_dir = database_dir
+        self.score_threshold = score_threshold
+        self.valid_residues = {"S", "T", "Y"}
+
+    def _get_database_file(self, sequence):
+        file_name = (f"{sequence.uniprot_ac}.netphos.txt"
+            if sequence.is_canonical
+            else f"{sequence.isoform}.netphos.txt")
+
+        file_path = os.path.join(self.database_dir, file_name)
+
+        if not os.path.isfile(file_path):
+            self.log.warning(f"couldn't find database file {file_path}")
+            return None
+
+        return file_path
+
+    def _parse_db_file(self, sequence):
+        file_path = self._get_database_file(sequence)
+
+        if file_path is None:
+            return []
+
+        sites = set()
+
+        try:
+            with open(file_path, "r") as infile:
+                for line in infile:
+                    if not line.startswith("#"):
+                        continue
+
+                    parts = line.strip().split()
+
+                    if len(parts) != 8:
+                        continue
+
+                    if not parts[2].isdigit():
+                        continue
+
+                    residue_number = int(parts[2])
+                    residue_type = parts[3]
+
+                    try:
+                        score = float(parts[5])
+                    except Exception:
+                        self.log.warning(f"could not parse score in {file_path}: {line.strip()}")
+                        continue
+
+                    if residue_type not in self.valid_residues:
+                        continue
+
+                    if score > self.score_threshold:
+                        sites.add(f"{residue_type}{residue_number}")
+
+        except Exception as exc:
+            self.log.error(f"couldn't read database file {file_path}: {exc}")
+            raise IOError from exc
+
+        return sorted(sites, key=lambda x: int(x[1:]))
+
+    def add_position_properties(self, sequence, properties=None):
+        if properties is None:
+            properties = ["phosphorylation"]
+
+        if "phosphorylation" not in properties:
+            return
+
+        sites = self._parse_db_file(sequence)
+        prop_name = "ptm_phosphorylation"
+
+        for site_label in sites:
+            wt = site_label[0]
+            site = int(site_label[1:])
+
+            try:
+                site_seq_idx = sequence.seq2index(site)
+                position = sequence.positions[site_seq_idx]
+            except Exception:
+                self.log.warning(f"NetPhos site {site_label} is outside the protein sequence; it will be skipped")
+                continue
+
+            if position.wt_residue_type != wt:
+                self.log.warning(f"for NetPhos site {site_label}, residue {wt} is "
+                    f"{position.wt_residue_type} in wild-type sequence; it will be skipped")
+                continue
+
+            if prop_name in position.properties:
+                prop = position.properties[prop_name]
+                if self not in prop.sources:
+                    prop.sources.append(self)
+                self.log.info(f"site {site_label} already annotated as phosphorylation; source will be added")
+            else:
+                prop = position_properties_classes[prop_name](sources=[self], position=position)
+                position.add_property(prop)
+                self.log.info(f"adding {site_label} to site {prop.name}")
 
 class GlyGen(StaticSource, object):
     @logger_init

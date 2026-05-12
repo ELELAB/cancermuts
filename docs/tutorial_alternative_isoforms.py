@@ -1,6 +1,9 @@
 # import the UniProt data source class
 
-from cancermuts.datasources import UniProt, cBioPortal, PhosphoSite, dbPTM, GlyGen, COSMIC, MobiDB, MyVariant, RevelDatabase, ManualAnnotation, ClinVar
+from cancermuts.datasources import (
+    UniProt, cBioPortal, PhosphoSite, dbPTM, GlyGen, COSMIC,
+    MobiDB, MyVariant, RevelDatabase, ManualAnnotation, ClinVar, NetPhos
+)
 from cancermuts.exceptions import *
 from cancermuts.core import Mutation
 from cancermuts.metadata import GenomicMutation
@@ -23,11 +26,12 @@ print(seq.positions[0:5])
 
 # confirm non-canonical status
 print("Is the sequence canonical?", seq.is_canonical)
-print("Transcript accession for filtering (if any):",
-      seq.aliases.get('transcript_accession') or seq.aliases.get('ensembl_transcript_id'))
+print(
+    "Transcript accession for filtering (if any):",
+    seq.aliases.get('transcript_accession') or seq.aliases.get('ensembl_transcript_id')
+)
 
-# Use COSMIC to retrieve non-canonical alternative isofrom annotations
-
+# Use COSMIC to retrieve non-canonical alternative isoform annotations
 cosmic = COSMIC(
     targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
     screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
@@ -50,8 +54,10 @@ if positions_with_mut:
     print("Sources:", first_mut.sources)
     print("Metadata:", first_mut.metadata)
 else:
-    print("No COSMIC mutations found for transcript:",
-          seq.aliases.get('transcript_accession') or seq.aliases.get('ensembl_transcript_id') or "canonical")
+    print(
+        "No COSMIC mutations found for transcript:",
+        seq.aliases.get('transcript_accession') or seq.aliases.get('ensembl_transcript_id') or "canonical"
+    )
 
 # cBioPortal does not support non-canonical mutations
 cbioportal = cBioPortal()
@@ -64,10 +70,19 @@ except UnexpectedIsoformError:
 # Use ClinVar to retrieve non-canonical alternative isoform annotations
 clinvar = ClinVar()
 clinvar.add_mutations(seq, metadata=[
-        'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status', 'genomic_mutations',
-        'clinvar_variant_id', 'genomic_coordinates', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_classification',
-        'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status', 
-        'clinvar_clinical_impact_classification'])
+    'clinvar_germline_classification',
+    'clinvar_germline_condition',
+    'clinvar_germline_review_status',
+    'genomic_mutations',
+    'clinvar_variant_id',
+    'genomic_coordinates',
+    'clinvar_oncogenicity_condition',
+    'clinvar_oncogenicity_classification',
+    'clinvar_oncogenicity_review_status',
+    'clinvar_clinical_impact_condition',
+    'clinvar_clinical_impact_review_status',
+    'clinvar_clinical_impact_classification'
+])
 
 is_cv = lambda m: m.metadata.get("clinvar_variant_id") is not None
 
@@ -125,7 +140,11 @@ try:
 except UnexpectedIsoformError:
     print("GlyGen annotations will not be added, as a non-canonical isoform has been provided")
 
-# MobiDB does not suport non-canonical isoforms
+# NetPhos supports non-canonical isoforms through isoform-specific local files
+np = NetPhos('/data/databases/netphos_human_proteome/netphos_human_isoforms/raw/')
+np.add_position_properties(seq)
+
+# MobiDB does not support non-canonical isoforms
 mdb = MobiDB()
 
 try:
@@ -133,7 +152,7 @@ try:
 except UnexpectedIsoformError:
     print("MobiDB annotations will not be added, as a non-canonical isoform has been provided")
 
-# MyVariant does not suport non-canonical isoforms
+# MyVariant does not support non-canonical isoforms
 mv = MyVariant()
 
 try:

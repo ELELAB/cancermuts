@@ -220,8 +220,11 @@ class GenomicMutation(Metadata):
             self.log.info("doing other")
             self.chr = None
             self.coord = None
+            self.coord_start = None
+            self.coord_end = None
             self.ref = None
             self.alt = None
+            self.substitution = None
             self.is_snv = False
             self.is_insdel = False
             self.is_inversion = False
