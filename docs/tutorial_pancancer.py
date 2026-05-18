@@ -19,8 +19,8 @@ seq.aliases["refseq"] = "NP_073729"
 # this prints the downloaded protein sequence
 print(seq.sequence)
 
-# the seq.positions attribute is an ordered list of the protein positions:
-print(seq.positions[0:3])
+# the seq.sequence_numbering attribute is an ordered list of the protein positions:
+print(seq.sequence_numbering[0:3])
 
 # import data sources classes
 from cancermuts.datasources import cBioPortal, COSMIC, ClinVar
@@ -31,13 +31,13 @@ cb = cBioPortal()
 cb.add_mutations(seq, metadata=['cancer_type', 'cancer_study', 'genomic_mutations'])
 
 # let us check out some of the mutations
-print(seq.positions[38].mutations)
-print(seq.positions[64].mutations)
-print(seq.positions[122].mutations)
+print(seq.variants_at_position(39))
+print(seq.variants_at_position(65))
+print(seq.variants_at_position(123))
 
-print(seq.positions[64].mutations[0].sources)
-print(seq.positions[64].mutations[0].mutated_residue_type)
-print(seq.positions[38].mutations[0].metadata)
+print(seq.variants_at_position(65)[0].sources)
+print(seq.variants_at_position(65)[0].alt)
+print(seq.variants_at_position(39)[0].metadata)
 
 # add mutations from COSMIC
 cosmic = COSMIC(
@@ -54,9 +54,9 @@ cosmic.add_mutations(
 )
 
 # let's check them out
-print(seq.positions[64].mutations[0])
-print(seq.positions[64].mutations[0].sources)
-print(seq.positions[64].mutations[0].metadata)
+print(seq.variants_at_position(65)[0])
+print(seq.variants_at_position(65)[0].sources)
+print(seq.variants_at_position(65)[0].metadata)
 
 # add mutations from ClinVar
 clinvar = ClinVar()
@@ -76,11 +76,11 @@ clinvar.add_mutations(seq, metadata=[
 ])
 
 # Check ClinVar Variant
-print(seq.positions[14].mutations)
-print(seq.positions[14].mutations[0].sources)
-print(seq.positions[14].mutations[0].mutated_residue_type)
-print(seq.positions[14].mutations[0].metadata['clinvar_germline_condition'])
-print(seq.positions[14].mutations[0].metadata['clinvar_germline_classification'])
+print(seq.variants_at_position(15))
+print(seq.variants_at_position(15)[0].sources)
+print(seq.variants_at_position(15)[0].alt)
+print(seq.variants_at_position(15)[0].metadata['clinvar_germline_condition'])
+print(seq.variants_at_position(15)[0].metadata['clinvar_germline_classification'])
 
 # add annotations from MyVariant (REVEL)
 from cancermuts.datasources import MyVariant
@@ -88,7 +88,7 @@ from cancermuts.datasources import MyVariant
 mv = MyVariant()
 mv.add_metadata(seq)
 
-print(seq.positions[64].mutations[0].metadata['revel_score'])
+print(seq.variants_at_position(65)[0].metadata['revel_score'])
 
 # add annotations from gnomAD
 from cancermuts.datasources import gnomAD
@@ -99,36 +99,36 @@ gnomad.add_metadata(seq, md_type=[
     'gnomad_genome_allele_frequency'
 ])
 
-print(seq.positions[64].mutations[0].metadata['gnomad_exome_allele_frequency'])
-print(seq.positions[64].mutations[0].metadata['gnomad_genome_allele_frequency'])
+print(seq.variants_at_position(65)[0].metadata['gnomad_exome_allele_frequency'])
+print(seq.variants_at_position(65)[0].metadata['gnomad_genome_allele_frequency'])
 
 from cancermuts.datasources import PhosphoSite, dbPTM, GlyGen, MobiDB, NetPhos
 
 # add annotations from PhosphoSite
 ps = PhosphoSite('/data/databases/phosphosite/')
-ps.add_position_properties(seq)
+ps.add_sequence_properties(seq)
 
-print(seq.positions[4].properties)
-print(seq.positions[28].properties)
+print(seq.properties_at_position(5))
+print(seq.properties_at_position(29))
 
 # add annotations from dbPTM
 db = dbPTM('/data/databases/dbPTM/')
-db.add_position_properties(seq)
+db.add_sequence_properties(seq)
 
 # add annotations from GlyGen
 gg = GlyGen('/data/databases/GlyGen/', database_file='human_proteoform_glycosylation_sites_uniprotkb_filtered.csv')
-gg.add_position_properties(seq)
+gg.add_sequence_properties(seq)
 
 # add annotations from NetPhos
 np = NetPhos('/data/databases/netphos_human_proteome/netphos_human_isoforms/raw/')
-np.add_position_properties(seq)
+np.add_sequence_properties(seq)
 
 # add annotations from MobiDB
 mdb = MobiDB()
-mdb.add_position_properties(seq)
+mdb.add_sequence_properties(seq)
 
-print(seq.positions[0].properties['mobidb_disorder_propensity'])
-print(seq.positions[10].properties['mobidb_disorder_propensity'])
+print(seq.properties_at_position(1,'mobidb_disorder_propensity'))
+print(seq.properties_at_position(11,'mobidb_disorder_propensity'))
 
 # add annotations from ELM
 from cancermuts.datasources import ELMPredictions

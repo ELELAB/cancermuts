@@ -2117,9 +2117,11 @@ class NetPhos(StaticSource, object):
 
         return sorted(sites, key=lambda x: int(x[1:]))
 
-    def add_position_properties(self, sequence, properties=None):
+    def add_sequence_properties(self, sequence, properties=None):
         if properties is None:
             properties = ["phosphorylation"]
+        elif isinstance(properties, str):
+            properties = [properties]
 
         if "phosphorylation" not in properties:
             return
@@ -2133,24 +2135,27 @@ class NetPhos(StaticSource, object):
 
             try:
                 site_seq_idx = sequence.seq2index(site)
-                position = sequence.positions[site_seq_idx]
             except Exception:
                 self.log.warning(f"NetPhos site {site_label} is outside the protein sequence; it will be skipped")
                 continue
 
-            if position.wt_residue_type != wt:
+            if sequence.sequence[site_seq_idx] != wt:
                 self.log.warning(f"for NetPhos site {site_label}, residue {wt} is "
-                    f"{position.wt_residue_type} in wild-type sequence; it will be skipped")
+                    f"{sequence.sequence[site_seq_idx]} in wild-type sequence; it will be skipped")
                 continue
 
-            if prop_name in position.properties:
-                prop = position.properties[prop_name]
-                if self not in prop.sources:
-                    prop.sources.append(self)
-                self.log.info(f"site {site_label} already annotated as phosphorylation; source will be added")
-            else:
-                prop = position_properties_classes[prop_name](sources=[self], position=position)
-                position.add_property(prop)
+            already_annotated = False
+            if prop_name in sequence.properties:
+                for prop in sequence.properties[prop_name]:
+                    if prop.positions == [site]:
+                        if self not in prop.sources:
+                            prop.sources.append(self)
+                        self.log.info(f"site {site_label} already annotated as phosphorylation; source will be added")
+                        already_annotated = True
+
+            if not already_annotated:
+                prop = sequence_properties_classes[prop_name](sources=[self], positions=[site])
+                sequence.add_property(prop)
                 self.log.info(f"adding {site_label} to site {prop.name}")
 
 class GlyGen(StaticSource, object):

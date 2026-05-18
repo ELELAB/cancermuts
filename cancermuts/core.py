@@ -185,6 +185,32 @@ class Sequence(object):
                     existing.metadata[k] = var.metadata[k]
                     self.log.debug("    metadata %s was added anew" % k)
 
+    def variants_at_position(self, position, variant_types=None):
+
+        if position not in self.sequence_numbering:
+            raise ValueError(f"Position {position} is outside sequence bounds: 1-{len(self.sequence)}")
+        if variant_types is None:
+            variant_types = ProteinVariant.VARIANT_TYPES
+        elif isinstance(variant_types, str):
+            variant_types = {variant_types}
+        else:
+            variant_types = set(variant_types)
+
+        invalid_variant_types = variant_types - ProteinVariant.VARIANT_TYPES
+        if invalid_variant_types:
+            raise ValueError(f"Invalid variant type(s): {invalid_variant_types}")
+        matching_variants = []
+        for variant in self.variants:
+            if variant.variant_type not in variant_types:
+                continue
+            if variant.variant_type == "insertion":
+                if position in {variant.start, variant.start + 1}:
+                    matching_variants.append(variant)
+            elif variant.start <= position <= variant.end:
+                matching_variants.append(variant)
+        return matching_variants
+
+
     def properties_at_position(self, position, property_name=None):
         """
         If property_name is provided, return a dict of properties mapped
@@ -228,7 +254,7 @@ class ProteinVariant(object):
         metadata : :obj:`dict`
             Dictionary encoding variant-associated metadata.
     """
-
+    VARIANT_TYPES = {"missense", "deletion", "insertion", "delins"}
     @logger_init
     def __init__(self, start, end, ref, alt, sources=None, metadata=None):
         """Constructor for the ProteinVariant class.
@@ -432,7 +458,7 @@ class VariantRegister:
                 variant_types = {variant_types}
             else:
                 variant_types = set(variant_types)
-            invalid_var_types = variant_types - {"missense", "delins", "insertion", "deletion"}
+            invalid_var_types = variant_types - ProteinVariant.VARIANT_TYPES
             if invalid_var_types:
                 raise ValueError(f"Invalid variant type(s): {invalid_var_types}")
             variants = [v for v in variants if v.variant_type in variant_types]
