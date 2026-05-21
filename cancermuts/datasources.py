@@ -636,7 +636,7 @@ class ClinVar(DynamicSource, object):
         'clinvar_variant_id', 'genomic_coordinates', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_classification',
         'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status', 'clinvar_clinical_impact_classification']
     @logger_init
-    def __init__(self, ncbi_requests_per_second=8, ncbi_rate_limit_lock_file="/tmp/cancermuts_ncbi_rate_limit.lock", ncbi_api_key="c1e940e61e13bf4652922ded36f5fb2f2108"):
+    def __init__(self, ncbi_requests_per_second=2, ncbi_rate_limit_lock_file="/tmp/cancermuts_ncbi_rate_limit.lock", ncbi_api_key=None):
         description = "ClinVar mutation database"
         super(ClinVar, self).__init__(name='ClinVar', version='', description=description)
         if ncbi_requests_per_second is None:
