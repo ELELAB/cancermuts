@@ -1552,7 +1552,12 @@ class ClinVar(DynamicSource, object):
         lock_fh = None
         if self._ncbi_rate_limit_lock_file is not None:
             lock_fh = self._open_ncbi_lock_file()
-            fcntl.flock(lock_fh, fcntl.LOCK_EX)
+            try:
+                fcntl.flock(lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                self.log.warning("Another cancermuts process is currently querying ClinVar; waiting for it to finish.")
+                fcntl.flock(lock_fh, fcntl.LOCK_EX)
+                self.log.warning("Resuming ClinVar queries.")
         try:
             gene = sequence.gene_id
             if "refseq" not in sequence.aliases or not sequence.aliases["refseq"]:
