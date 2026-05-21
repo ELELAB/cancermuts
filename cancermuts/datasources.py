@@ -179,7 +179,7 @@ class UniProt(DynamicSource, object):
                         isoform_map[iso_id] = is_displayed
         except KeyError as e:
             raise ValueError(f"Missing expected field '{e.args[0]}' in ALTERNATIVE PRODUCTS for UniProt entry {this_upac}")
-        
+
         canonical_isoforms = [iso_id for iso_id, is_canonical in isoform_map.items() if is_canonical]
 
         if isoform is not None:
