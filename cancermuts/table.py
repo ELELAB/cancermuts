@@ -219,15 +219,12 @@ class Table:
             return None
         return ", ".join(subtypes)
 
-    def _ptm_sources_at_position(self, sequence, position):
+    def _ptm_sources_at_position(self, properties_at_pos):
         ptm_sources_list = []
         for ptm_key in self.ptms.keys():
-            properties_at_pos = sequence.properties_at_position(position, ptm_key)
-            if ptm_key in properties_at_pos:
-                for prop in properties_at_pos[ptm_key]:
-                    ptm_sources_list.extend([s.name for s in prop.sources])
-        ptm_sources_str = ",".join(sorted(set(ptm_sources_list))) if ptm_sources_list else None
-        return ptm_sources_str
+            for prop in properties_at_pos.get(ptm_key, []):
+                ptm_sources_list.extend([s.name for s in prop.sources])s
+        return ",".join(sorted(set(ptm_sources_list))) if ptm_sources_list else None
 
     def to_dataframe(self, sequence, mutation_metadata=['cancer_study', 'cancer_type', 'genomic_coordinates', 'genomic_mutations', 'revel_score', 'cancer_site', 'cancer_histology',
                                                         'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency',
@@ -254,17 +251,14 @@ class Table:
 
         for position, residue in sequence:
             row = [position, residue]
+            properties_at_pos = sequence.properties_at_position(position)
 
             for property_name in sequence_properties:
-                properties_at_pos = sequence.properties_at_position(position, property_name)
-                if property_name in properties_at_pos:
-                    properties = properties_at_pos[property_name]
-                else:
-                    properties = []
+                properties = properties_at_pos.get(property_name, [])
                 row.append(self._format_property_values(properties))
                 if property_name == 'ptm_glycosylation':
                     row.append(self._format_glycosylation_subtypes(properties))
-            row.append(self._ptm_sources_at_position(sequence, position))
+            row.append(self._ptm_sources_at_position(properties_at_pos))
             position_rows.append(row)
 
         position_df = pd.DataFrame(position_rows, columns=position_header)

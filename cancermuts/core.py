@@ -33,6 +33,7 @@ from .log import logger_init
 import re
 import pandas as pd
 from Bio.SeqUtils import seq3
+from collections import defaultdict
 
 class Sequence(object):
     """The most fundamental class of Cancermuts, this class starts from a
@@ -61,9 +62,9 @@ class Sequence(object):
         protein sequence as obtained from the data source
     sequence_numbering : :obj:`list of int`
         list of integers, starting from one, each representing a position
-    properties : :obj:`dict`
-        dictionary including the downloaded protein-associated properties.
-        These can span one or more residues.
+    properties_by_position : :obj:`dict`
+        Dictionary mapping each sequence position to the sequence properties
+        annotated at that position. These can span one or more residues.
     aliases : :obj:`dict`
         This dictionary maps different "aliases" (i.e. identifiers) for the
         protein of interest. The key should represent the type of identifier
@@ -94,8 +95,8 @@ class Sequence(object):
         self.source = source
         self.sequence = sequence
         self.sequence_numbering = list(range(1, len(self.sequence) + 1))
-        self.properties = {}
-
+        self.properties_by_position = defaultdict(lambda: defaultdict(list))
+        self.properties_by_key = {}
 
     def seq2index(self, seqn):
         """
@@ -123,24 +124,37 @@ class Sequence(object):
 
     def add_property(self, prop):
         """
-        Adds sequence property to sequence object. If a property of the same
-        category is already present, the property will be added to the same
-        category; otherwise the category will be created anew
+        Add a SequenceProperty to the sequence and index it by sequence position.
+        If a property with the same category and exact positions already exists,
+        its sources are extended instead of storing a duplicate.
 
         Parameters
         ----------
         prop : :obj:`cancermuts.properties.SequenceProperty`
             new property to be added
         """
+        if prop.category not in sequence_properties_classes:
+            raise ValueError(f"Unknown property category: {prop.category}")
+        positions = list(prop.positions)
+        for position in positions:
+            if position not in self.sequence_numbering:
+                raise ValueError(f"Property {prop} is outside sequence bounds: "
+                                f"position {position} for sequence of length {len(self.sequence)}")
+        property_key = (prop.category, tuple(positions))
 
-        if prop.category in self.properties:
-            self.properties[prop.category].append(prop)
-            add_type = "appending"
-            self.log.debug("adding property %s to sequence of %s (appeding)" % (str(prop), self.gene_id))
-        else:
-            self.properties[prop.category] = [prop]
-            add_type = "new category"
-            self.log.debug("adding property %s to sequence of %s (%s)" % (str(prop), self.gene_id, add_type))
+        if property_key in self.properties_by_key:
+            existing_prop = self.properties_by_key[property_key]
+            for source in prop.sources:
+                if source not in existing_prop.sources:
+                    existing_prop.sources.append(source)
+            self.log.debug("adding property %s to sequence of %s (%s)"% (str(existing_prop), self.gene_id, "appending source"))
+            return existing_prop
+
+        self.properties_by_key[property_key] = prop
+        for position in positions:
+            self.properties_by_position[position][prop.category].append(prop)
+        self.log.debug("adding property %s to sequence of %s (%s)" % (str(prop), self.gene_id, "new property"))
+        return prop
 
     def _variant_wt_check(self, var):
         if var.start < 1 or var.end > len(self.sequence):
@@ -218,23 +232,16 @@ class Sequence(object):
         If property_name is None, return all property categories with their
         properties.
         """
-
+        if position not in self.sequence_numbering:
+            raise ValueError(f"Position {position} is outside sequence bounds: 1-{len(self.sequence)}")
         if property_name is not None:
             if property_name not in sequence_properties_classes:
                 raise ValueError(f"Unknown property_name: {property_name}")
-            if property_name not in self.properties:
-                properties_to_check = {property_name: []}
-            else:
-                properties_to_check = {property_name: self.properties[property_name]}
-        else:
-            properties_to_check = self.properties
+            props = self.properties_by_position.get(position, {}).get(property_name, [])
+            return {property_name: list(props)} if props else {}
+        return {this_property_name: list(props) for this_property_name, props
+                in self.properties_by_position.get(position, {}).items()}
 
-        properties = {}
-        for this_property_name, props in properties_to_check.items():
-            matching_props = [prop for prop in props if position in prop.positions]
-            if matching_props:
-                properties[this_property_name] = matching_props
-        return properties
 
 class ProteinVariant(object):
     """This class describes in-frame protein variants on a reference sequence.

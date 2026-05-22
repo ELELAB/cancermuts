@@ -1930,21 +1930,10 @@ class PhosphoSite(DynamicSource, object):
                     self.log.warning("for PTM %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, sequence.sequence[site_seq_idx]))
                     continue
 
-                already_annotated = False
-                if self._ptm_types_to_classes[ptm] in sequence.properties:
-                    for prop in sequence.properties[self._ptm_types_to_classes[ptm]]:
-                        if prop.positions == [site]:
-                            if self not in prop.sources:
-                                prop.sources.append(self)
-                            self.log.info("site %s already annotated as %s; source will be added" % (m, self._ptm_types_to_classes[ptm]))
-                            already_annotated = True
-                            property_obj = prop
-
-                if not already_annotated:
-                    property_obj = sequence_properties_classes[self._ptm_types_to_classes[ptm]](  sources=[self],
-                                                        positions=[site] )
-                    sequence.add_property(property_obj)
-                    self.log.info("adding %s to site %s" % (m, property_obj.name))
+                prop_name = self._ptm_types_to_classes[ptm]
+                property_obj = sequence_properties_classes[prop_name](sources=[self], positions=[site])
+                property_obj = sequence.add_property(property_obj)
+                self.log.info("adding/updatng %s to site %s" % (m, property_obj.name))
 
                 if ptm == "O-GalNAc" or ptm == "O-GlcNAc":
                     property_obj.add_subtype(ptm)
@@ -2020,22 +2009,8 @@ class dbPTM(DynamicSource, object):
                     continue
         
                 prop_name = self._ptm_types_to_classes[ptm]
-
-                already_annotated = False
-                if prop_name in sequence.properties:
-                    for prop in sequence.properties[prop_name]:
-                        if prop.positions == [site]:
-                            if self not in prop.sources:
-                                prop.sources.append(self)
-                            already_annotated = True
-                            property_obj = prop
-
-                if not already_annotated:
-                    property_obj = sequence_properties_classes[prop_name](
-                        sources=[self],
-                        positions=[site]
-                    )
-                    sequence.add_property(property_obj)
+                property_obj = sequence_properties_classes[prop_name](sources=[self], positions=[site])
+                property_obj = sequence.add_property(property_obj)
 
                 if ptm in self._glyco_subtypes:
 
@@ -2144,19 +2119,9 @@ class NetPhos(StaticSource, object):
                     f"{sequence.sequence[site_seq_idx]} in wild-type sequence; it will be skipped")
                 continue
 
-            already_annotated = False
-            if prop_name in sequence.properties:
-                for prop in sequence.properties[prop_name]:
-                    if prop.positions == [site]:
-                        if self not in prop.sources:
-                            prop.sources.append(self)
-                        self.log.info(f"site {site_label} already annotated as phosphorylation; source will be added")
-                        already_annotated = True
-
-            if not already_annotated:
-                prop = sequence_properties_classes[prop_name](sources=[self], positions=[site])
-                sequence.add_property(prop)
-                self.log.info(f"adding {site_label} to site {prop.name}")
+            prop = sequence_properties_classes[prop_name](sources=[self], positions=[site])
+            prop = sequence.add_property(prop)
+            self.log.info(f"adding/updating {site_label} to site {prop.name}")
 
 class GlyGen(StaticSource, object):
     @logger_init
@@ -2188,20 +2153,9 @@ class GlyGen(StaticSource, object):
             site = int(row['glycosylation_site_uniprotkb'])
             subtype = f"{row['glycosylation_type']}-{row['carb_name'].rstrip('.')}"
 
-
-            already_annotated = False
-            if prop_name in sequence.properties:
-                for prop in sequence.properties[prop_name]:
-                    if prop.positions == [site]:
-                        if self not in prop.sources:
-                            prop.sources.append(self)
-                        prop.add_subtype(subtype)
-                        already_annotated = True
-
-            if not already_annotated:
-                property_obj = GlycosylationSite(positions=[site], sources=[self])
-                property_obj.add_subtype(subtype)
-                sequence.add_property(property_obj)
+            property_obj = GlycosylationSite(positions=[site], sources=[self])
+            property_obj = sequence.add_property(property_obj)
+            property_obj.add_subtype(subtype)
 
 class MyVariant(DynamicSource, object):
     @logger_init
