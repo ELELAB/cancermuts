@@ -57,7 +57,7 @@ from requests.adapters import HTTPAdapter
 import gget
 from io import StringIO
 import xmltodict
-
+import fcntl
 
 if sys.version_info[0] >= 3:
     unicode = str
@@ -636,9 +636,45 @@ class ClinVar(DynamicSource, object):
         'clinvar_variant_id', 'genomic_coordinates', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_classification',
         'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status', 'clinvar_clinical_impact_classification']
     @logger_init
-    def __init__(self):
+    def __init__(self, ncbi_requests_per_second=2, ncbi_rate_limit_lock_file="/tmp/cancermuts_ncbi_rate_limit.lock", ncbi_api_key=None):
         description = "ClinVar mutation database"
         super(ClinVar, self).__init__(name='ClinVar', version='', description=description)
+        if ncbi_requests_per_second is None:
+            self._ncbi_min_interval = None
+        elif type(ncbi_requests_per_second) is not int or ncbi_requests_per_second <= 0:
+            raise ValueError("ncbi_requests_per_second must be an integer > 0, or None to disable request throttling")
+        else:
+            self._ncbi_min_interval = 1.0 / ncbi_requests_per_second
+        self._ncbi_rate_limit_lock_file = ncbi_rate_limit_lock_file
+        self._ncbi_last_request_time = 0.0
+        self._session = rq.Session()
+        self._ncbi_api_key = ncbi_api_key
+
+    def _open_ncbi_lock_file(self):
+        path = self._ncbi_rate_limit_lock_file
+        try:
+            return open(path, "r+")
+        except FileNotFoundError:
+            try:
+                fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o666)
+                os.fchmod(fd, 0o666)
+                return os.fdopen(fd, "r+")
+            except FileExistsError:
+                return open(path, "r+")
+
+    def _ncbi_throttle(self):
+        """
+        Restrict NCBI E-utilities requests across jobs running
+        on the same server.
+        """
+        if self._ncbi_min_interval is None:
+            return
+        now = time.time()
+        elapsed = now - self._ncbi_last_request_time
+        wait = self._ncbi_min_interval - elapsed
+        if wait > 0:
+            time.sleep(wait)
+        self._ncbi_last_request_time = time.time()
 
     def _melting_dictionary(self, variants_annotation, add_method=False):
         '''
@@ -722,9 +758,13 @@ class ClinVar(DynamicSource, object):
         delay = 3
         while attempts < max_retries:
             try:
-                response = rq.get(URL)
-            except:
-                self.log.warning(f"An error occurred during the ClinVar database query."
+                self._ncbi_throttle()
+                params = {}
+                if self._ncbi_api_key is not None:
+                    params["api_key"] = self._ncbi_api_key
+                response = self._session.get(URL, params=params, timeout=(10, 60))
+            except Exception as e:
+                self.log.warning(f"An error occurred during the ClinVar database query: {type(e).__name__}: {e}. "
                       f" Will try again in {delay} seconds (attempt {attempts+1}/{max_retries})")
                 attempts +=1
                 time.sleep(delay)
@@ -1509,48 +1549,62 @@ class ClinVar(DynamicSource, object):
         return mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene
 
     def add_mutations(self, sequence, metadata=[]):
-        gene = sequence.gene_id
-        if "refseq" not in sequence.aliases or not sequence.aliases["refseq"]:
-            self.log.error(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
-            raise TypeError(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
-        refseq = sequence.aliases["refseq"]
-        filter_missense_variants = f'({gene}[gene] AND ("missense variant"[molecular consequence] OR "SO:0001583"[molecular consequence]))'
-        mutation_type = "missense"
-        not_found_gene = []
-
+        lock_fh = None
+        if self._ncbi_rate_limit_lock_file is not None:
+            lock_fh = self._open_ncbi_lock_file()
+            try:
+                fcntl.flock(lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                self.log.warning("Another cancermuts process is currently querying ClinVar; waiting for it to finish.")
+                fcntl.flock(lock_fh, fcntl.LOCK_EX)
+                self.log.warning("Resuming ClinVar queries.")
         try:
-            clinvar_ids, out_gene = self._filtered_variants_extractor(filter_missense_variants, mutation_type, gene)
-        except RuntimeError as e:
-            raise RuntimeError(f"ClinVar mutation extraction failed: {e}")
-        if not clinvar_ids:
-            not_found_gene.append(out_gene)
-            self.log.warning(f"No ClinVar {mutation_type} variants are available for gene {out_gene}. No ClinVar mutation will be added to the sequence.")
-            return {
-                    "variants_to_check": pd.DataFrame(),
-                    "entry_not_found": pd.DataFrame(not_found_gene, columns=["gene_name"]),
-                    "inconsistency_annotations": pd.DataFrame()
-            }
+            gene = sequence.gene_id
+            if "refseq" not in sequence.aliases or not sequence.aliases["refseq"]:
+                self.log.error(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
+                raise TypeError(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
+            refseq = sequence.aliases["refseq"]
+            filter_missense_variants = f'({gene}[gene] AND ("missense variant"[molecular consequence] OR "SO:0001583"[molecular consequence]))'
+            mutation_type = "missense"
+            not_found_gene = []
 
-        mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene = self._get_available_muts_and_md(sequence, clinvar_ids, metadata)
+            try:
+                clinvar_ids, out_gene = self._filtered_variants_extractor(filter_missense_variants, mutation_type, gene)
+            except RuntimeError as e:
+                raise RuntimeError(f"ClinVar mutation extraction failed: {e}")
+            if not clinvar_ids:
+                not_found_gene.append(out_gene)
+                self.log.warning(f"No ClinVar {mutation_type} variants are available for gene {out_gene}. No ClinVar mutation will be added to the sequence.")
+                return {
+                        "variants_to_check": pd.DataFrame(),
+                        "entry_not_found": pd.DataFrame(not_found_gene, columns=["gene_name"]),
+                        "inconsistency_annotations": pd.DataFrame()
+                }
 
-        for mutation_idx, mutation in enumerate(mutations):
-            for md in metadata:
-                if md not in self._clinvar_supported_metadata:
-                    self.log.error(f'{md} is not a valid metadata. Supported metadata are: {self._clinvar_supported_metadata}')
-                    raise ValueError(f'{md} is not a valid metadata. Supported metadata are: {self._clinvar_supported_metadata}')
+            mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene = self._get_available_muts_and_md(sequence, clinvar_ids, metadata)
 
-                value = out_metadata[md][mutation_idx]
-                if value is not None:
-                    if md == "genomic_coordinates":
-                        mutation.metadata[md] = [GenomicCoordinates(self, *coord) for coord in value]
-                    elif md == "genomic_mutations":
-                        mutation.metadata[md] = value
-                    else:
-                        mutation.metadata[md] = [metadata_classes[md](self, value)]
+            for mutation_idx, mutation in enumerate(mutations):
+                for md in metadata:
+                    if md not in self._clinvar_supported_metadata:
+                        self.log.error(f'{md} is not a valid metadata. Supported metadata are: {self._clinvar_supported_metadata}')
+                        raise ValueError(f'{md} is not a valid metadata. Supported metadata are: {self._clinvar_supported_metadata}')
 
-            self.log.debug("adding mutation %s" % str(mutation))
-            mutation.sequence_position.add_mutation(mutation)
+                    value = out_metadata[md][mutation_idx]
+                    if value is not None:
+                        if md == "genomic_coordinates":
+                            mutation.metadata[md] = [GenomicCoordinates(self, *coord) for coord in value]
+                        elif md == "genomic_mutations":
+                            mutation.metadata[md] = value
+                        else:
+                            mutation.metadata[md] = [metadata_classes[md](self, value)]
 
+                self.log.debug("adding mutation %s" % str(mutation))
+                mutation.sequence_position.add_mutation(mutation)
+
+        finally:
+            if lock_fh is not None:
+                fcntl.flock(lock_fh, fcntl.LOCK_UN)
+                lock_fh.close()
         return {
             "variants_to_check": df_strange,
             "entry_not_found": df_not_found,

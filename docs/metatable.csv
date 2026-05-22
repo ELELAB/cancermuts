@@ -112,7 +112,7 @@
 110,109,L,,,,,,,,,,,,,"Atg8 protein family ligands (LIG_LIR_Gen_1), 105-114, ELM|Atg8 protein family ligands (LIG_LIR_Gen_1), 106-114, ELM",,,,,,,,,,,,,,,,,,,,,,,
 111,110,Y,,,,,,,,,,,,,"Atg8 protein family ligands (LIG_LIR_Gen_1), 105-114, ELM|Atg8 protein family ligands (LIG_LIR_Gen_1), 106-114, ELM",,,,,,,,,,,,,,,,,,,,,,,
 112,111,M,,,,,,,,,,,,,"Atg8 protein family ligands (LIG_LIR_Gen_1), 105-114, ELM|Atg8 protein family ligands (LIG_LIR_Gen_1), 106-114, ELM",,,,,,,,,,,,,,,,,,,,,,,
-113,112,V,,,,,,,,,,,,,"Atg8 protein family ligands (LIG_LIR_Gen_1), 105-114, ELM|Atg8 protein family ligands (LIG_LIR_Gen_1), 106-114, ELM",,,,,,,,,,,,,,,,,,,,,,,
+113,112,V,I,,,,,,,,,,,,"Atg8 protein family ligands (LIG_LIR_Gen_1), 105-114, ELM|Atg8 protein family ligands (LIG_LIR_Gen_1), 106-114, ELM",,ClinVar,,,"hg19,16:87436659-87436659, hg38,16:87403053-87403053","hg19,16:g.87436659G>A, hg38,16:g.87403053G>A",0.193,,,,,,,4837135,Uncertain significance,not specified,1,,,,,,
 114,113,Y,,,,,,,,,,,,,"Atg8 protein family ligands (LIG_LIR_Gen_1), 105-114, ELM|Atg8 protein family ligands (LIG_LIR_Gen_1), 106-114, ELM|Phosphotyrosine ligands bound by SH2 domains (LIG_SH2_STAT3), 113-116, ELM",,,,,,,,,,,,,,,,,,,,,,,
 115,114,A,,,,,,,,,,,,,"Atg8 protein family ligands (LIG_LIR_Gen_1), 105-114, ELM|Atg8 protein family ligands (LIG_LIR_Gen_1), 106-114, ELM|Phosphotyrosine ligands bound by SH2 domains (LIG_SH2_STAT3), 113-116, ELM",,,,,,,,,,,,,,,,,,,,,,,
 116,115,S,,P,,,,,,,,,,NetPhos,"Phosphotyrosine ligands bound by SH2 domains (LIG_SH2_STAT3), 113-116, ELM",,,,,,,,,,,,,,,,,,,,,,,
