@@ -223,7 +223,7 @@ class Table:
         ptm_sources_list = []
         for ptm_key in self.ptms.keys():
             for prop in properties_at_pos.get(ptm_key, []):
-                ptm_sources_list.extend([s.name for s in prop.sources])s
+                ptm_sources_list.extend([s.name for s in prop.sources])
         return ",".join(sorted(set(ptm_sources_list))) if ptm_sources_list else None
 
     def to_dataframe(self, sequence, mutation_metadata=['cancer_study', 'cancer_type', 'genomic_coordinates', 'genomic_mutations', 'revel_score', 'cancer_site', 'cancer_histology',

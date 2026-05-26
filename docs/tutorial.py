@@ -158,8 +158,8 @@ elm.add_sequence_properties(
     exclude_elm_classes="MOD_."
 )
 
-print(seq.properties)
-print(seq.properties['linear_motif'][0].type)
+print(seq.properties_at_position(29))
+print(seq.properties_at_position(10, 'linear_motif'))
 
 # save table
 from cancermuts.table import Table

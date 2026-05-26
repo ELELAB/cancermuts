@@ -229,7 +229,7 @@ class CleavageSite(SequenceProperty):
 class DisorderPropensity(SequenceProperty):
     description = "Structural disorder"
     header = "disorder_propensity"
-    category = 'disorder_propensity'
+    category = "mobidb_disorder_propensity"
 
     def __init__(self, positions, sources, disorder_state):
         super(DisorderPropensity, self).__init__(name="Disorder Propensity",

@@ -834,10 +834,10 @@ We can then check the annotation as done previously:
 
 ```py
 >>> seq.properties_at_position(1,'mobidb_disorder_propensity')
-{}
+{'mobidb_disorder_propensity': [<StructuralDisorder, None>]}
 
 >>> seq.properties_at_position(11,'mobidb_disorder_propensity')
-{}
+{'mobidb_disorder_propensity': [<StructuralDisorder, None>]}
 ```
 
 There are four types of annotations, here listed in order of priority.
@@ -877,19 +877,16 @@ post-translational modifications which are already supplied by PhosphoSite.
 We can check the linear motifs we have collected:
 
 ```py
->>> seq.properties
-{'ptm_acetylation': [<SequenceProperty Acetylation Site from PhosphoSite, dbPTM, positions 51>,
-<SequenceProperty Acetylation Site from PhosphoSite, positions 49>,
-<SequenceProperty Acetylation Site from dbPTM, positions 30>], 'ptm_methylation': [<SequenceProperty Methylation Site from PhosphoSite, positions 21>], 'ptm_phosphorylation': [<SequenceProperty Phosphorylation Site from PhosphoSite, NetPhos, positions 12>,
-<SequenceProperty Phosphorylation Site from PhosphoSite, positions 50>,
+>>> seq.properties_at_position(29)
+{'ptm_phosphorylation': [<SequenceProperty Phosphorylation Site from PhosphoSite, dbPTM, positions 29>], 'mobidb_disorder_propensity': [<StructuralDisorder, None>]}
   ...
 ```
 
 and their specifics:
 
 ```py
->>> seq.properties['linear_motif'][0].type
-'NRD cleavage site'
+>>> seq.properties_at_position(10, 'linear_motif')
+{'linear_motif': [<SequenceProperty Linear motif from ELM, positions 10,11,12>, <SequenceProperty Linear motif from ELM, positions 10,11,12,13,14>]}
 ```
 
 Alternatively, and in a very similar fashion, it is possible to use the [gget Python
@@ -1013,11 +1010,11 @@ We can then verify:
 >>> seq.properties_at_position(3, 'ptm_phosphorylation')
 {'ptm_phosphorylation': [<SequenceProperty Phosphorylation Site from Manual annotations from test.csv, positions 3>]}
 
->>> seq.properties['linear_motif']
-[<SequenceProperty Linear motif from Manual annotations from test.csv, positions 10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25>]
+>>> seq.properties_at_position(10, 'linear_motif')
+{'linear_motif': [<SequenceProperty Linear motif from Manual annotations from test.csv, positions 10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25>]}
 
->>> seq.properties['structure']
-[<SequenceProperty Structure from Manual annotations from test.csv, positions 30,31,32,33,34,35,36,37,38,39,40>]
+>>> seq.properties_at_position(30, 'structure')
+{'structure':[<SequenceProperty Structure from Manual annotations from test.csv, positions 30,31,32,33,34,35,36,37,38,39,40>]}
 ```
 
 ## Generating the final table
