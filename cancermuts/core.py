@@ -96,7 +96,6 @@ class Sequence(object):
         self.sequence = sequence
         self.sequence_numbering = list(range(1, len(self.sequence) + 1))
         self.properties_by_position = defaultdict(lambda: defaultdict(list))
-        self.properties_by_key = {}
 
     def seq2index(self, seqn):
         """
@@ -140,18 +139,7 @@ class Sequence(object):
             if position not in self.sequence_numbering:
                 raise ValueError(f"Property {prop} is outside sequence bounds: "
                                 f"position {position} for sequence of length {len(self.sequence)}")
-        property_key = (prop.category, tuple(positions))
-
-        if property_key in self.properties_by_key:
-            existing_prop = self.properties_by_key[property_key]
-            for source in prop.sources:
-                if source not in existing_prop.sources:
-                    existing_prop.sources.append(source)
-            self.log.debug("adding property %s to sequence of %s (%s)"% (str(existing_prop), self.gene_id, "appending source"))
-            return existing_prop
-
-        self.properties_by_key[property_key] = prop
-        for position in positions:
+        
             self.properties_by_position[position][prop.category].append(prop)
         self.log.debug("adding property %s to sequence of %s (%s)" % (str(prop), self.gene_id, "new property"))
         return prop
