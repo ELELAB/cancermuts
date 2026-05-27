@@ -2226,10 +2226,18 @@ class GlyGen(StaticSource, object):
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("GlyGen annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
         
-        protein_df = self.database_df[self.database_df['uniprotkb_canonical_ac'] == sequence.isoform]
+        glygen_isoform = sequence.isoform
+        if glygen_isoform is None:
+            glygen_isoform = f"{sequence.uniprot_ac}-1"
+            self.log.warning(f"No isoform identifier found for canonical sequence {sequence.uniprot_ac}. "
+                             f"GlyGen annotates canonical proteoforms as {glygen_isoform}, so this "
+                             f"identifier will be used for GlyGen matching only." )
+
+        protein_df = self.database_df[self.database_df['uniprotkb_canonical_ac'] == glygen_isoform].copy()
         if protein_df.empty:
             if sequence.uniprot_ac in self.database_df['src_xref_id'].values:
-                raise UnexpectedIsoformError('GlyGen contains this protein, but the requested isoform is not present')
+                raise UnexpectedIsoformError(f"GlyGen contains this protein, but the requested canonical "
+                    f"isoform {glygen_isoform} is not present")
             else:
                 return
 
