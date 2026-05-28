@@ -197,10 +197,13 @@ class Table:
             md_str = ", ".join(sorted(set(map(str, md_values))))
         return md_str
 
-    def _format_property_values(self, properties):
+    def _format_property_values(self, property_obj, entries):
+        if property_obj is None:
+            return None
+
         values = []
-        for prop in properties:
-            value = prop.get_value_str()
+        for entry in entries:
+            value = property_obj.get_value_str(entry)
             if value is None or value != value:
                 continue
             if value not in values:
@@ -209,21 +212,25 @@ class Table:
             return None
         return "|".join(map(str, values))
 
-    def _format_glycosylation_subtypes(self, properties):
-        subtypes = []
-        for prop in properties:
-            for subtype in prop.metadata["subtypes"]:
-                if subtype not in subtypes:
-                    subtypes.append(subtype)
-        if len(subtypes) == 0:
+    def _format_glycosylation_subtypes(self, entries):
+        existing_subtypes = []
+        for entry in entries:
+            for new_subtype in entry.get("metadata", {}).get("subtypes", []):
+                base = new_subtype.split("-")[0]
+                has_specific = any(st.startswith(base + "-") and st != new_subtype for st in existing_subtypes)
+
+            if not has_specific and new_subtype not in existing_subtypes:
+                existing_subtypes.append(new_subtype)
+
+        if len(existing_subtypes) == 0:
             return None
-        return ", ".join(subtypes)
+        return ", ".join(existing_subtypes)
 
     def _ptm_sources_at_position(self, properties_at_pos):
         ptm_sources_list = []
         for ptm_key in self.ptms.keys():
-            for prop in properties_at_pos.get(ptm_key, []):
-                ptm_sources_list.extend([s.name for s in prop.sources])
+            for entry in properties_at_pos.get(ptm_key, []):
+                ptm_sources_list.extend([source.name for source in entry.get("sources", [])])
         return ",".join(sorted(set(ptm_sources_list))) if ptm_sources_list else None
 
     def to_dataframe(self, sequence, mutation_metadata=['cancer_study', 'cancer_type', 'genomic_coordinates', 'genomic_mutations', 'revel_score', 'cancer_site', 'cancer_histology',
@@ -254,10 +261,12 @@ class Table:
             properties_at_pos = sequence.properties_at_position(position)
 
             for property_name in sequence_properties:
-                properties = properties_at_pos.get(property_name, [])
-                row.append(self._format_property_values(properties))
+                entries = properties_at_pos.get(property_name, [])
+                property_obj = sequence.properties.get(property_name)
+
+                row.append(self._format_property_values(property_obj, entries))
                 if property_name == 'ptm_glycosylation':
-                    row.append(self._format_glycosylation_subtypes(properties))
+                    row.append(self._format_glycosylation_subtypes(entries))
             row.append(self._ptm_sources_at_position(properties_at_pos))
             position_rows.append(row)
 

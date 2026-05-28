@@ -33,7 +33,6 @@ from .log import logger_init
 import re
 import pandas as pd
 from Bio.SeqUtils import seq3
-from collections import defaultdict
 
 class Sequence(object):
     """The most fundamental class of Cancermuts, this class starts from a
@@ -56,15 +55,16 @@ class Sequence(object):
     ----------
     source : :obj:`cancermuts.datasources.Datasource`
         Source from where the protein sequence is downloaded
-    gene_id : :obj:`int`, optional
+    gene_id : :obj:`str`, optional
         gene name to which the sequence to be downloaded belongs
     sequence : :obj:`str`
         protein sequence as obtained from the data source
     sequence_numbering : :obj:`list of int`
         list of integers, starting from one, each representing a position
-    properties_by_position : :obj:`dict`
-        Dictionary mapping each sequence position to the sequence properties
-        annotated at that position. These can span one or more residues.
+    properties : :obj:`dict`
+        Dictionary mapping property names to one SequenceProperty object per
+        property type. Each SequenceProperty stores its own entries internally
+        by residue position
     aliases : :obj:`dict`
         This dictionary maps different "aliases" (i.e. identifiers) for the
         protein of interest. The key should represent the type of identifier
@@ -95,7 +95,7 @@ class Sequence(object):
         self.source = source
         self.sequence = sequence
         self.sequence_numbering = list(range(1, len(self.sequence) + 1))
-        self.properties_by_position = defaultdict(lambda: defaultdict(list))
+        self.properties = {}
 
     def seq2index(self, seqn):
         """
@@ -121,28 +121,30 @@ class Sequence(object):
     def __repr__(self):
         return f"<Sequence gene_id={self.gene_id}, uniprot_ac={self.uniprot_ac}, isoform={self.isoform}, is_canonical={self.is_canonical}, source={self.source.name}, {len(self.sequence)} positions>"
 
-    def add_property(self, prop):
+    def add_property(self, property_name, positions, sources=None, **metadata):
         """
-        Add a SequenceProperty to the sequence and index it by sequence position.
-        If a property with the same category and exact positions already exists,
-        its sources are extended instead of storing a duplicate.
+        Add an entry to a sequence property.
+        A Sequence stores one SequenceProperty object per property name. This method
+        creates the property object if needed, then stores the provided entry inside
+        that object at the requested residue positions.
 
-        Parameters
-        ----------
-        prop : :obj:`cancermuts.properties.SequenceProperty`
-            new property to be added
         """
-        if prop.category not in sequence_properties_classes:
-            raise ValueError(f"Unknown property category: {prop.category}")
-        positions = list(prop.positions)
+        if property_name not in sequence_properties_classes:
+            raise ValueError(f"Unknown property_name: {property_name}")
+
+        if positions is None:
+            positions = []
+        if not isinstance(positions, list):
+            raise TypeError("positions must be a list of 1-based residue numbers")
+
         for position in positions:
             if position not in self.sequence_numbering:
-                raise ValueError(f"Property {prop} is outside sequence bounds: "
-                                f"position {position} for sequence of length {len(self.sequence)}")
-        
-            self.properties_by_position[position][prop.category].append(prop)
-        self.log.debug("adding property %s to sequence of %s (%s)" % (str(prop), self.gene_id, "new property"))
-        return prop
+                    raise ValueError(f"Property {property_name} is outside sequence bounds: "
+                                     f"position {position} for sequence of length {len(self.sequence)}")
+        if property_name not in self.properties:
+            self.properties[property_name] = sequence_properties_classes[property_name]()
+
+        return self.properties[property_name].add(positions=positions, sources=sources, **metadata)
 
     def _variant_wt_check(self, var):
         if var.start < 1 or var.end > len(self.sequence):
@@ -212,23 +214,31 @@ class Sequence(object):
                 matching_variants.append(variant)
         return matching_variants
 
-
     def properties_at_position(self, position, property_name=None):
         """
-        If property_name is provided, return a dict of properties mapped
-        to the property category.
-        If property_name is None, return all property categories with their
-        properties.
+        Return property entries annotated at a residue position.
+        If property_name is provided, only entries for that property type are
+        returned. If property_name is None, entries for all property types present
+        at the position are returned.
         """
         if position not in self.sequence_numbering:
             raise ValueError(f"Position {position} is outside sequence bounds: 1-{len(self.sequence)}")
-        if property_name is not None:
+
+        properties = {}
+        if property_name is None:
+            property_names = self.properties.keys()
+        else:
             if property_name not in sequence_properties_classes:
                 raise ValueError(f"Unknown property_name: {property_name}")
-            props = self.properties_by_position.get(position, {}).get(property_name, [])
-            return {property_name: list(props)} if props else {}
-        return {this_property_name: list(props) for this_property_name, props
-                in self.properties_by_position.get(position, {}).items()}
+            property_names = [property_name]
+
+        for property_name in property_names:
+            if property_name not in self.properties:
+                continue
+            entries = self.properties[property_name].get_entries_at(position)
+            if entries:
+                properties[property_name] = entries
+        return properties
 
 
 class ProteinVariant(object):
