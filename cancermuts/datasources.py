@@ -1273,7 +1273,7 @@ class ClinVar(DynamicSource, object):
                 self.log.error(f"Could not parse annotation: {ann} → {e}")
         return genomic_mutations
 
-    def _get_available_muts_and_md(self, sequence, clinvar_ids, metadata=[]):
+    def _get_available_muts_and_md(self, sequence, clinvar_ids, metadata=[], cross_check=False):
 
         # Initial object assignment:
         missense_variants = {}
@@ -1289,24 +1289,27 @@ class ClinVar(DynamicSource, object):
 
         # Prepare classification-based queries for consistency check:
         filter_ids = {}
-        classifications = ["Pathogenic", "Benign", "Likely Pathogenic", "Likely Benign", "vus", "Conflicting"]
-        filters_on_classification = [
-            f"({gene}[gene] AND ((\"clinsig pathogenic\"[Properties] or \"clinsig pathogenic low penetrance\"[Properties] or \"clinsig established risk allele\"[Properties]))",
-            f"({gene}[gene] AND (\"clinsig benign\"[Properties]))",
-            f"({gene}[gene] AND ((\"clinsig likely pathogenic\"[Properties] or \"clinsig likely pathogenic low penetrance\"[Properties] or \"clinsig likely risk allele\"[Properties]))",
-            f"({gene}[gene] AND (\"clinsig benign\"[Properties])) AND (\"clinsig likely benign\"[Properties])",
-            f"({gene}[gene] AND ((\"clinsig vus\"[Properties] or \"clinsig uncertain risk allele\"[Properties])))",
-            f"({gene}[gene] AND (\"clinsig has conflicts\"[Properties]))"
-            ]
+        if cross_check:
+            classifications = ["Pathogenic", "Benign", "Likely Pathogenic", "Likely Benign", "vus", "Conflicting"]
+            filters_on_classification = [
+                f"({gene}[gene] AND ((\"clinsig pathogenic\"[Properties] or \"clinsig pathogenic low penetrance\"[Properties] or \"clinsig established risk allele\"[Properties]))",
+                f"({gene}[gene] AND (\"clinsig benign\"[Properties]))",
+                f"({gene}[gene] AND ((\"clinsig likely pathogenic\"[Properties] or \"clinsig likely pathogenic low penetrance\"[Properties] or \"clinsig likely risk allele\"[Properties]))",
+                f"({gene}[gene] AND (\"clinsig benign\"[Properties])) AND (\"clinsig likely benign\"[Properties])",
+                f"({gene}[gene] AND ((\"clinsig vus\"[Properties] or \"clinsig uncertain risk allele\"[Properties])))",
+                f"({gene}[gene] AND (\"clinsig has conflicts\"[Properties]))"
+                ]
 
-        for classification, URL in zip(classifications, filters_on_classification):
-            try:
-                clinvar_ids_class, out_gene = self._filtered_variants_extractor(URL, classification, gene)
-            except RuntimeError as e:
-                self.log.error(e)
-                continue
-            if clinvar_ids_class:
-                filter_ids[classification] = [clinvar_ids_class, [gene], [refseq]]
+            for classification, URL in zip(classifications, filters_on_classification):
+                try:
+                    clinvar_ids_class, out_gene = self._filtered_variants_extractor(URL, classification, gene)
+                except RuntimeError as e:
+                    self.log.error(e)
+                    continue
+                if clinvar_ids_class:
+                    filter_ids[classification] = [clinvar_ids_class, [gene], [refseq]]
+        else:
+            self.log.info("ClinVar consistency cross-check skipped.")
 
         for clinvar_id in clinvar_ids:
             missense_variants[clinvar_id] = {"gene":gene, "isoform":refseq}
@@ -1392,44 +1395,45 @@ class ClinVar(DynamicSource, object):
         inconsistent_annotations = {}
         misannotated = {}
 
-        for classification,ids in filter_ids.items():
-            clinvar_ids = ids[0]
-            variants = []
-            for clinvar_id in clinvar_ids:
-                variants_set = []
-                try:
-                    parse_VCV = self._VCV_summary_retriever(clinvar_id)
-                except (RuntimeError,KeyError) as e:
-                    self.log.error(f"Failed to retrieve VCV summary for ClinVar ID {clinvar_id}: {e}")
-                    raise RuntimeError(f"Failed to retrieve VCV summary for ClinVar ID {clinvar_id}: {e}")
+        if cross_check:
+            for classification,ids in filter_ids.items():
+                clinvar_ids = ids[0]
+                variants = []
+                for clinvar_id in clinvar_ids:
+                    variants_set = []
+                    try:
+                        parse_VCV = self._VCV_summary_retriever(clinvar_id)
+                    except (RuntimeError,KeyError) as e:
+                        self.log.error(f"Failed to retrieve VCV summary for ClinVar ID {clinvar_id}: {e}")
+                        raise RuntimeError(f"Failed to retrieve VCV summary for ClinVar ID {clinvar_id}: {e}")
 
 
-                hgvss_coding,hgvss_genomic = self._coding_region_variants_extractor(parse_VCV, clinvar_id)
-                if hgvss_coding:
-                    correct_variant = self._missense_variants_extractor(hgvss_coding, ids[1][0], clinvar_id, ids[2][0])
-                    match = re.search(r"\(p\.([A-Z][a-z][a-z][0-9]+([A-Z][a-z][a-z]))\)", str(correct_variant))
-                    if not clinvar_id in missense_variants.keys() and match and match.group(2) != 'Ter':
-                        variants.append([clinvar_id, ids[1][0]])
-                        classifications = self._classifications_extractor(parse_VCV, clinvar_id)
-                        conditions = self._conditions_extractor(parse_VCV, clinvar_id)
-                        methods = self._classification_methods_extractor(parse_VCV, clinvar_id)
-                        genomic_annotations = self._genomic_annotation_extractor(hgvss_genomic)
-                        if isinstance(methods,tuple):
-                            methods = methods[0]
-                        review_status = self._review_status_extractor(parse_VCV, clinvar_id)
-                        value = {"variant":correct_variant,"gene":ids[1][0]}
-                        for feature,key_name in zip([classifications, conditions, review_status, methods, genomic_annotations],["classifications", "conditions", "review_status", "methods", "genomic_annotations"]):
-                                value[key_name] = feature
-                        inconsistent_annotations[clinvar_id] = value
+                    hgvss_coding,hgvss_genomic = self._coding_region_variants_extractor(parse_VCV, clinvar_id)
+                    if hgvss_coding:
+                        correct_variant = self._missense_variants_extractor(hgvss_coding, ids[1][0], clinvar_id, ids[2][0])
+                        match = re.search(r"\(p\.([A-Z][a-z][a-z][0-9]+([A-Z][a-z][a-z]))\)", str(correct_variant))
+                        if not clinvar_id in missense_variants.keys() and match and match.group(2) != 'Ter':
+                            variants.append([clinvar_id, ids[1][0]])
+                            classifications = self._classifications_extractor(parse_VCV, clinvar_id)
+                            conditions = self._conditions_extractor(parse_VCV, clinvar_id)
+                            methods = self._classification_methods_extractor(parse_VCV, clinvar_id)
+                            genomic_annotations = self._genomic_annotation_extractor(hgvss_genomic)
+                            if isinstance(methods,tuple):
+                                methods = methods[0]
+                            review_status = self._review_status_extractor(parse_VCV, clinvar_id)
+                            value = {"variant":correct_variant,"gene":ids[1][0]}
+                            for feature,key_name in zip([classifications, conditions, review_status, methods, genomic_annotations],["classifications", "conditions", "review_status", "methods", "genomic_annotations"]):
+                                    value[key_name] = feature
+                            inconsistent_annotations[clinvar_id] = value
 
-            misannotated[classification] = variants
+                misannotated[classification] = variants
 
-        for classification,mut_annotations in misannotated.items():
-            if mut_annotations:
-                for clinvar_id in mut_annotations:
-                    self.log.warning(f"annotation inconsistency detected for {clinvar_id[0]} clinvar id in {clinvar_id[1]} gene")
-            else:
-                self.log.info(f"{classification} mutations passed the consistency check")
+            for classification,mut_annotations in misannotated.items():
+                if mut_annotations:
+                    for clinvar_id in mut_annotations:
+                        self.log.warning(f"annotation inconsistency detected for {clinvar_id[0]} clinvar id in {clinvar_id[1]} gene")
+                else:
+                    self.log.info(f"{classification} mutations passed the consistency check")
 
         mutations = []
         out_metadata = {md: [] for md in metadata}
@@ -1548,7 +1552,7 @@ class ClinVar(DynamicSource, object):
 
         return mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene
 
-    def add_mutations(self, sequence, metadata=[]):
+    def add_mutations(self, sequence, metadata=[], cross_check=False):
         lock_fh = None
         if self._ncbi_rate_limit_lock_file is not None:
             lock_fh = self._open_ncbi_lock_file()
@@ -1581,7 +1585,7 @@ class ClinVar(DynamicSource, object):
                         "inconsistency_annotations": pd.DataFrame()
                 }
 
-            mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene = self._get_available_muts_and_md(sequence, clinvar_ids, metadata)
+            mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene = self._get_available_muts_and_md(sequence, clinvar_ids, metadata, cross_check=cross_check)
 
             for mutation_idx, mutation in enumerate(mutations):
                 for md in metadata:
