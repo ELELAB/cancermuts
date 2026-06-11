@@ -2249,14 +2249,16 @@ class GlyGen(StaticSource, object):
             subtype = f"{row['glycosylation_type']}-{row['carb_name'].rstrip('.')}"
             position_obj = sequence.positions[idx]
 
-            already_annotated = False
-            for prop in position_obj.properties:
-                if isinstance(prop, GlycosylationSite):
-                    prop.sources.append(self)
-                    prop.add_subtype(subtype)
-                    already_annotated = True
+            if GlycosylationSite.category in position_obj.properties:
 
-            if not already_annotated:
+                prop = position_obj.properties[GlycosylationSite.category]
+
+                if self not in prop.sources:
+                    prop.sources.append(self)
+
+                prop.add_subtype(subtype)
+
+            else:
                 property_obj = GlycosylationSite(position_obj, sources=[self])
                 property_obj.add_subtype(subtype)
                 position_obj.add_property(property_obj)

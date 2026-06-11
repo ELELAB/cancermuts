@@ -188,7 +188,14 @@ class GlycosylationSite(PositionProperty):
                                                     values={},
                                                     metadata={"subtypes": []}  )
 
-    def add_subtype(self,subtype):
+    def add_subtype(self, subtype):
+        base = subtype.split("-")[0]
+
+        self.metadata["subtypes"] = [
+            st for st in self.metadata["subtypes"]
+            if not (st.startswith(base + "-") and st != subtype)
+        ]
+
         if subtype not in self.metadata["subtypes"]:
             self.metadata["subtypes"].append(subtype)
 
