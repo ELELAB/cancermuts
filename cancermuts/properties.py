@@ -37,7 +37,7 @@ class SequenceProperty(object):
     def __init__(self):
         self.data_by_pos = defaultdict(list)
 
-    def add(self, positions, sources=None, value=None, **metadata):
+    def add_entries(self, positions, sources=None, value=None, **metadata):
 
         if positions is None:
             positions = []
@@ -98,10 +98,10 @@ class LinearMotif(SequenceProperty):
     header = "linear_motif"
     category = 'linear_motif'
 
-    def add(self, positions, sources=None, name="", id="", **metadata):
+    def add_entries(self, positions, sources=None, name="", id="", **metadata):
         metadata["type"] = name
         metadata["id"] = id
-        return super(LinearMotif, self).add(positions=positions, sources=sources, **metadata)
+        return super(LinearMotif, self).add_entries(positions=positions, sources=sources, **metadata)
 
     def get_value_str(self, entry):
         return "%s (%s), %s-%s, %s" % (entry["metadata"]["type"], entry["metadata"]["id"], entry["positions"][0],
@@ -112,9 +112,9 @@ class Structure(SequenceProperty):
     header = "structure"
     category = 'structure'
 
-    def add(self, positions, sources=None, name="", **metadata):
+    def add_entries(self, positions, sources=None, name="", **metadata):
         metadata["type"] = name
-        return super(Structure, self).add(positions=positions,sources=sources,**metadata)
+        return super(Structure, self).add_entries(positions=positions,sources=sources,**metadata)
 
     def get_value_str(self, entry):
         return "%s, %d-%d, %s" % (entry["metadata"]["type"], entry["positions"][0],
@@ -154,13 +154,13 @@ class GlycosylationSite(PTMSite):
     category='ptm_glycosylation'
     code = "Gly"
 
-    def add(self, positions, sources=None, subtype=None, **metadata):
+    def add_entries(self, positions, sources=None, subtype=None, **metadata):
         metadata["subtypes"] = []
 
         if subtype is not None:
             metadata["subtypes"].append(subtype)
 
-        return super(GlycosylationSite, self).add(positions=positions, sources=sources, **metadata)
+        return super(GlycosylationSite, self).add_entries(positions=positions, sources=sources, **metadata)
 
 class SumoylationSite(PTMSite):
     description = "Sumoylation site"
@@ -185,19 +185,19 @@ class DisorderPropensity(SequenceProperty):
     header = "disorder_propensity"
     category = "mobidb_disorder_propensity"
 
-    def add(self, positions, sources=None, disorder_state=None, **metadata):
-        return super(DisorderPropensity, self).add(positions=positions, value=disorder_state,
+    def add_entries(self, positions, sources=None, disorder_state=None, **metadata):
+        return super(DisorderPropensity, self).add_entries(positions=positions, value=disorder_state,
                                                    sources=sources, **metadata)
     def get_value_str(self, entry):
         return entry.get("value")
 
 class Structured(DisorderPropensity):
-    def add(self, positions, sources=None, **metadata):
-        return super(Structured, self).add(positions=positions, sources=sources, disorder_state="S", **metadata)
+    def add_entries(self, positions, sources=None, **metadata):
+        return super(Structured, self).add_entries(positions=positions, sources=sources, disorder_state="S", **metadata)
 
 class Disordered(DisorderPropensity):
-    def add(self, positions, sources=None, **metadata):
-        return super(Disordered, self).add(positions=positions, sources=sources, disorder_state="D", **metadata)
+    def add_entries(self, positions, sources=None, **metadata):
+        return super(Disordered, self).add_entries(positions=positions, sources=sources, disorder_state="D", **metadata)
 
 sequence_properties_classes = {  'ptm_phosphorylation'            : PhosphorylationSite,
                                  'ptm_methylation'                : MethylationSite,
