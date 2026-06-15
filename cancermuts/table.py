@@ -162,10 +162,6 @@ class Table:
             headers[k] = v.header
 
         headers['position'] = 'aa_position'
-        headers['variant_hgvs'] = 'variant_hgvs'
-        headers['variant_start'] = 'variant_start'
-        headers['variant_end'] = 'variant_end'
-        headers['variant_type'] = 'variant_type'
         headers['wt'] = 'ref_aa'
         headers['mutated'] = 'alt_aa'
         headers['mut_sources'] = 'sources'
