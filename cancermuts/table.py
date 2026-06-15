@@ -280,7 +280,7 @@ class Table:
         variant_df = variant_df.rename(columns=metadata_rename)
         df = position_df.merge(variant_df, how='left',
                                            left_on=self.headers['position'],
-                                           right_on=self.headers['variant_start'],
+                                           right_on='variant_start',
                                            sort=False)
 
         df[self.headers['wt']] = df['variant_ref']
@@ -290,10 +290,6 @@ class Table:
         header = [self.headers['position'],
                   self.headers['wt'],
                   self.headers['mutated'],
-                  self.headers['variant_hgvs'],
-                  self.headers['variant_start'],
-                  self.headers['variant_end'],
-                  self.headers['variant_type'],
                   self.headers['mut_sources']]
 
         for property_name in sequence_properties:
@@ -392,11 +388,6 @@ class Table:
             this_muts = df_m[df_m[self.headers['position']] == p]
             labels = []
             for _, row in this_muts.iterrows():
-                if self.headers['variant_hgvs'] in this_muts.columns:
-                    variant = row[self.headers['variant_hgvs']]
-                    if pd.notna(variant) and variant != "":
-                        labels.append(str(variant))
-                        continue
                 labels.append("%s%d%s" % (row[self.headers['wt']],
                                           row[self.headers['position']],
                                           row[self.headers['mutated']]))
