@@ -214,13 +214,17 @@ class Table:
 
     def _format_glycosylation_subtypes(self, entries):
         existing_subtypes = []
-        for entry in entries:
-            for new_subtype in entry.get("metadata", {}).get("subtypes", []):
-                base = new_subtype.split("-")[0]
-                has_specific = any(st.startswith(base + "-") and st != new_subtype for st in existing_subtypes)
 
-            if not has_specific and new_subtype not in existing_subtypes:
-                existing_subtypes.append(new_subtype)
+        for entry in entries:
+            subtypes = entry.get("metadata", {}).get("subtypes", [])
+            for new_subtype in subtypes:
+                base = new_subtype.split("-")[0]
+                has_specific = any(
+                    st.startswith(base + "-") and st != new_subtype
+                    for st in existing_subtypes
+                )
+                if not has_specific and new_subtype not in existing_subtypes:
+                    existing_subtypes.append(new_subtype)
 
         if len(existing_subtypes) == 0:
             return None
