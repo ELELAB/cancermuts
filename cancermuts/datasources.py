@@ -1929,25 +1929,13 @@ class PhosphoSite(DynamicSource, object):
                 if sequence.sequence[site_seq_idx] != wt:
                     self.log.warning("for PTM %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, sequence.sequence[site_seq_idx]))
                     continue
-
-                already_annotated = False
-                if self._ptm_types_to_classes[ptm] in sequence.properties:
-                    for prop in sequence.properties[self._ptm_types_to_classes[ptm]]:
-                        if prop.positions == [site]:
-                            if self not in prop.sources:
-                                prop.sources.append(self)
-                            self.log.info("site %s already annotated as %s; source will be added" % (m, self._ptm_types_to_classes[ptm]))
-                            already_annotated = True
-                            property_obj = prop
-
-                if not already_annotated:
-                    property_obj = sequence_properties_classes[self._ptm_types_to_classes[ptm]](  sources=[self],
-                                                        positions=[site] )
-                    sequence.add_property(property_obj)
-                    self.log.info("adding %s to site %s" % (m, property_obj.name))
+                prop_name = self._ptm_types_to_classes[ptm]
 
                 if ptm == "O-GalNAc" or ptm == "O-GlcNAc":
-                    property_obj.add_subtype(ptm)
+                    sequence.add_property(prop_name, positions=[site], sources=[self], subtype=ptm)
+                else:
+                    sequence.add_property(prop_name, positions=[site], sources=[self])
+                self.log.info("adding %s as %s" % (m, prop_name))
 
 class dbPTM(DynamicSource, object):
     @logger_init 
@@ -2021,35 +2009,11 @@ class dbPTM(DynamicSource, object):
         
                 prop_name = self._ptm_types_to_classes[ptm]
 
-                already_annotated = False
-                if prop_name in sequence.properties:
-                    for prop in sequence.properties[prop_name]:
-                        if prop.positions == [site]:
-                            if self not in prop.sources:
-                                prop.sources.append(self)
-                            already_annotated = True
-                            property_obj = prop
-
-                if not already_annotated:
-                    property_obj = sequence_properties_classes[prop_name](
-                        sources=[self],
-                        positions=[site]
-                    )
-                    sequence.add_property(property_obj)
-
                 if ptm in self._glyco_subtypes:
+                    sequence.add_property(prop_name, positions=[site], sources=[self], subtype=self._glyco_subtypes[ptm])
+                else:
+                    sequence.add_property(prop_name, positions=[site], sources=[self])
 
-                    new_subtype = self._glyco_subtypes[ptm]
-                    existing_subtypes = property_obj.metadata.get("subtypes", [])
-                    base = new_subtype.split("-")[0]
-
-                    has_specific = any(
-                        st.startswith(base + "-") and st != new_subtype
-                        for st in existing_subtypes
-                    )
-
-                    if not has_specific and new_subtype not in existing_subtypes:
-                        property_obj.add_subtype(new_subtype)
 
 class NetPhos(StaticSource, object):
     @logger_init
@@ -2117,9 +2081,11 @@ class NetPhos(StaticSource, object):
 
         return sorted(sites, key=lambda x: int(x[1:]))
 
-    def add_position_properties(self, sequence, properties=None):
+    def add_sequence_properties(self, sequence, properties=None):
         if properties is None:
             properties = ["phosphorylation"]
+        elif isinstance(properties, str):
+            properties = [properties]
 
         if "phosphorylation" not in properties:
             return
@@ -2133,25 +2099,17 @@ class NetPhos(StaticSource, object):
 
             try:
                 site_seq_idx = sequence.seq2index(site)
-                position = sequence.positions[site_seq_idx]
             except Exception:
                 self.log.warning(f"NetPhos site {site_label} is outside the protein sequence; it will be skipped")
                 continue
 
-            if position.wt_residue_type != wt:
+            if sequence.sequence[site_seq_idx] != wt:
                 self.log.warning(f"for NetPhos site {site_label}, residue {wt} is "
-                    f"{position.wt_residue_type} in wild-type sequence; it will be skipped")
+                    f"{sequence.sequence[site_seq_idx]} in wild-type sequence; it will be skipped")
                 continue
 
-            if prop_name in position.properties:
-                prop = position.properties[prop_name]
-                if self not in prop.sources:
-                    prop.sources.append(self)
-                self.log.info(f"site {site_label} already annotated as phosphorylation; source will be added")
-            else:
-                prop = position_properties_classes[prop_name](sources=[self], position=position)
-                position.add_property(prop)
-                self.log.info(f"adding {site_label} to site {prop.name}")
+            sequence.add_property(prop_name, positions=[site], sources=[self])
+            self.log.info(f"adding/updating {site_label} to site {prop_name}")
 
 class GlyGen(StaticSource, object):
     @logger_init
@@ -2183,20 +2141,7 @@ class GlyGen(StaticSource, object):
             site = int(row['glycosylation_site_uniprotkb'])
             subtype = f"{row['glycosylation_type']}-{row['carb_name'].rstrip('.')}"
 
-
-            already_annotated = False
-            if prop_name in sequence.properties:
-                for prop in sequence.properties[prop_name]:
-                    if prop.positions == [site]:
-                        if self not in prop.sources:
-                            prop.sources.append(self)
-                        prop.add_subtype(subtype)
-                        already_annotated = True
-
-            if not already_annotated:
-                property_obj = GlycosylationSite(positions=[site], sources=[self])
-                property_obj.add_subtype(subtype)
-                sequence.add_property(property_obj)
+            sequence.add_property(prop_name, positions=[site], sources=[self], subtype=subtype)
 
 class MyVariant(DynamicSource, object):
     @logger_init
@@ -2738,14 +2683,12 @@ class ELMPredictions(DynamicSource, object):
                 sequence.seq2index(p)
                 this_positions.append(p)
 
-            property_obj = sequence_properties_classes['linear_motif']  (sources=[self],
-                                                                         positions=this_positions,
-                                                                         name=self._elm_classes[d[0]][0],
-                                                                         id=d[0])
-
-            property_obj.metadata['function'] = [self._elm_classes[d[0]][0]]
-            property_obj.metadata['ref']      = self.description
-            sequence.add_property(property_obj)
+            sequence.add_property("linear_motif", positions=this_positions,
+                                                  sources=[self],
+                                                  name=self._elm_classes[d[0]][0],
+                                                  id=d[0],
+                                                  function=[self._elm_classes[d[0]][0]],
+                                                  ref=self.description)
 
 class ggetELMPredictions(StaticSource, object):
     @logger_init
@@ -2819,14 +2762,12 @@ class ggetELMPredictions(StaticSource, object):
                 sequence.seq2index(p)
                 this_positions.append(p)
 
-            property_obj = sequence_properties_classes['linear_motif']  (sources=[self],
-                                                                         positions=this_positions,
-                                                                         name=r['FunctionalSiteName'],
-                                                                         id=r['ELMIdentifier'])
-
-            property_obj.metadata['function'] = [r['Description']]
-            property_obj.metadata['ref']      = self.description
-            sequence.add_property(property_obj)
+            sequence.add_property("linear_motif", positions=this_positions,
+                                                  sources=[self],
+                                                  name=r["FunctionalSiteName"],
+                                                  id=r["ELMIdentifier"],
+                                                  function=[r["Description"]],
+                                                  ref=self.description)
 
 
 class gnomAD(DynamicSource, object):
@@ -3337,11 +3278,7 @@ class MobiDB(DynamicSource):
             return False
 
         for i,a in enumerate(assignments):
-            property_obj = sequence_properties_classes['mobidb_disorder_propensity'](
-                positions=[i+1],
-                sources=[self],
-                disorder_state=a)
-            sequence.add_property(property_obj)
+            sequence.add_property("mobidb_disorder_propensity", positions=[i + 1], sources=[self], disorder_state=a)
 
     def _get_mobidb_disorder_predictions_assignments(self, sequence, *args, **kwargs):
         if 'use_alias' in kwargs:
@@ -3610,12 +3547,9 @@ class ManualAnnotation(StaticSource):
                 continue
 
             if row['type'] in self._ptm_keywords:
-                property_obj = sequence_properties_classes[row['type']](sources=[self], positions=positions)
+                sequence.add_property(
+                    row['type'], positions=positions, sources=[self], function=row['function'], reference=row['reference'])
             else:
-                property_obj = sequence_properties_classes[row['type']](sources=[self], positions=positions,
-                                                                        name=row['name'])
+                sequence.add_property(row['type'], positions=positions, sources=[self], name=row['name'], function=row['function'],
+                                      reference=row['reference'])
 
-            property_obj.metadata['function']  = row['function']
-            property_obj.metadata['reference'] = row['reference']
-
-            sequence.add_property(property_obj)

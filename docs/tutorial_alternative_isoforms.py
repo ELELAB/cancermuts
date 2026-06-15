@@ -5,7 +5,7 @@ from cancermuts.datasources import (
     MobiDB, MyVariant, RevelDatabase, ManualAnnotation, ClinVar, NetPhos
 )
 from cancermuts.exceptions import *
-from cancermuts.core import Mutation
+from cancermuts.core import ProteinVariant
 from cancermuts.metadata import GenomicMutation
 from cancermuts.table import Table
 
@@ -21,8 +21,8 @@ seq.aliases["refseq"] = "NP_001287660"
 # this prints the downloaded isoform sequence
 print(seq.sequence)
 
-# the seq.positions attribute is an ordered list of the protein positions:
-print(seq.positions[0:5])
+# the seq.sequence_numbering attribute is an ordered list of the protein positions:
+print(seq.sequence_numbering[0:3])
 
 # confirm non-canonical status
 print("Is the sequence canonical?", seq.is_canonical)
@@ -46,13 +46,18 @@ cosmic.add_mutations(
     metadata=['genomic_coordinates', 'genomic_mutations', 'cancer_site', 'cancer_histology']
 )
 
-positions_with_mut = [p for p in seq.positions if p.mutations]
-if positions_with_mut:
-    first_pos = positions_with_mut[0]
-    first_mut = first_pos.mutations[0]
-    print("First COSMIC mutation:", first_mut, "at position", first_pos.sequence_position)
-    print("Sources:", first_mut.sources)
-    print("Metadata:", first_mut.metadata)
+cosmic_variants = []
+seen = set()
+for position in seq.sequence_numbering:
+    for variant in seq.variants_at_position(position):
+        if variant.hgvs not in seen and any(source.name == "COSMIC" for source in variant.sources):
+            cosmic_variants.append((position, variant))
+            seen.add(variant.hgvs)
+if cosmic_variants:
+    first_position, first_mutation = cosmic_variants[0]
+    print("First COSMIC mutation:", first_mutation, "at position", first_position)
+    print("Sources:", first_mutation.sources)
+    print("Metadata:", first_mutation.metadata)
 else:
     print(
         "No COSMIC mutations found for transcript:",
@@ -84,35 +89,30 @@ clinvar.add_mutations(seq, metadata=[
     'clinvar_clinical_impact_classification'
 ])
 
-is_cv = lambda m: m.metadata.get("clinvar_variant_id") is not None
-
-positions_with_cv = [
-    p for p in seq.positions
-    if p.mutations and any(is_cv(m) for m in p.mutations)
-]
-
-if positions_with_cv:
-    first_pos = positions_with_cv[0]
-    first_mut = [m for m in first_pos.mutations if is_cv(m)][0]
-    print("First ClinVar mutation:", first_mut, "at position", first_pos.sequence_position)
-
-    last_pos = positions_with_cv[-1]
-    last_mutations = [m for m in last_pos.mutations if is_cv(m)]
-    last_mut = last_mutations[-1]
-
-    if last_pos == first_pos and last_mut == first_mut:
+clinvar_variants = []
+seen = set()
+for position in seq.sequence_numbering:
+    for variant in seq.variants_at_position(position):
+        if variant.hgvs not in seen and variant.metadata.get("clinvar_variant_id"):
+            clinvar_variants.append((position, variant))
+            seen.add(variant.hgvs)
+if clinvar_variants:
+    first_position, first_mutation = clinvar_variants[0]
+    print("First ClinVar mutation:", first_mutation, "at position", first_position)
+    last_position, last_mutation = clinvar_variants[-1]
+    if last_position == first_position and last_mutation == first_mutation:
         print("(Only one ClinVar mutation found)")
     else:
-        print("Last ClinVar mutation:", last_mut, "at position", last_pos.sequence_position)
+        print("Last ClinVar mutation:", last_mutation, "at position", last_position)
 else:
-    print("No ClinVar mutations found for refseq:", seq.aliases['refseq'])
+    print("No ClinVar mutations found for RefSeq:", seq.aliases["refseq"])
 
 # annotate with REVEL using local database
 rl = RevelDatabase("/data/databases/REVEL/revel_with_transcript_ids")
 rl.add_metadata(seq)
 
 # print annotated mutation and REVEL score
-mut = seq.positions[819].mutations[0]
+mut = seq.variants_at_position(820)[0]
 print("Mutation:", mut)
 print("REVEL score:", mut.metadata.get('revel_score', []))
 
@@ -120,7 +120,7 @@ print("REVEL score:", mut.metadata.get('revel_score', []))
 ps = PhosphoSite('/data/databases/phosphosite/')
 
 try:
-    ps.add_position_properties(seq)
+    ps.add_sequence_properties(seq)
 except UnexpectedIsoformError:
     print("PhosphoSite annotations will not be added, as a non-canonical isoform has been provided")
 
@@ -128,7 +128,7 @@ except UnexpectedIsoformError:
 db = dbPTM('/data/databases/dbPTM/')
 
 try:
-    db.add_position_properties(seq)
+    db.add_sequence_properties(seq)
 except UnexpectedIsoformError:
     print("dbPTM annotations will not be added, as a non-canonical isoform has been provided")
 
@@ -136,19 +136,19 @@ except UnexpectedIsoformError:
 gg = GlyGen('/data/databases/GlyGen/', database_file='human_proteoform_glycosylation_sites_uniprotkb_filtered.csv')
 
 try:
-    gg.add_position_properties(seq)
+    gg.add_sequence_properties(seq)
 except UnexpectedIsoformError:
     print("GlyGen annotations will not be added, as a non-canonical isoform has been provided")
 
 # NetPhos supports non-canonical isoforms through isoform-specific local files
 np = NetPhos('/data/databases/netphos_human_proteome/netphos_human_isoforms/raw/')
-np.add_position_properties(seq)
+np.add_sequence_properties(seq)
 
 # MobiDB does not support non-canonical isoforms
 mdb = MobiDB()
 
 try:
-    mdb.add_position_properties(seq)
+    mdb.add_sequence_properties(seq)
 except UnexpectedIsoformError:
     print("MobiDB annotations will not be added, as a non-canonical isoform has been provided")
 

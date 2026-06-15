@@ -162,10 +162,6 @@ class Table:
             headers[k] = v.header
 
         headers['position'] = 'aa_position'
-        headers['variant_hgvs'] = 'variant_hgvs'
-        headers['variant_start'] = 'variant_start'
-        headers['variant_end'] = 'variant_end'
-        headers['variant_type'] = 'variant_type'
         headers['wt'] = 'ref_aa'
         headers['mutated'] = 'alt_aa'
         headers['mut_sources'] = 'sources'
@@ -197,10 +193,13 @@ class Table:
             md_str = ", ".join(sorted(set(map(str, md_values))))
         return md_str
 
-    def _format_property_values(self, properties):
+    def _format_property_values(self, property_obj, entries):
+        if property_obj is None:
+            return None
+
         values = []
-        for prop in properties:
-            value = prop.get_value_str()
+        for entry in entries:
+            value = property_obj.get_value_str(entry)
             if value is None or value != value:
                 continue
             if value not in values:
@@ -209,25 +208,30 @@ class Table:
             return None
         return "|".join(map(str, values))
 
-    def _format_glycosylation_subtypes(self, properties):
-        subtypes = []
-        for prop in properties:
-            for subtype in prop.metadata["subtypes"]:
-                if subtype not in subtypes:
-                    subtypes.append(subtype)
-        if len(subtypes) == 0:
-            return None
-        return ", ".join(subtypes)
+    def _format_glycosylation_subtypes(self, entries):
+        existing_subtypes = []
 
-    def _ptm_sources_at_position(self, sequence, position):
+        for entry in entries:
+            subtypes = entry.get("metadata", {}).get("subtypes", [])
+            for new_subtype in subtypes:
+                base = new_subtype.split("-")[0]
+                has_specific = any(
+                    st.startswith(base + "-") and st != new_subtype
+                    for st in existing_subtypes
+                )
+                if not has_specific and new_subtype not in existing_subtypes:
+                    existing_subtypes.append(new_subtype)
+
+        if len(existing_subtypes) == 0:
+            return None
+        return ", ".join(existing_subtypes)
+
+    def _ptm_sources_at_position(self, properties_at_pos):
         ptm_sources_list = []
         for ptm_key in self.ptms.keys():
-            properties_at_pos = sequence.properties_at_position(position, ptm_key)
-            if ptm_key in properties_at_pos:
-                for prop in properties_at_pos[ptm_key]:
-                    ptm_sources_list.extend([s.name for s in prop.sources])
-        ptm_sources_str = ",".join(sorted(set(ptm_sources_list))) if ptm_sources_list else None
-        return ptm_sources_str
+            for entry in properties_at_pos.get(ptm_key, []):
+                ptm_sources_list.extend([source.name for source in entry.get("sources", [])])
+        return ",".join(sorted(set(ptm_sources_list))) if ptm_sources_list else None
 
     def to_dataframe(self, sequence, mutation_metadata=['cancer_study', 'cancer_type', 'genomic_coordinates', 'genomic_mutations', 'revel_score', 'cancer_site', 'cancer_histology',
                                                         'gnomad_exome_allele_frequency', 'gnomad_genome_allele_frequency',
@@ -254,17 +258,16 @@ class Table:
 
         for position, residue in sequence:
             row = [position, residue]
+            properties_at_pos = sequence.properties_at_position(position)
 
             for property_name in sequence_properties:
-                properties_at_pos = sequence.properties_at_position(position, property_name)
-                if property_name in properties_at_pos:
-                    properties = properties_at_pos[property_name]
-                else:
-                    properties = []
-                row.append(self._format_property_values(properties))
+                entries = properties_at_pos.get(property_name, [])
+                property_obj = sequence.properties.get(property_name)
+
+                row.append(self._format_property_values(property_obj, entries))
                 if property_name == 'ptm_glycosylation':
-                    row.append(self._format_glycosylation_subtypes(properties))
-            row.append(self._ptm_sources_at_position(sequence, position))
+                    row.append(self._format_glycosylation_subtypes(entries))
+            row.append(self._ptm_sources_at_position(properties_at_pos))
             position_rows.append(row)
 
         position_df = pd.DataFrame(position_rows, columns=position_header)
@@ -277,7 +280,7 @@ class Table:
         variant_df = variant_df.rename(columns=metadata_rename)
         df = position_df.merge(variant_df, how='left',
                                            left_on=self.headers['position'],
-                                           right_on=self.headers['variant_start'],
+                                           right_on='variant_start',
                                            sort=False)
 
         df[self.headers['wt']] = df['variant_ref']
@@ -287,10 +290,6 @@ class Table:
         header = [self.headers['position'],
                   self.headers['wt'],
                   self.headers['mutated'],
-                  self.headers['variant_hgvs'],
-                  self.headers['variant_start'],
-                  self.headers['variant_end'],
-                  self.headers['variant_type'],
                   self.headers['mut_sources']]
 
         for property_name in sequence_properties:
@@ -389,11 +388,6 @@ class Table:
             this_muts = df_m[df_m[self.headers['position']] == p]
             labels = []
             for _, row in this_muts.iterrows():
-                if self.headers['variant_hgvs'] in this_muts.columns:
-                    variant = row[self.headers['variant_hgvs']]
-                    if pd.notna(variant) and variant != "":
-                        labels.append(str(variant))
-                        continue
                 labels.append("%s%d%s" % (row[self.headers['wt']],
                                           row[self.headers['position']],
                                           row[self.headers['mutated']]))

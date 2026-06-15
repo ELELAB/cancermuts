@@ -55,15 +55,16 @@ class Sequence(object):
     ----------
     source : :obj:`cancermuts.datasources.Datasource`
         Source from where the protein sequence is downloaded
-    gene_id : :obj:`int`, optional
+    gene_id : :obj:`str`, optional
         gene name to which the sequence to be downloaded belongs
     sequence : :obj:`str`
         protein sequence as obtained from the data source
     sequence_numbering : :obj:`list of int`
         list of integers, starting from one, each representing a position
     properties : :obj:`dict`
-        dictionary including the downloaded protein-associated properties.
-        These can span one or more residues.
+        Dictionary mapping property names to one SequenceProperty object per
+        property type. Each SequenceProperty stores its own entries internally
+        by residue position
     aliases : :obj:`dict`
         This dictionary maps different "aliases" (i.e. identifiers) for the
         protein of interest. The key should represent the type of identifier
@@ -88,14 +89,13 @@ class Sequence(object):
                     f"and aliases['uniprot_acc'] ('{aliases['uniprot_acc']}')"
                 )
             self.aliases = aliases
-        
+
         self.aliases["uniprot_acc"] = self.uniprot_ac
         self.variants = VariantRegister()
         self.source = source
         self.sequence = sequence
         self.sequence_numbering = list(range(1, len(self.sequence) + 1))
         self.properties = {}
-
 
     def seq2index(self, seqn):
         """
@@ -121,26 +121,29 @@ class Sequence(object):
     def __repr__(self):
         return f"<Sequence gene_id={self.gene_id}, uniprot_ac={self.uniprot_ac}, isoform={self.isoform}, is_canonical={self.is_canonical}, source={self.source.name}, {len(self.sequence)} positions>"
 
-    def add_property(self, prop):
+    def add_property(self, property_name, positions, sources=None, **metadata):
         """
-        Adds sequence property to sequence object. If a property of the same
-        category is already present, the property will be added to the same
-        category; otherwise the category will be created anew
+        Add an entry to a sequence property.
+        A Sequence stores one SequenceProperty object per property name. This method
+        creates the property object if needed, then stores the provided entry inside
+        that object at the requested residue positions.
 
-        Parameters
-        ----------
-        prop : :obj:`cancermuts.properties.SequenceProperty`
-            new property to be added
         """
+        if property_name not in sequence_properties_classes:
+            raise ValueError(f"Unknown property_name: {property_name}")
 
-        if prop.category in self.properties:
-            self.properties[prop.category].append(prop)
-            add_type = "appending"
-            self.log.debug("adding property %s to sequence of %s (appeding)" % (str(prop), self.gene_id))
-        else:
-            self.properties[prop.category] = [prop]
-            add_type = "new category"
-            self.log.debug("adding property %s to sequence of %s (%s)" % (str(prop), self.gene_id, add_type))
+        if positions is None:
+            positions = []
+        if not isinstance(positions, list):
+            raise TypeError("positions must be a list of 1-based residue numbers")
+        if len(set(positions)) != len(positions):
+            raise ValueError(f"Repeated positions provided for property {property_name}: {positions}")
+        if not set(positions).issubset(set(self.sequence_numbering)):
+            raise ValueError(f"Property {property_name} is outside sequence bounds for sequence of length {len(self.sequence)}")
+        if property_name not in self.properties:
+            self.properties[property_name] = sequence_properties_classes[property_name]()
+
+        self.properties[property_name].add_entries(positions=positions, sources=sources, **metadata)
 
     def _variant_wt_check(self, var):
         if var.start < 1 or var.end > len(self.sequence):
@@ -159,7 +162,7 @@ class Sequence(object):
 
     def add_variant(self, var):
         """
-        Adds variant to a :obj:`Sequence` object. If the variant is already present, 
+        Adds variant to a :obj:`Sequence` object. If the variant is already present,
         source and metadata will be added to the already-present variant. Otherwise
         the variant is added as new.
 
@@ -185,30 +188,60 @@ class Sequence(object):
                     existing.metadata[k] = var.metadata[k]
                     self.log.debug("    metadata %s was added anew" % k)
 
-    def properties_at_position(self, position, property_name=None):
-        """
-        If property_name is provided, return a dict of properties mapped
-        to the property category.
-        If property_name is None, return all property categories with their
-        properties.
-        """
+    def variants_at_position(self, position, variant_types=None):
 
-        if property_name is not None:
-            if property_name not in sequence_properties_classes:
-                raise ValueError(f"Unknown property_name: {property_name}")
-            if property_name not in self.properties:
-                properties_to_check = {property_name: []}
-            else:
-                properties_to_check = {property_name: self.properties[property_name]}
+        if position not in self.sequence_numbering:
+            raise ValueError(f"Position {position} is outside sequence bounds: 1-{len(self.sequence)}")
+        if variant_types is None:
+            variant_types = ProteinVariant.supported_variant_types
+        elif isinstance(variant_types, str):
+            variant_types = {variant_types}
         else:
-            properties_to_check = self.properties
+            variant_types = set(variant_types)
+
+        invalid_variant_types = variant_types - ProteinVariant.supported_variant_types
+        if invalid_variant_types:
+            raise ValueError(f"Invalid variant type(s): {invalid_variant_types}")
+        matching_variants = []
+        for variant in self.variants:
+            if variant.variant_type not in variant_types:
+                continue
+            if variant.variant_type == "insertion":
+                if position in {variant.start, variant.start + 1}:
+                    matching_variants.append(variant)
+            elif variant.start <= position <= variant.end:
+                matching_variants.append(variant)
+        return matching_variants
+
+    def properties_at_position(self, position, property_names=None):
+        """
+        Return property entries annotated at a residue position.
+        If property_names is provided, only entries for that property type are
+        returned. If property_names is None, entries for all property types present
+        at the position are returned.
+        """
+        if position not in self.sequence_numbering:
+            raise ValueError(f"Position {position} is outside sequence bounds: 1-{len(self.sequence)}")
+
+        if property_names is None:
+            property_names = list(self.properties.keys())
+        elif isinstance(property_names, str):
+            property_names = [property_names]
+        else:
+            property_names = list(property_names)
+        unknown_properties = set(property_names) - set(sequence_properties_classes)
+        if unknown_properties:
+                raise ValueError(f"Unknown property name(s): {unknown_properties}")
 
         properties = {}
-        for this_property_name, props in properties_to_check.items():
-            matching_props = [prop for prop in props if position in prop.positions]
-            if matching_props:
-                properties[this_property_name] = matching_props
+        for property_name in property_names:
+            if property_name not in self.properties:
+                continue
+            entries = self.properties[property_name].get_entries_at(position)
+            if entries:
+                properties[property_name] = entries
         return properties
+
 
 class ProteinVariant(object):
     """This class describes in-frame protein variants on a reference sequence.
@@ -228,7 +261,7 @@ class ProteinVariant(object):
         metadata : :obj:`dict`
             Dictionary encoding variant-associated metadata.
     """
-
+    supported_variant_types = {"missense", "deletion", "insertion", "delins"}
     @logger_init
     def __init__(self, start, end, ref, alt, sources=None, metadata=None):
         """Constructor for the ProteinVariant class.
@@ -432,7 +465,7 @@ class VariantRegister:
                 variant_types = {variant_types}
             else:
                 variant_types = set(variant_types)
-            invalid_var_types = variant_types - {"missense", "delins", "insertion", "deletion"}
+            invalid_var_types = variant_types - ProteinVariant.supported_variant_types
             if invalid_var_types:
                 raise ValueError(f"Invalid variant type(s): {invalid_var_types}")
             variants = [v for v in variants if v.variant_type in variant_types]
