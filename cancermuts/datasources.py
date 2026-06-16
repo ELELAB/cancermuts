@@ -57,7 +57,7 @@ from requests.adapters import HTTPAdapter
 import gget
 from io import StringIO
 import xmltodict
-
+import fcntl
 
 if sys.version_info[0] >= 3:
     unicode = str
@@ -182,14 +182,6 @@ class UniProt(DynamicSource, object):
 
         canonical_isoforms = [iso_id for iso_id, is_canonical in isoform_map.items() if is_canonical]
 
-        if len(canonical_isoforms) > 1:
-            raise RuntimeError(
-                f"More than one canonical isoform found for UniProt entry {this_upac}: "
-                f"{', '.join(canonical_isoforms)}"
-            )
-
-        canonical_isoform = canonical_isoforms[0] if canonical_isoforms else None
-
         if isoform is not None:
             self.log.info(f"Isoform requested: {isoform}")
 
@@ -200,6 +192,14 @@ class UniProt(DynamicSource, object):
             fasta_id = isoform
 
         else:
+            if len(canonical_isoforms) > 1:
+                raise RuntimeError(
+                    f"More than one canonical isoform ID found for UniProt entry {this_upac}: "
+                    f"{', '.join(canonical_isoforms)}. "
+                    f"Please specify one explicitly with the isoform argument.")
+
+            canonical_isoform = canonical_isoforms[0] if canonical_isoforms else None
+
             if canonical_isoform is not None:
                 isoform = canonical_isoform
                 is_canonical = True
@@ -633,9 +633,45 @@ class ClinVar(DynamicSource, object):
         'clinvar_variant_id', 'genomic_coordinates', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_classification',
         'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status', 'clinvar_clinical_impact_classification']
     @logger_init
-    def __init__(self):
+    def __init__(self, ncbi_requests_per_second=2, ncbi_rate_limit_lock_file="/tmp/cancermuts_ncbi_rate_limit.lock", ncbi_api_key=None):
         description = "ClinVar mutation database"
         super(ClinVar, self).__init__(name='ClinVar', version='', description=description)
+        if ncbi_requests_per_second is None:
+            self._ncbi_min_interval = None
+        elif type(ncbi_requests_per_second) is not int or ncbi_requests_per_second <= 0:
+            raise ValueError("ncbi_requests_per_second must be an integer > 0, or None to disable request throttling")
+        else:
+            self._ncbi_min_interval = 1.0 / ncbi_requests_per_second
+        self._ncbi_rate_limit_lock_file = ncbi_rate_limit_lock_file
+        self._ncbi_last_request_time = 0.0
+        self._session = rq.Session()
+        self._ncbi_api_key = ncbi_api_key
+
+    def _open_ncbi_lock_file(self):
+        path = self._ncbi_rate_limit_lock_file
+        try:
+            return open(path, "r+")
+        except FileNotFoundError:
+            try:
+                fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o666)
+                os.fchmod(fd, 0o666)
+                return os.fdopen(fd, "r+")
+            except FileExistsError:
+                return open(path, "r+")
+
+    def _ncbi_throttle(self):
+        """
+        Restrict NCBI E-utilities requests across jobs running
+        on the same server.
+        """
+        if self._ncbi_min_interval is None:
+            return
+        now = time.time()
+        elapsed = now - self._ncbi_last_request_time
+        wait = self._ncbi_min_interval - elapsed
+        if wait > 0:
+            time.sleep(wait)
+        self._ncbi_last_request_time = time.time()
 
     def _melting_dictionary(self, variants_annotation, add_method=False):
         '''
@@ -719,9 +755,13 @@ class ClinVar(DynamicSource, object):
         delay = 3
         while attempts < max_retries:
             try:
-                response = rq.get(URL)
-            except:
-                self.log.warning(f"An error occurred during the ClinVar database query."
+                self._ncbi_throttle()
+                params = {}
+                if self._ncbi_api_key is not None:
+                    params["api_key"] = self._ncbi_api_key
+                response = self._session.get(URL, params=params, timeout=(10, 60))
+            except Exception as e:
+                self.log.warning(f"An error occurred during the ClinVar database query: {type(e).__name__}: {e}. "
                       f" Will try again in {delay} seconds (attempt {attempts+1}/{max_retries})")
                 attempts +=1
                 time.sleep(delay)
@@ -1230,7 +1270,7 @@ class ClinVar(DynamicSource, object):
                 self.log.error(f"Could not parse annotation: {ann} → {e}")
         return genomic_mutations
 
-    def _get_available_muts_and_md(self, sequence, clinvar_ids, metadata=[]):
+    def _get_available_muts_and_md(self, sequence, clinvar_ids, metadata=[], cross_check=False):
 
         # Initial object assignment:
         missense_variants = {}
@@ -1246,24 +1286,27 @@ class ClinVar(DynamicSource, object):
 
         # Prepare classification-based queries for consistency check:
         filter_ids = {}
-        classifications = ["Pathogenic", "Benign", "Likely Pathogenic", "Likely Benign", "vus", "Conflicting"]
-        filters_on_classification = [
-            f"({gene}[gene] AND ((\"clinsig pathogenic\"[Properties] or \"clinsig pathogenic low penetrance\"[Properties] or \"clinsig established risk allele\"[Properties]))",
-            f"({gene}[gene] AND (\"clinsig benign\"[Properties]))",
-            f"({gene}[gene] AND ((\"clinsig likely pathogenic\"[Properties] or \"clinsig likely pathogenic low penetrance\"[Properties] or \"clinsig likely risk allele\"[Properties]))",
-            f"({gene}[gene] AND (\"clinsig benign\"[Properties])) AND (\"clinsig likely benign\"[Properties])",
-            f"({gene}[gene] AND ((\"clinsig vus\"[Properties] or \"clinsig uncertain risk allele\"[Properties])))",
-            f"({gene}[gene] AND (\"clinsig has conflicts\"[Properties]))"
-            ]
+        if cross_check:
+            classifications = ["Pathogenic", "Benign", "Likely Pathogenic", "Likely Benign", "vus", "Conflicting"]
+            filters_on_classification = [
+                f"({gene}[gene] AND ((\"clinsig pathogenic\"[Properties] or \"clinsig pathogenic low penetrance\"[Properties] or \"clinsig established risk allele\"[Properties]))",
+                f"({gene}[gene] AND (\"clinsig benign\"[Properties]))",
+                f"({gene}[gene] AND ((\"clinsig likely pathogenic\"[Properties] or \"clinsig likely pathogenic low penetrance\"[Properties] or \"clinsig likely risk allele\"[Properties]))",
+                f"({gene}[gene] AND (\"clinsig benign\"[Properties])) AND (\"clinsig likely benign\"[Properties])",
+                f"({gene}[gene] AND ((\"clinsig vus\"[Properties] or \"clinsig uncertain risk allele\"[Properties])))",
+                f"({gene}[gene] AND (\"clinsig has conflicts\"[Properties]))"
+                ]
 
-        for classification, URL in zip(classifications, filters_on_classification):
-            try:
-                clinvar_ids_class, out_gene = self._filtered_variants_extractor(URL, classification, gene)
-            except RuntimeError as e:
-                self.log.error(e)
-                continue
-            if clinvar_ids_class:
-                filter_ids[classification] = [clinvar_ids_class, [gene], [refseq]]
+            for classification, URL in zip(classifications, filters_on_classification):
+                try:
+                    clinvar_ids_class, out_gene = self._filtered_variants_extractor(URL, classification, gene)
+                except RuntimeError as e:
+                    self.log.error(e)
+                    continue
+                if clinvar_ids_class:
+                    filter_ids[classification] = [clinvar_ids_class, [gene], [refseq]]
+        else:
+            self.log.info("ClinVar consistency cross-check skipped.")
 
         for clinvar_id in clinvar_ids:
             missense_variants[clinvar_id] = {"gene":gene, "isoform":refseq}
@@ -1349,44 +1392,45 @@ class ClinVar(DynamicSource, object):
         inconsistent_annotations = {}
         misannotated = {}
 
-        for classification,ids in filter_ids.items():
-            clinvar_ids = ids[0]
-            variants = []
-            for clinvar_id in clinvar_ids:
-                variants_set = []
-                try:
-                    parse_VCV = self._VCV_summary_retriever(clinvar_id)
-                except (RuntimeError,KeyError) as e:
-                    self.log.error(f"Failed to retrieve VCV summary for ClinVar ID {clinvar_id}: {e}")
-                    raise RuntimeError(f"Failed to retrieve VCV summary for ClinVar ID {clinvar_id}: {e}")
+        if cross_check:
+            for classification,ids in filter_ids.items():
+                clinvar_ids = ids[0]
+                variants = []
+                for clinvar_id in clinvar_ids:
+                    variants_set = []
+                    try:
+                        parse_VCV = self._VCV_summary_retriever(clinvar_id)
+                    except (RuntimeError,KeyError) as e:
+                        self.log.error(f"Failed to retrieve VCV summary for ClinVar ID {clinvar_id}: {e}")
+                        raise RuntimeError(f"Failed to retrieve VCV summary for ClinVar ID {clinvar_id}: {e}")
 
 
-                hgvss_coding,hgvss_genomic = self._coding_region_variants_extractor(parse_VCV, clinvar_id)
-                if hgvss_coding:
-                    correct_variant = self._missense_variants_extractor(hgvss_coding, ids[1][0], clinvar_id, ids[2][0])
-                    match = re.search(r"\(p\.([A-Z][a-z][a-z][0-9]+([A-Z][a-z][a-z]))\)", str(correct_variant))
-                    if not clinvar_id in missense_variants.keys() and match and match.group(2) != 'Ter':
-                        variants.append([clinvar_id, ids[1][0]])
-                        classifications = self._classifications_extractor(parse_VCV, clinvar_id)
-                        conditions = self._conditions_extractor(parse_VCV, clinvar_id)
-                        methods = self._classification_methods_extractor(parse_VCV, clinvar_id)
-                        genomic_annotations = self._genomic_annotation_extractor(hgvss_genomic)
-                        if isinstance(methods,tuple):
-                            methods = methods[0]
-                        review_status = self._review_status_extractor(parse_VCV, clinvar_id)
-                        value = {"variant":correct_variant,"gene":ids[1][0]}
-                        for feature,key_name in zip([classifications, conditions, review_status, methods, genomic_annotations],["classifications", "conditions", "review_status", "methods", "genomic_annotations"]):
-                                value[key_name] = feature
-                        inconsistent_annotations[clinvar_id] = value
+                    hgvss_coding,hgvss_genomic = self._coding_region_variants_extractor(parse_VCV, clinvar_id)
+                    if hgvss_coding:
+                        correct_variant = self._missense_variants_extractor(hgvss_coding, ids[1][0], clinvar_id, ids[2][0])
+                        match = re.search(r"\(p\.([A-Z][a-z][a-z][0-9]+([A-Z][a-z][a-z]))\)", str(correct_variant))
+                        if not clinvar_id in missense_variants.keys() and match and match.group(2) != 'Ter':
+                            variants.append([clinvar_id, ids[1][0]])
+                            classifications = self._classifications_extractor(parse_VCV, clinvar_id)
+                            conditions = self._conditions_extractor(parse_VCV, clinvar_id)
+                            methods = self._classification_methods_extractor(parse_VCV, clinvar_id)
+                            genomic_annotations = self._genomic_annotation_extractor(hgvss_genomic)
+                            if isinstance(methods,tuple):
+                                methods = methods[0]
+                            review_status = self._review_status_extractor(parse_VCV, clinvar_id)
+                            value = {"variant":correct_variant,"gene":ids[1][0]}
+                            for feature,key_name in zip([classifications, conditions, review_status, methods, genomic_annotations],["classifications", "conditions", "review_status", "methods", "genomic_annotations"]):
+                                    value[key_name] = feature
+                            inconsistent_annotations[clinvar_id] = value
 
-            misannotated[classification] = variants
+                misannotated[classification] = variants
 
-        for classification,mut_annotations in misannotated.items():
-            if mut_annotations:
-                for clinvar_id in mut_annotations:
-                    self.log.warning(f"annotation inconsistency detected for {clinvar_id[0]} clinvar id in {clinvar_id[1]} gene")
-            else:
-                self.log.info(f"{classification} mutations passed the consistency check")
+            for classification,mut_annotations in misannotated.items():
+                if mut_annotations:
+                    for clinvar_id in mut_annotations:
+                        self.log.warning(f"annotation inconsistency detected for {clinvar_id[0]} clinvar id in {clinvar_id[1]} gene")
+                else:
+                    self.log.info(f"{classification} mutations passed the consistency check")
 
         mutations = []
         out_metadata = {md: [] for md in metadata}
@@ -1502,49 +1546,63 @@ class ClinVar(DynamicSource, object):
 
         return mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene
 
-    def add_mutations(self, sequence, metadata=[]):
-        gene = sequence.gene_id
-        if "refseq" not in sequence.aliases or not sequence.aliases["refseq"]:
-            self.log.error(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
-            raise TypeError(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
-        refseq = sequence.aliases["refseq"]
-        filter_missense_variants = f'({gene}[gene] AND ("missense variant"[molecular consequence] OR "SO:0001583"[molecular consequence]))'
-        mutation_type = "missense"
-        not_found_gene = []
-
+    def add_mutations(self, sequence, metadata=[], cross_check=False):
+        lock_fh = None
+        if self._ncbi_rate_limit_lock_file is not None:
+            lock_fh = self._open_ncbi_lock_file()
+            try:
+                fcntl.flock(lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                self.log.warning("Another cancermuts process is currently querying ClinVar; waiting for it to finish.")
+                fcntl.flock(lock_fh, fcntl.LOCK_EX)
+                self.log.warning("Resuming ClinVar queries.")
         try:
-            clinvar_ids, out_gene = self._filtered_variants_extractor(filter_missense_variants, mutation_type, gene)
-        except RuntimeError as e:
-            raise RuntimeError(f"ClinVar mutation extraction failed: {e}")
-        if not clinvar_ids:
-            not_found_gene.append(out_gene)
-            self.log.warning(f"No ClinVar {mutation_type} variants are available for gene {out_gene}. No ClinVar mutation will be added to the sequence.")
-            return {
-                    "variants_to_check": pd.DataFrame(),
-                    "entry_not_found": pd.DataFrame(not_found_gene, columns=["gene_name"]),
-                    "inconsistency_annotations": pd.DataFrame()
-            }
+            gene = sequence.gene_id
+            if "refseq" not in sequence.aliases or not sequence.aliases["refseq"]:
+                self.log.error(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
+                raise TypeError(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
+            refseq = sequence.aliases["refseq"]
+            filter_missense_variants = f'({gene}[gene] AND ("missense variant"[molecular consequence] OR "SO:0001583"[molecular consequence]))'
+            mutation_type = "missense"
+            not_found_gene = []
 
-        mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene = self._get_available_muts_and_md(sequence, clinvar_ids, metadata)
+            try:
+                clinvar_ids, out_gene = self._filtered_variants_extractor(filter_missense_variants, mutation_type, gene)
+            except RuntimeError as e:
+                raise RuntimeError(f"ClinVar mutation extraction failed: {e}")
+            if not clinvar_ids:
+                not_found_gene.append(out_gene)
+                self.log.warning(f"No ClinVar {mutation_type} variants are available for gene {out_gene}. No ClinVar mutation will be added to the sequence.")
+                return {
+                        "variants_to_check": pd.DataFrame(),
+                        "entry_not_found": pd.DataFrame(not_found_gene, columns=["gene_name"]),
+                        "inconsistency_annotations": pd.DataFrame()
+                }
 
-        for mutation_idx, mutation in enumerate(mutations):
-            for md in metadata:
-                if md not in self._clinvar_supported_metadata:
-                    self.log.error(f'{md} is not a valid metadata. Supported metadata are: {self._clinvar_supported_metadata}')
-                    raise ValueError(f'{md} is not a valid metadata. Supported metadata are: {self._clinvar_supported_metadata}')
+            mutations, out_metadata, df_strange, df_not_found, df2, not_found_gene = self._get_available_muts_and_md(sequence, clinvar_ids, metadata, cross_check=cross_check)
 
-                value = out_metadata[md][mutation_idx]
-                if value is not None:
-                    if md == "genomic_coordinates":
-                        mutation.metadata[md] = [GenomicCoordinates(self, *coord) for coord in value]
-                    elif md == "genomic_mutations":
-                        mutation.metadata[md] = value
-                    else:
-                        mutation.metadata[md] = [metadata_classes[md](self, value)]
+            for mutation_idx, mutation in enumerate(mutations):
+                for md in metadata:
+                    if md not in self._clinvar_supported_metadata:
+                        self.log.error(f'{md} is not a valid metadata. Supported metadata are: {self._clinvar_supported_metadata}')
+                        raise ValueError(f'{md} is not a valid metadata. Supported metadata are: {self._clinvar_supported_metadata}')
 
-            self.log.debug("adding mutation %s" % str(mutation))
-            sequence.add_variant(mutation)
+                    value = out_metadata[md][mutation_idx]
+                    if value is not None:
+                        if md == "genomic_coordinates":
+                            mutation.metadata[md] = [GenomicCoordinates(self, *coord) for coord in value]
+                        elif md == "genomic_mutations":
+                            mutation.metadata[md] = value
+                        else:
+                            mutation.metadata[md] = [metadata_classes[md](self, value)]
 
+                self.log.debug("adding mutation %s" % str(mutation))
+                sequence.add_variant(mutation)
+
+        finally:
+            if lock_fh is not None:
+                fcntl.flock(lock_fh, fcntl.LOCK_UN)
+                lock_fh.close()
         return {
             "variants_to_check": df_strange,
             "entry_not_found": df_not_found,
@@ -2127,10 +2185,18 @@ class GlyGen(StaticSource, object):
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("GlyGen annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
         
-        protein_df = self.database_df[self.database_df['uniprotkb_canonical_ac'] == sequence.isoform]
+        glygen_isoform = sequence.isoform
+        if glygen_isoform is None:
+            glygen_isoform = f"{sequence.uniprot_ac}-1"
+            self.log.warning(f"No isoform identifier found for canonical sequence {sequence.uniprot_ac}. "
+                             f"GlyGen annotates canonical proteoforms as {glygen_isoform}, so this "
+                             f"identifier will be used for GlyGen matching only." )
+
+        protein_df = self.database_df[self.database_df['uniprotkb_canonical_ac'] == glygen_isoform].copy()
         if protein_df.empty:
             if sequence.uniprot_ac in self.database_df['src_xref_id'].values:
-                raise UnexpectedIsoformError('GlyGen contains this protein, but the requested isoform is not present')
+                raise UnexpectedIsoformError(f"GlyGen contains this protein, but the requested canonical "
+                    f"isoform {glygen_isoform} is not present")
             else:
                 return
 
