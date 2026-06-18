@@ -2068,10 +2068,21 @@ class dbPTM(DynamicSource, object):
                 prop_name = self._ptm_types_to_classes[ptm]
 
                 if ptm in self._glyco_subtypes:
-                    sequence.add_property(prop_name, positions=[site], sources=[self], subtype=self._glyco_subtypes[ptm])
+                    new_subtype = self._glyco_subtypes[ptm]
+                    existing_entries = sequence.properties_at_position(site, prop_name).get(prop_name, [])
+                    existing_subtypes = []
+                    for entry in existing_entries:
+                        existing_subtypes.extend(entry.get("metadata", {}).get("subtypes", []))
+
+                    base = new_subtype.split("-")[0]
+                    has_specific = any(st.startswith(base + "-") and st != new_subtype for st in existing_subtypes)
+
+                    if has_specific or new_subtype in existing_subtypes:
+                        sequence.add_property(prop_name, positions=[site], sources=[self])
+                    else:
+                        sequence.add_property(prop_name, positions=[site], sources=[self], subtype=new_subtype)
                 else:
                     sequence.add_property(prop_name, positions=[site], sources=[self])
-
 
 class NetPhos(StaticSource, object):
     @logger_init
