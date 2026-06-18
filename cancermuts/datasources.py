@@ -542,7 +542,7 @@ class cBioPortal(DynamicSource, object):
             self.log.debug(f"Gathering mutations for {cancer_study.studyId}")
 
             cancer_study_id = cancer_study.studyId
-            cancer_type     = cancer_study.cancerType
+            cancer_type     = cancer_study.cancerType.name
             cancer_type_id  = cancer_study.cancerTypeId
 
             if do_cancer_type:
