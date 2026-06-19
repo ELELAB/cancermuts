@@ -35,7 +35,7 @@ from Bio.PDB.Polypeptide import three_to_index, index_to_one
 from Bio import SeqIO
 import numpy as np
 import pandas as pd
-from .core import Sequence, Mutation
+from .core import Sequence, ProteinVariant
 from .properties import *
 from .metadata import *
 from .log import *
@@ -414,15 +414,12 @@ class cBioPortal(DynamicSource, object):
                 self.log.warning(f"mutation {m} is outside the protein sequence; it will be skipped")
                 continue
 
-            position = sequence.positions[site_seq_idx]
-
-            if position.wt_residue_type != wt:
-                self.log.warning(f"for mutation {m}, residue {wt} is {position.wt_residue_type} in wild-type sequence; it will be skipped")
+            if sequence.sequence[site_seq_idx] != wt:
+                self.log.warning(f"for mutation {m}, residue {wt} is {sequence.sequence[site_seq_idx]} in wild-type sequence; it will be skipped")
                 continue
 
-            mutation_obj = Mutation(sequence.positions[site_seq_idx],
-                                    mut,
-                                    [self])
+            mutation_obj = ProteinVariant(start=num, end=num, ref=wt, alt=mut, sources=[self])
+
             for md in metadata:
                 mutation_obj.metadata[md] = []
                 for mi in mutation_indices:
@@ -432,7 +429,7 @@ class cBioPortal(DynamicSource, object):
                         mutation_obj.metadata[md].append(this_md)
 
             self.log.debug("adding mutation %s" % str(mutation_obj))
-            sequence.positions[site_seq_idx].add_mutation(mutation_obj)
+            sequence.add_variant(mutation_obj)
 
     def _get_cancer_types(self):
         self.log.info("fetching cancer types")
@@ -1458,16 +1455,13 @@ class ClinVar(DynamicSource, object):
                 self.log.warning(f"mutation {one_letter_mut} is outside the protein sequence; it will be skipped")
                 continue
 
-            position = sequence.positions[site_idx]
-            if position.wt_residue_type != ref_aa:
-                self.log.warning(
-                    f"Error with ClinVar ID {clinvar_id}: Ref AA mismatch at position {pos} "
-                    f"(expected {ref_aa}, found {position.wt_residue_type})"
-                )
+            if sequence.sequence[site_idx] != ref_aa:
+                self.log.warning(f"Error with ClinVar ID {clinvar_id}: Ref AA mismatch at position {pos} "
+                                 f"(expected {ref_aa}, found {sequence.sequence[site_idx]})")
                 continue
 
             # Create mutation:
-            mutation = Mutation(position, alt_aa, [self])
+            mutation = ProteinVariant(start=pos, end=pos, ref=ref_aa, alt=alt_aa, sources=[self])
 
             # Store metadata:
 
@@ -1603,7 +1597,7 @@ class ClinVar(DynamicSource, object):
                             mutation.metadata[md] = [metadata_classes[md](self, value)]
 
                 self.log.debug("adding mutation %s" % str(mutation))
-                mutation.sequence_position.add_mutation(mutation)
+                sequence.add_variant(mutation)
 
         finally:
             if lock_fh is not None:
@@ -1898,17 +1892,13 @@ class COSMIC(DynamicSource, object):
                 self.log.warning(f"mutation {m} is outside the protein sequence; it will be skipped")
                 continue
 
-            position = sequence.positions[site_seq_idx]
-
-            if position.wt_residue_type != wt:
-                self.log.warning("for mutation %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
+            if sequence.sequence[site_seq_idx] != wt:
+                self.log.warning("for mutation %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, sequence.sequence[site_seq_idx]))
                 continue
 
             mutation_indices = [i for i, x in enumerate(mutations) if x == m]
 
-            mutation_obj = Mutation(sequence.positions[site_seq_idx],
-                                    mut,
-                                    [self])
+            mutation_obj = ProteinVariant(start=num, end=num, ref=wt, alt=mut, sources=[self])
             for md in metadata:
                 mutation_obj.metadata[md] = []
                 for mi in mutation_indices:
@@ -1916,7 +1906,7 @@ class COSMIC(DynamicSource, object):
                         tmp_md = [self] + out_metadata[md][mi]
                         this_md = metadata_classes[md](*tmp_md)
                         mutation_obj.metadata[md].append(this_md)
-            position.add_mutation(mutation_obj)
+            sequence.add_variant(mutation_obj)
 
 class PhosphoSite(DynamicSource, object):
     @logger_init
@@ -1970,7 +1960,7 @@ class PhosphoSite(DynamicSource, object):
 
         return sites
 
-    def add_position_properties(self, sequence, properties=None):
+    def add_sequence_properties(self, sequence, properties=None):
 
         if not sequence.is_canonical:
             raise UnexpectedIsoformError(
@@ -1994,29 +1984,16 @@ class PhosphoSite(DynamicSource, object):
                     self.log.warning("PTM site %s is outside the protein sequence; it will be skipped" % m)
                     continue
 
-                position = sequence.positions[site_seq_idx]
-                if position.wt_residue_type != wt:
-                    self.log.warning("for PTM %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, position.wt_residue_type))
+                if sequence.sequence[site_seq_idx] != wt:
+                    self.log.warning("for PTM %s, residue %s is %s in wild-type sequence; it will be skipped" %(m, wt, sequence.sequence[site_seq_idx]))
                     continue
-
-                already_annotated = False
-                for prop in position.properties:
-                    if isinstance(prop, position_properties_classes[self._ptm_types_to_classes[ptm]]):
-                        prop.sources.append(self)
-                        self.log.info("site %s already annotated as %s; source will be added" % (m, position_properties_classes[ptm].name))
-
-                        already_annotated = True
-                        property_obj = prop
-
-                if not already_annotated:
-                    property_obj = position_properties_classes[self._ptm_types_to_classes[ptm]](  sources=[self],
-                                                        position=sequence.positions[site_seq_idx]
-                                                        )
-                    position.add_property(property_obj)
-                    self.log.info("adding %s to site %s" % (m, property_obj.name))
+                prop_name = self._ptm_types_to_classes[ptm]
 
                 if ptm == "O-GalNAc" or ptm == "O-GlcNAc":
-                    property_obj.add_subtype(ptm)
+                    sequence.add_property(prop_name, positions=[site], sources=[self], subtype=ptm)
+                else:
+                    sequence.add_property(prop_name, positions=[site], sources=[self])
+                self.log.info("adding %s as %s" % (m, prop_name))
 
 class dbPTM(DynamicSource, object):
     @logger_init 
@@ -2068,49 +2045,44 @@ class dbPTM(DynamicSource, object):
             df = df[df["protein"].str.endswith("_HUMAN", na=False)]       
             self._dbptm_data[ptm_type] = df
 
-    def add_position_properties(self, sequence, properties=None):
+    def add_sequence_properties(self, sequence, properties=None):
         
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("dbPTM annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
 
-        for ptm in self._ptm_types:   
+        if properties is None:
+            properties = self._ptm_types
+
+        for ptm in properties:
             df = self._dbptm_data[ptm]    
             df = df[df["uniprot"] == sequence.uniprot_ac]
 
             for pos in df['position']:
+                site = int(pos)
                 try:
-                    site_seq_idx = sequence.seq2index(pos)
-                    seq_pos = sequence.positions[site_seq_idx]
+                    sequence.seq2index(site)
                 except:
-                    self.log.warning("dbPTM site %s is outside the protein sequence; it will be skipped" %pos)
+                    self.log.warning("dbPTM site %s is outside the protein sequence; it will be skipped" %site)
                     continue
         
                 prop_name = self._ptm_types_to_classes[ptm]
 
-                if prop_name in seq_pos.properties:
-                    prop = seq_pos.properties[prop_name]
-                    prop.sources.append(self)
-
-                else:
-                    prop = position_properties_classes[prop_name](
-                        sources=[self],
-                        position=seq_pos
-                    )
-                    seq_pos.add_property(prop)
-
                 if ptm in self._glyco_subtypes:
-
                     new_subtype = self._glyco_subtypes[ptm]
-                    existing_subtypes = prop.metadata.get("subtypes", [])
+                    existing_entries = sequence.properties_at_position(site, prop_name).get(prop_name, [])
+                    existing_subtypes = []
+                    for entry in existing_entries:
+                        existing_subtypes.extend(entry.get("metadata", {}).get("subtypes", []))
+
                     base = new_subtype.split("-")[0]
+                    has_specific = any(st.startswith(base + "-") and st != new_subtype for st in existing_subtypes)
 
-                    has_specific = any(
-                        st.startswith(base + "-") and st != new_subtype
-                        for st in existing_subtypes
-                    )
-
-                    if not has_specific and new_subtype not in existing_subtypes:
-                        prop.add_subtype(new_subtype)
+                    if has_specific or new_subtype in existing_subtypes:
+                        sequence.add_property(prop_name, positions=[site], sources=[self])
+                    else:
+                        sequence.add_property(prop_name, positions=[site], sources=[self], subtype=new_subtype)
+                else:
+                    sequence.add_property(prop_name, positions=[site], sources=[self])
 
 class NetPhos(StaticSource, object):
     @logger_init
@@ -2178,9 +2150,11 @@ class NetPhos(StaticSource, object):
 
         return sorted(sites, key=lambda x: int(x[1:]))
 
-    def add_position_properties(self, sequence, properties=None):
+    def add_sequence_properties(self, sequence, properties=None):
         if properties is None:
             properties = ["phosphorylation"]
+        elif isinstance(properties, str):
+            properties = [properties]
 
         if "phosphorylation" not in properties:
             return
@@ -2194,25 +2168,17 @@ class NetPhos(StaticSource, object):
 
             try:
                 site_seq_idx = sequence.seq2index(site)
-                position = sequence.positions[site_seq_idx]
             except Exception:
                 self.log.warning(f"NetPhos site {site_label} is outside the protein sequence; it will be skipped")
                 continue
 
-            if position.wt_residue_type != wt:
+            if sequence.sequence[site_seq_idx] != wt:
                 self.log.warning(f"for NetPhos site {site_label}, residue {wt} is "
-                    f"{position.wt_residue_type} in wild-type sequence; it will be skipped")
+                    f"{sequence.sequence[site_seq_idx]} in wild-type sequence; it will be skipped")
                 continue
 
-            if prop_name in position.properties:
-                prop = position.properties[prop_name]
-                if self not in prop.sources:
-                    prop.sources.append(self)
-                self.log.info(f"site {site_label} already annotated as phosphorylation; source will be added")
-            else:
-                prop = position_properties_classes[prop_name](sources=[self], position=position)
-                position.add_property(prop)
-                self.log.info(f"adding {site_label} to site {prop.name}")
+            sequence.add_property(prop_name, positions=[site], sources=[self])
+            self.log.info(f"adding/updating {site_label} to site {prop_name}")
 
 class GlyGen(StaticSource, object):
     @logger_init
@@ -2226,7 +2192,7 @@ class GlyGen(StaticSource, object):
         file_path = os.path.join(self.database_dir, self.database_file)
         self.database_df = pd.read_csv(file_path)
 
-    def add_position_properties(self, sequence):
+    def add_sequence_properties(self, sequence):
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("GlyGen annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
         
@@ -2246,26 +2212,13 @@ class GlyGen(StaticSource, object):
                 return
 
         protein_df["glycosylation_type"] = protein_df["glycosylation_type"].str.rstrip("-linked")
+        prop_name = GlycosylationSite.category
 
         for index, row in protein_df.iterrows():
-            idx = sequence.seq2index(row['glycosylation_site_uniprotkb'])
-
+            site = int(row['glycosylation_site_uniprotkb'])
             subtype = f"{row['glycosylation_type']}-{row['carb_name'].rstrip('.')}"
-            position_obj = sequence.positions[idx]
 
-            if GlycosylationSite.category in position_obj.properties:
-
-                prop = position_obj.properties[GlycosylationSite.category]
-
-                if self not in prop.sources:
-                    prop.sources.append(self)
-
-                prop.add_subtype(subtype)
-
-            else:
-                property_obj = GlycosylationSite(position_obj, sources=[self])
-                property_obj.add_subtype(subtype)
-                position_obj.add_property(property_obj)
+            sequence.add_property(prop_name, positions=[site], sources=[self], subtype=subtype)
 
 class MyVariant(DynamicSource, object):
     @logger_init
@@ -2299,10 +2252,9 @@ class MyVariant(DynamicSource, object):
             except KeyError:
                 self.log.warning("MyVariant doesn't support metadata type %s" % md_type)
 
-        for pos in sequence.positions:
-            for mut in pos.mutations:
-                for add_this_metadata in metadata_functions:
-                    add_this_metadata(mut)
+        for var in sequence.variants:
+            for add_this_metadata in metadata_functions:
+                add_this_metadata(var)
 
 
     def _get_revel(self, mutation):
@@ -2367,19 +2319,19 @@ class MyVariant(DynamicSource, object):
                 self.log.info(f"No residue information was found in variant definition {idx_this_aa}")
                 continue
 
-            if not mutation.sequence_position.wt_residue_type == this_hit_ref:
+            if not mutation.ref == this_hit_ref:
                 self.log.info(f"Reference residue in revel does not correspond in variant definition {idx_this_aa}")
                 continue
 
-            if not mutation.sequence_position.sequence_position == this_hit_pos:
+            if not mutation.start == this_hit_pos:
                 try:
-                    if not mutation.sequence_position.sequence_position in [ int(a) for a in this_hit_pos ]:
+                    if not mutation.start in [ int(a) for a in this_hit_pos ]:
                         raise TypeError
                 except:
                     self.log.info(f"Sequence position in revel does not correspond for in variant definition {idx_this_aa}")
                     continue
 
-            if mutation.mutated_residue_type != this_hit_alt:
+            if mutation.alt != this_hit_alt:
                 self.log.info(f"Protein mutation in revel does not correspond for this in variant definition {idx_this_aa}")
                 continue
 
@@ -2577,13 +2529,12 @@ class RevelDatabase(StaticSource, object):
         "REVEL annotation cannot proceed.")
 
         mutations = []
-        for pos in sequence.positions:
-            for mut in pos.mutations:
-                gms = mut.metadata.get('genomic_mutations', [])
-                if not gms:
-                    self.log.debug(f"[REVEL] No genomic mutation available for {mut}; skipping.")
-                    continue
-                mutations.append((mut, gms, transcript_id))
+        for var in sequence.variants:
+            gms = var.metadata.get('genomic_mutations', [])
+            if not gms:
+                self.log.debug(f"[REVEL] No genomic mutation available for {var}; skipping.")
+                continue
+            mutations.append((var, gms, transcript_id))
 
         self._get_revel(mutations)
 
@@ -2656,17 +2607,17 @@ class RevelDatabase(StaticSource, object):
                     mutation_cache[gm] = ()
                     continue
 
-                aa_mismatches = df_filtered[df_filtered["aaref"] != mutation.sequence_position.wt_residue_type]
+                aa_mismatches = df_filtered[df_filtered["aaref"] != mutation.ref]
                 if not aa_mismatches.empty:
                     self.log.warning(f"[REVEL] Amino acid reference mismatch for {mutation}: expected "
-                        f"{mutation.sequence_position.wt_residue_type}, got {set(aa_mismatches['aaref'])} "
+                        f"{mutation.ref}, got {set(aa_mismatches['aaref'])} "
                         f"at chr={gm.chr}, pos={gm.get_coord()} (transcript {transcript_id})")
                     mutation_cache[gm] = ()
                     continue
 
-                df_final = df_filtered[df_filtered["aaalt"] == mutation.mutated_residue_type]
+                df_final = df_filtered[df_filtered["aaalt"] == mutation.alt]
                 if df_final.empty:
-                    self.log.warning(f"[REVEL] No match with expected alt amino acid {mutation.mutated_residue_type} "
+                    self.log.warning(f"[REVEL] No match with expected alt amino acid {mutation.alt} "
                         f"for {mutation} at chr={gm.chr}, pos={gm.get_coord()}")
                     mutation_cache[gm] = ()
                     continue
@@ -2689,8 +2640,8 @@ class RevelDatabase(StaticSource, object):
                         parsed_scores.append(score)
                         self.log.info(
                             f"[REVEL] Match for {mutation}: chr={gm.chr}, pos={gm.get_coord()}, "
-                            f"ref={gm.ref}, alt={gm.alt}, aaref={mutation.sequence_position.wt_residue_type}, "
-                            f"aaalt={mutation.mutated_residue_type}, transcript={transcript_id}, score={score}")
+                            f"ref={gm.ref}, alt={gm.alt}, aaref={mutation.ref}, "
+                            f"aaalt={mutation.alt}, transcript={transcript_id}, score={score}")
                     except ValueError:
                         self.log.warning(f"[REVEL] Could not parse REVEL score '{score_str}' for {mutation}")
 
@@ -2806,16 +2757,15 @@ class ELMPredictions(DynamicSource, object):
 
             this_positions = []
             for p in range(d[1],d[2]+1):
-                this_positions.append(sequence.positions[sequence.seq2index(p)])
+                sequence.seq2index(p)
+                this_positions.append(p)
 
-            property_obj = sequence_properties_classes['linear_motif']  (sources=[self],
-                                                                         positions=this_positions,
-                                                                         name=self._elm_classes[d[0]][0],
-                                                                         id=d[0])
-
-            property_obj.metadata['function'] = [self._elm_classes[d[0]][0]]
-            property_obj.metadata['ref']      = self.description
-            sequence.add_property(property_obj)
+            sequence.add_property("linear_motif", positions=this_positions,
+                                                  sources=[self],
+                                                  name=self._elm_classes[d[0]][0],
+                                                  id=d[0],
+                                                  function=[self._elm_classes[d[0]][0]],
+                                                  ref=self.description)
 
 class ggetELMPredictions(StaticSource, object):
     @logger_init
@@ -2886,16 +2836,15 @@ class ggetELMPredictions(StaticSource, object):
 
             this_positions = []
             for p in range(r['motif_start_in_query'], r['motif_end_in_query']+1):
-                this_positions.append(sequence.positions[sequence.seq2index(p)])
+                sequence.seq2index(p)
+                this_positions.append(p)
 
-            property_obj = sequence_properties_classes['linear_motif']  (sources=[self],
-                                                                         positions=this_positions,
-                                                                         name=r['FunctionalSiteName'],
-                                                                         id=r['ELMIdentifier'])
-
-            property_obj.metadata['function'] = [r['Description']]
-            property_obj.metadata['ref']      = self.description
-            sequence.add_property(property_obj)
+            sequence.add_property("linear_motif", positions=this_positions,
+                                                  sources=[self],
+                                                  name=r["FunctionalSiteName"],
+                                                  id=r["ELMIdentifier"],
+                                                  function=[r["Description"]],
+                                                  ref=self.description)
 
 
 class gnomAD(DynamicSource, object):
@@ -2996,21 +2945,20 @@ class gnomAD(DynamicSource, object):
 
         self.log.debug("collected metadata functions: %s" % ', '.join([i for i in metadata_functions.__repr__()]))
 
-        for pos in sequence.positions:
-            for mut in pos.mutations:
-                for i,add_this_metadata in enumerate(metadata_functions):
-                    mut.metadata[md_types[i]] = []
+        for var in sequence.variants:
+            for i,add_this_metadata in enumerate(metadata_functions):
+                var.metadata[md_types[i]] = []
 
-                if not 'genomic_mutations' in mut.metadata:
-                    self.log.warning("no genomic mutation data available for gnomAD, mutation %s. It will be skipped" % mut)
-                    continue
-                elif mut.metadata['genomic_mutations'] is None or len(mut.metadata['genomic_mutations']) == 0:
-                    self.log.warning("no genomic mutation data available for gnomAD, mutation %s. It will be skipped" % mut)
-                    continue
+            if not 'genomic_mutations' in var.metadata:
+                self.log.warning("no genomic mutation data available for gnomAD, mutation %s. It will be skipped" % var)
+                continue
+            elif var.metadata['genomic_mutations'] is None or len(var.metadata['genomic_mutations']) == 0:
+                self.log.warning("no genomic mutation data available for gnomAD, mutation %s. It will be skipped" % var)
+                continue
 
-                for i,add_this_metadata in enumerate(metadata_functions):
-                    self.log.debug("adding metadata %s to %s" % (md_types[i], mut))
-                    add_this_metadata(mut, gene_id)
+            for i,add_this_metadata in enumerate(metadata_functions):
+                self.log.debug("adding metadata %s to %s" % (md_types[i], var))
+                add_this_metadata(var, gene_id)
 
     def _get_exome_allele_freq(self, mutation, gene_id):
         self.log.info("getting exome allele frequency")
@@ -3371,7 +3319,7 @@ class MobiDB(DynamicSource):
         self._data_cache = {}
         self._supported_properties = { 'mobidb_disorder_propensity' : self._get_mobidb_disorder_predictions }
 
-    def add_position_properties(self, sequence, prop=['mobidb_disorder_propensity'], use_alias='uniprot_acc'):
+    def add_sequence_properties(self, sequence, prop=['mobidb_disorder_propensity'], use_alias='uniprot_acc'):
 
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("MobiDB position annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
@@ -3402,13 +3350,12 @@ class MobiDB(DynamicSource):
 
         assignments = self._get_mobidb_disorder_predictions_assignments(sequence, *args, **kwargs)
 
-        if len(assignments) != len(sequence.positions):
+        if len(assignments) != len(sequence.sequence_numbering):
             self.log.error("Error in the assignment of predictions: length of MobiDB structure assignment and sequence don't match")
             return False
 
         for i,a in enumerate(assignments):
-            sequence.positions[i].properties['mobidb_disorder_propensity'] = position_properties_classes['mobidb_disorder_propensity'](sequence.positions[i], [self], a)
-
+            sequence.add_property("mobidb_disorder_propensity", positions=[i + 1], sources=[self], disorder_state=a)
 
     def _get_mobidb_disorder_predictions_assignments(self, sequence, *args, **kwargs):
         if 'use_alias' in kwargs:
@@ -3456,7 +3403,7 @@ class MobiDB(DynamicSource):
                         'homology-disorder-priority': homology_disorder_data,
                         'prediction-disorder-priority': predicted_disorder_data}
 
-        assignments = [None for p in sequence.positions]
+        assignments = [None for p in sequence.sequence_numbering]
 
         # If specified data is available, annotate sequence accordingly
         for dis_term in disorder_types:
@@ -3507,8 +3454,7 @@ class ManualAnnotation(StaticSource):
     _expected_cols = ['name', 'site', 'type', 'function', 'reference']
     _metadata_cols = ['genomic_mutations']
     _ptm_keywords = ['ptm_cleavage', 'ptm_phosphorylation', 'ptm_ubiquitination', 'ptm_acetylation', 'ptm_sumoylation', 'ptm_nitrosylation', 'ptm_methylation']
-    _supported_position_properties = _ptm_keywords
-    _supported_sequence_properties = ['linear_motif', 'structure']
+    _supported_sequence_properties = ['linear_motif', 'structure'] + _ptm_keywords
     _supported_mutation            = ['mutation']
     _mut_prot_parse = 'p.{wt:3l}{position:d}{mut:3l}'
 
@@ -3554,7 +3500,7 @@ class ManualAnnotation(StaticSource):
         self.log.info("Parsed file:")
         self.log.info('\n{0}'.format(str(self._df)))
 
-        all_properties = set(self._supported_position_properties + self._supported_sequence_properties + self._supported_mutation)
+        all_properties = set(self._supported_sequence_properties + self._supported_mutation)
 
         diff = set(df['type']).difference(all_properties)
         if len(diff) > 0:
@@ -3618,10 +3564,8 @@ class ManualAnnotation(StaticSource):
                 self.log.warning(f"mutation {m} is outside the protein sequence; it will be skipped")
                 continue
 
-            position = sequence.positions[site_seq_idx]
-
-            if position.wt_residue_type != wt:
-                self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, num, position.wt_residue_type))
+            if sequence.sequence[site_seq_idx] != wt:
+                self.log.warning("for mutation %s, residue %d is %s in wild-type sequence; it will be skipped" %(m, num, sequence.sequence[site_seq_idx]))
                 continue
 
             mutation_indices = [i for i, x in enumerate(mutations) if x == m]
@@ -3640,9 +3584,7 @@ class ManualAnnotation(StaticSource):
                         out_metadata['genomic_mutations'][mi] = out_metadata['genomic_mutations'][mi][0:2]
                 mutation_indices.extend(new_mut_ind)
 
-            mutation_obj = Mutation(sequence.positions[site_seq_idx],
-                                    mut,
-                                    [self])
+            mutation_obj = ProteinVariant(start=num, end=num, ref=wt, alt=mut, sources=[self])
 
             #Adding mutation to mutation object
             for md in metadata:
@@ -3652,32 +3594,8 @@ class ManualAnnotation(StaticSource):
                         tmp_md = [self] + out_metadata[md][mi]
                         this_md = metadata_classes[md](*tmp_md)
                         mutation_obj.metadata[md].append(this_md)
-            position.add_mutation(mutation_obj)
+            sequence.add_variant(mutation_obj)
 
-
-    def add_position_properties(self, sequence, prop=_supported_position_properties):
-
-        if self._df is None:
-            return
-
-        tmp_df = self._df[ self._df.apply(lambda x: x['type'] in self._supported_position_properties, axis=1) ]
-
-        for idx, row in tmp_df.iterrows():
-
-            try:
-                this_position = sequence.positions[sequence.seq2index(int(row['site']))]
-            except:
-                self.log.error("position property refers to a position outside of the sequence")
-
-            property_obj = position_properties_classes[row['type']](sources=[self],
-                                                                    position=this_position)
-
-            property_obj.metadata['function']  = row['function']
-            property_obj.metadata['reference'] = row['reference']
-
-            this_position.add_property(property_obj)
-
-            self.log.info("added %s from row %d" % (row['type'], idx+1))
 
     def add_sequence_properties(self, sequence, prop=_supported_sequence_properties):
 
@@ -3688,27 +3606,27 @@ class ManualAnnotation(StaticSource):
 
         for idx,row in tmp_df.iterrows():
             if '-' in row['site']:
-                tmp = list(map(int, row['site'].split("-")))
-                try:
-                    assert(len(tmp) == 2)
-                    assert(int(tmp[0]) <= int(tmp[1]))
-                except AssertionError:
-                    self.log.error("line %d range in site column must be specified as 'from-to' (ex 10-15)" % (idx+1))
-                positions = tuple(range(tmp[0], tmp[1]+1))
+                    tmp = list(map(int, row['site'].split("-")))
+                    try:
+                        assert(len(tmp) == 2)
+                        assert(int(tmp[0]) <= int(tmp[1]))
+                    except AssertionError:
+                        self.log.error("line %d range in site column must be specified as 'from-to' (ex 10-15)" % (idx+1))
+                    positions = list(range(tmp[0], tmp[1]+1))
             else:
-                positions = ( int(row['site']) )
+                positions = [ int(row['site']) ]
 
             try:
-                positions = [ sequence.positions[sequence.seq2index(p)] for p in positions ]
+                for p in positions:
+                    sequence.seq2index(p)
             except:
-                self.log.warning("position property %s is outside the protein sequence; it will be skipped" % row['type'])
+                self.log.warning("sequence property %s is outside the protein sequence; it will be skipped" % row['type'])
                 continue
 
-            property_obj = sequence_properties_classes[row['type']](sources=[self],
-                                                                    positions=positions,
-                                                                    name=row['name'])
+            if row['type'] in self._ptm_keywords:
+                sequence.add_property(
+                    row['type'], positions=positions, sources=[self], function=row['function'], reference=row['reference'])
+            else:
+                sequence.add_property(row['type'], positions=positions, sources=[self], name=row['name'], function=row['function'],
+                                      reference=row['reference'])
 
-            property_obj.metadata['function']  = row['function']
-            property_obj.metadata['reference'] = row['reference']
-
-            sequence.add_property(property_obj)

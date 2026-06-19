@@ -22,7 +22,7 @@ as detailed in the installation section.
 
 Finally, you can decide to perform this tutorial either interactively (i.e.
 running line by line in a Python command line) or as a script (i.e. saving
-the lines you need in a script and running it). The two options are equvalent
+the lines you need in a script and running it). The two options are equivalent
 from the point of view of the result. If you're going for the first
 option, we recommended that you install the IPython command line interface
 which is more user friendly than the regular Python interpreter:
@@ -69,8 +69,8 @@ and links together all the available annotations
 appropriately using other data sources
 
 3. Download annotations for either mutations (these are called metadata) or
-position or sequence properties (these are called properties). This is once
-again done by using appropriate data sources for the task.
+sequence properties (these are called properties). This is once again done by 
+using appropriate data sources for the task.
 
 4. Create a pandas data frame from the Sequence object. This will contain all
 the gathered information.
@@ -168,9 +168,9 @@ This is done as follows:
 >>> print(seq.sequence)
 MPSEKTFKQRRTFEQRVEDVRLIREQHPTKIPVIIERYKGEKQLPVLDKTKFLVPDHVNMSELIKIIRRRLQLNANQAFFLLVNGHSMVSVSTPISEVYESEKDEDGFLYMVYASQETFGMKLSV
 
-# the seq.positions attribute is an ordered list of the protein positions:
->>> seq.positions[0:3]
-
+# the seq.sequence_numbering attribute is an ordered list of the protein positions:
+>>> print(seq.sequence_numbering[0:3])
+[1, 2, 3]
 ```
 
 ```py
@@ -283,37 +283,37 @@ of the corresponding gene will be annotated.
 This step might take a few minutes as Cancermuts interrogates the cBioPortal
 online database. The final result of this step will have modified the `seq`
 Sequence object we have created by adding mutations to the positions of the
-respective residues. In this case, Cancermuts identified only three
+respective residues. In this case, Cancermuts identified only four
 mutations for cBioPortal:
 
 ```py
->>> print(seq.positions[38].mutations)
-[<Mutation K39R from cBioPortal>]
+>>> seq.variants_at_position(39)
+[<ProteinVariant p.Lys39Arg from cBioPortal>]
 
->>> print(seq.positions[64].mutations)
-[<Mutation K65E from cBioPortal>]
+>>> seq.variants_at_position(65)
+[<ProteinVariant p.Lys65Glu from cBioPortal>]
 
->>> print(seq.positions[122].mutations)
-[<Mutation L123S from cBioPortal>]
+>>> seq.variants_at_position(123)
+[<ProteinVariant p.Leu123Ser from cBioPortal>, <ProteinVariant p.Leu123Val from cBioPortal>]
 ```
 
-Each mutation is recorded in a Mutation object that can be further explored:
+Each mutation is recorded in a ProteinVariant object that can be further explored:
 
 ```py
->>> seq.positions[64].mutations
-[<Mutation K65E from cBioPortal>]
+>>> seq.variants_at_position(65)
+[<ProteinVariant p.Lys65Glu from cBioPortal>]
 
->>> seq.positions[64].mutations[0].sources
-[<cancermuts.datasources.cBioPortal at 0x1510a0455c50>]
+>>> seq.variants_at_position(65)[0].sources
+[<cancermuts.datasources.cBioPortal object at 0x7fab69dad960>]
 
->>> seq.positions[64].mutations[0].mutated_residue_type
+>>> seq.variants_at_position(65)[0].alt
 'E'
 
->>> seq.positions[38].mutations[0].metadata
+>>> seq.variants_at_position(39)[0].metadata
 {'cancer_type': [<CancerType Colorectal Adenocarcinoma from cBioPortal>],
- 'cancer_study': [<CancerStudy coadread_genentech from cBioPortal>],
- 'genomic_mutations': [<GenomicMutation hg19,16:g.87435877A>G from cBioPortal>],
- 'genomic_coordinates': [<GenomicCoordinates 16:87435877-87435877 in hg19 from cBioPortal>]}
+ 'cancer_study': [<CancerStudy coadread_tcga_pan_can_atlas_2018 from cBioPortal>],
+ 'genomic_mutations': [<GenomicMutation hg19,16:g.87435800A>G from cBioPortal>],
+ 'genomic_coordinates':  [<GenomicCoordinates 16:87435800-87435800 in hg19 from cBioPortal>]}
  ```
 
 {% hint style='info' %}
@@ -332,8 +332,8 @@ Note that COSMIC supports non-canonical alternative isoforms.
 ```py
 cosmic = COSMIC(targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
 screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
-classification_database_fil='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
-database_encoding='latin1', lazy_load_db= rue)
+classification_database_file='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
+database_encoding='latin1', lazy_load_db= True)
 ```
 
 here the `targeted_database_file`, `screen_mutant_database_file`, `classification_database_file` argument are strings.
@@ -400,14 +400,15 @@ this newfound mutation. We see now that the details obtained by both cBioPortal
 and COSMIC are present:
 
 ```py
->>> seq.positions[64].mutations[0]
-<Mutation K65E from cBioPortal,COSMIC>
+>>> seq.variants_at_position(65)[0]
+<p.Lys65Glu>
 
->>> seq.positions[64].mutations[0].sources
-[<cancermuts.datasources.cBioPortal at 0x1510a0455c50>,
- <cancermuts.datasources.COSMIC at 0x15109ff10050>]
+>>> seq.variants_at_position(65)[0].sources
+[<cancermuts.datasources.cBioPortal object at 0x7fab69dad960>,
+ <cancermuts.datasources.COSMIC object at 0x7faaee4fafe0>]
 
->>> seq.positions[64].mutations[0].metadata
+
+>>> seq.variants_at_position(65)[0].metadata
 {'cancer_type': [<CancerType Colorectal Adenocarcinoma from cBioPortal>],
  'cancer_study': [<CancerStudy coadread_genentech from cBioPortal>],
  'genomic_mutations': [<GenomicMutation hg19,16:g.87435877A>G from cBioPortal>,
@@ -445,27 +446,27 @@ Once the RefSeq is set, we can annotate the sequence object with all ClinVar mis
 Once complete, mutations identified by ClinVar will be added to the appropriate positions in the sequence:
 
 ```py
->>> seq.positions[14].mutations
-[<Mutation Q15R from ClinVar>]
+>>> seq.variants_at_position(15)
+[<ProteinVariant p.Gln15Arg from ClinVar>]
 
 ```
 
-Each mutation is recorded in a Mutation object that can be further explored:
+Each mutation is recorded in a ProteinVariant object that can be further explored:
 
 ```py
->>> seq.positions[14].mutations
-[<Mutation Q15R from ClinVar>]
+>>> seq.variants_at_position(15)
+[<ProteinVariant p.Gln15Arg from ClinVar>]
 
->>> seq.positions[14].mutations[0].sources
-[<cancermuts.datasources.ClinVar object at 0x7fcdb3880a60>]
+>>> seq.variants_at_position(15)[0].sources
+[<cancermuts.datasources.ClinVar object at 0x7faaee4f9cc0>]
 
->>> seq.positions[14].mutations[0].mutated_residue_type
+>>> seq.variants_at_position(15)[0].alt
 'R'
 
->>> seq.positions[14].mutations[0].metadata['clinvar_germline_condition']
+>>> seq.variants_at_position(15)[0].metadata['clinvar_germline_condition']
 [ClinvarGermlineCondition(source=<cancermuts.datasources.ClinVar object at 0x7fa0d32b4280>, conditions=['not specified'])]
 
->>> seq.positions[14].mutations[0].metadata['clinvar_germline_classification']
+>>> seq.variants_at_position(15)[0].metadata['clinvar_germline_classification']
 [ClinvarGermlineClassification(source=<cancermuts.datasources.ClinVar object at 0x7fa0d32b4280>, classification='Uncertain significance')]
 
 ```
@@ -496,8 +497,8 @@ class:
 we can check that the mutations have been annotated with the REVEL score:
 
 ```py
->>> seq.positions[64].mutations[0].metadata['revel_score']
-[<DbnsfpRevel, 0.314>, <DbnsfpRevel, 0.314>]
+>>> seq.variants_at_position(65)[0].metadata['revel_score']
+[<Revel, 0.314>, <Revel, 0.314>]
 ```
 
 In this case we see the same score twice, as the mutation was previously
@@ -549,7 +550,7 @@ We can then annotate our sequence with the local REVEL database:
 We can now check that REVEL scores have been annotated for our mutations:
 
 ```py
->>> seq.positions[64].mutations[0].metadata['revel_score']
+>>> seq.variants_at_position(65)[0].metadata['revel_score'])
 [<Revel, 0.575>]
 ```
 
@@ -594,24 +595,21 @@ all supported non-bottlenecked populations and then finding the maximum frequenc
 Finally we can check the downloaded metadata:
 
 ```py
->>> seq.positions[64].mutations[0].metadata['gnomad_exome_allele_frequency']
-[<gnomADExomeAlleleFrequency, 0.000028>,
- <gnomADExomeAlleleFrequency, 0.000028>]
+>>> seq.variants_at_position(65)[0].metadata['gnomad_exome_allele_frequency']
+[<gnomADExomeAlleleFrequency, 0.000028>, <gnomADExomeAlleleFrequency, 0.000028>]
 
->>> seq.positions[64].mutations[0].metadata['gnomad_genome_allele_frequency']
-[<gnomADGenomeAlleleFrequency, nan>,
- <gnomADGenomeAlleleFrequency, nan>]
+>>> seq.variants_at_position(65)[0].metadata['gnomad_genome_allele_frequency']
+[]
 ```
 
 here Cancermuts could assign an exome allele frequency for the associated genomic
 mutations, however it wasn't able to download or calculate the corresponding
 genome allele frequency.
 
-### Position properties
+### Sequence properties
 
-We will further annotate our sequence object with properties connected to each single
-residue. For the moment, these are post-translation modifications from Phosphosite and
-order/disorder propensity from MobiDB.
+We will further annotate our sequence object with properties connected to single
+residue or short sequence fragments.
 
 We import the relative data source class, similarly as what done previously:
 
@@ -644,10 +642,10 @@ dictionary associating each PTM to a file name:
 ```
 
 the keys of the dictionaries should be the options supported in the `properties`
-argument of the `add_position_properties` (see below).
+argument of the `add_sequence_properties` (see below).
 
-Once the object is created we can add the position properties to our sequence
-object. If no `properties` is supplied, all of them will be considered. Otherwise,
+Once the object is created we can add sequence property annotations to our Sequence object.
+If no `properties` is supplied, all of them will be considered. Otherwise,
 the `properties` object should be a list of the keywords corresponding to the PTMs
 that we want to be annotated, as follows:
 
@@ -664,24 +662,24 @@ that we want to be annotated, as follows:
 So, for instance:
 
 ```py
->>> ps.add_position_properties(seq,
+>>> ps.add_sequence_properties(seq,
 	                           properties=['phosphorylation', 'ubiquitination'])
 ```
 
 However, in this case we will consider all of them:
 
 ```py
->>> ps.add_position_properties(seq)
+>>> ps.add_sequence_properties(seq)
 ```
 
 Once again, we can check the result:
 
 ```py
->>> seq.positions[4].properties
-{'ptm_ubiquitination': <PositionProperty Ubiquitination Site from PhosphoSite>}
+>>> seq.properties_at_position(5)
+{'ptm_ubiquitination': [{'positions': [5], 'sources': [<cancermuts.datasources.PhosphoSite object at 0x7fb317ba0070>], 'value': None, 'metadata': {}}]}
 
->>> seq.positions[28].properties
-{'ptm_phosphorylation': <PositionProperty Phosphorylation Site from PhosphoSite>}
+>>> seq.properties_at_position(29)
+{'ptm_phosphorylation': [{'positions': [29], 'sources': [<cancermuts.datasources.PhosphoSite object at 0x7fb317ba0070>], 'value': None, 'metadata': {}}]}
 ```
 
 #### Post-translational modifications with dbPTM
@@ -709,7 +707,7 @@ ones (e.g. Phosphorylation, Acetylation, N-linked_Glycosylation, etc.). However 
 ```
 The keys of the dictionaries should be the options supported by the dbPTM datasource (see `cancermuts.datasources.dbPTM._ptm_types`).
 
-Once the object is created we can add the position properties to our sequence
+Once the object is created we can add the sequence properties to our sequence
 object. 
 The dbPTM datasource currently supports the following PTM annotations:
 
@@ -735,16 +733,17 @@ For glycosylation sites, dbPTM provides the glycosylation type, which is stored 
 | C-linked glycosylation | `C-Gly`        |
 | S-linked glycosylation | `S-Gly`        |
 
-If a glycosylation site is already annotated with a more specific subtype (for example O-GalNAc or O-GlcNAc from PhosphoSite), the generic O-Gly subtype from dbPTM is not added in order to avoid redundant information.
+For glycosylation sites, dbPTM provides the glycosylation type, which is stored as subtype metadata on the corresponding `ptm_glycosylation` entry. In the metatable, glycosylation subtypes with the same base type, such as multiple `O-*` annotations, are collapsed to the first subtype encountered.
 
 Once again, we can check the result:
 
 ```py
->>> seq.positions[18].properties
-{'ptm_glycosylation': <PositionProperty Glycosylation Site from dbPTM>}
+>>> seq.properties_at_position(19, 'ptm_glycosylation')
+{}
 
->>> seq.positions[42].properties
-{'ptm_phosphorylation': <PositionProperty Phosphorylation Site from dbPTM>}
+>>> seq.properties_at_position(29, 'ptm_phosphorylation')
+{'ptm_phosphorylation': [{'positions': [29], 'sources': [<cancermuts.datasources.PhosphoSite object at 0x7fb317ba0070>], 'value': None, 'metadata': {}}, {'positions': [29], 'sources': [<cancermuts.datasources.dbPTM object at 0x7fb3085802b0>], 'value': None, 'metadata': {}}]}
+
 ```
 
 #### Predicted phosphorylation sites with NetPhos
@@ -753,8 +752,8 @@ We can also annotate predicted phosphorylation sites using a local **NetPhos**
 dataset. In contrast to PhosphoSite and dbPTM, which provide experimentally
 derived PTM annotations, NetPhos provides **predicted phosphorylation sites**.
 
-Cancermuts imports these predictions as regular phosphorylation position
-properties (`ptm_phosphorylation`).
+Cancermuts imports these predictions as `ptm_phosphorylation` sequence property
+entries.
 
 We first create the NetPhos data source object. We need to supply the location
 of the directory containing the NetPhos output files:
@@ -771,25 +770,25 @@ whereas for non-canonical isoforms it uses the isoform identifier
 By default, NetPhos annotations are added for residues of type `S`, `T`, or `Y`
 when the predicted score is higher than `0.5`.
 
-Once the object is created, we can add the position properties to our sequence
+Once the object is created, we can add the property to our sequence
 object:
 
 ```py
->>> np.add_position_properties(seq)
+>>> np.add_sequence_properties(seq)
 ```
 
 Optionally, since NetPhos currently only supports phosphorylation, the
 `properties` argument can also be specified explicitly:
 
 ```py
->>> np.add_position_properties(seq, properties=['phosphorylation'])
+>>> np.add_sequence_properties(seq, properties=['phosphorylation'])
 ```
 
 Once again, we can check the result:
 
 ```py
->>> seq.positions[51].properties
-{'ptm_phosphorylation': <PositionProperty Phosphorylation Site from NetPhos>}
+>>> seq.properties_at_position(3, 'ptm_phosphorylation')
+{'ptm_phosphorylation': [{'positions': [3], 'sources': [<cancermuts.datasources.NetPhos object at 0x7fb30855ff70>], 'value': None, 'metadata': {}}]}
 ```
 
 In this case, the phosphorylation annotation was added from a NetPhos prediction
@@ -807,20 +806,17 @@ We first create the GlyGen data source object by specifying the location of the 
 ```py
 >>> gg = GlyGen('/data/databases/GlyGen/', database_file='human_proteoform_glycosylation_sites_uniprotkb_filtered.csv')
 ```
-Once the object is created we can add the position properties to our sequence object.
+Once the object is created we can add the property to our sequence object.
 
-GlyGen annotates glycosylation sites by adding a ptm_glycosylation property to the corresponding sequence positions. Each site is associated with a subtype that combines the glycosylation type (e.g. N, O) and the glycan name.
+GlyGen annotates glycosylation sites by adding a ptm_glycosylation property to the  sequence. Each site is associated with a subtype that combines the glycosylation type (e.g. N, O) and the glycan name.
 
-If multiple glycosylation annotations are available for the same position, they are merged into a single property, and all subtypes are retained.
+If multiple glycosylation annotations are available for the same position, they are stored as separate entries in the `ptm_glycosylation` property object, and their subtypes are summarized in the table output.
 
 We can inspect the result as follows:
 
 ```py
->>> seq.positions[45].properties
-{'ptm_glycosylation': <PositionProperty Glycosylation Site from GlyGen>}
-
->>> seq.positions[45].properties['ptm_glycosylation'].metadata
-{'subtypes': ['N-GlcNAc', 'O-GalNAc']}
+>>> seq.properties_at_position(46, 'ptm_glycosylation')
+{}
 ```
 Only canonical isoforms are supported by the GlyGen datasource.
 
@@ -831,17 +827,17 @@ protein of interest using the consensus of the entry. This works similarly as be
 
 ```py
 mdb = MobiDB()
-mdb.add_position_properties(seq)
+mdb.add_sequence_properties(seq)
 ```
 
 We can then check the annotation as done previously:
 
 ```py
->>> seq.positions[0].properties['mobidb_disorder_propensity']
-<StructuralDisorder, None>
+>>> seq.properties_at_position(1,'mobidb_disorder_propensity')
+{'mobidb_disorder_propensity': [{'positions': [1], 'sources': [<cancermuts.datasources.MobiDB object at 0x7fb30855fdf0>], 'value': None, 'metadata': {}}]}
 
->>> seq.positions[10].properties['mobidb_disorder_propensity']
-<StructuralDisorder, Structured, observed>
+>>> seq.properties_at_position(11,'mobidb_disorder_propensity')
+{'mobidb_disorder_propensity': [{'positions': [11], 'sources': [<cancermuts.datasources.MobiDB object at 0x7fb30855fdf0>], 'value': None, 'metadata': {}}]}
 ```
 
 There are four types of annotations, here listed in order of priority.
@@ -854,19 +850,15 @@ There are four types of annotations, here listed in order of priority.
 * Disordered, predicted
     * Based on predictions
 
-If none of these data are available for the consensus, the residue will not be annotated.
+If no disorder evidence is available for a residue, the disorder value may be `None`.
 For more information about the types of evidence, please see the [MobiDB vocabulary](https://mobidb.bio.unipd.it/about/vocabulary)
 
-### Sequence properties
 
-We further annotate properties to the sequence, i.e. properties that cover
-multiple residues. We first import the respective classes:
+#### Predictions of short linear motifs from ELM
 
 ```py
 >>> from cancermuts.datasources import ELMPredictions
 ```
-
-#### Predictions of short linear motifs from ELM
 
 We annotate the sequence using predictions for short linear motifs from the
 [Eukaryotic Linear Motif](http://elm.eu.org) database:
@@ -885,23 +877,17 @@ post-translational modifications which are already supplied by PhosphoSite.
 We can check the linear motifs we have collected:
 
 ```py
->>> seq.properties
-{'linear_motif': [<SequenceProperty Linear motif from ELM, positions 10,11,12>,
-  <SequenceProperty Linear motif from ELM, positions 69,70,71>,
-  <SequenceProperty Linear motif from ELM, positions 5,6,7,8,9>,
+>>> seq.properties_at_position(29)
+{'ptm_phosphorylation': [{'positions': [29], 'sources': [<cancermuts.datasources.PhosphoSite object at 0x7fb317ba0070>], 'value': None, 'metadata': {}}, {'positions': [29], 'sources': [<cancermuts.datasources.dbPTM object at 0x7fb3085802b0>], 'value': None, 'metadata': {}}], 'mobidb_disorder_propensity': [{'positions': [29], 'sources': [<cancermuts.datasources.MobiDB object at 0x7fb30855fdf0>], 'value': None, 'metadata': {}}]}
   ...
 ```
 
 and their specifics:
 
 ```py
->>> seq.properties['linear_motif'][0].type
-'NRD cleavage site'
+>>> seq.properties_at_position(10, 'linear_motif')
+{'linear_motif': [{'positions': [10, 11, 12], 'sources': [<cancermuts.datasources.ELMPredictions object at 0x7fb30856d540>], 'value': None, 'metadata': {'function': ['NRD cleavage site'], 'ref': 'ELM Prediction', 'type': 'NRD cleavage site', 'id': 'CLV_NRD_NRD_1'}}, {'positions': [10, 11, 12, 13, 14], 'sources': [<cancermuts.datasources.ELMPredictions object at 0x7fb30856d540>], 'value': None, 'metadata': {'function': ['14-3-3 binding phosphopeptide motif'], 'ref': 'ELM Prediction', 'type': '14-3-3 binding phosphopeptide motif', 'id': 'LIG_14-3-3_CanoR_1'}}]}
 
->>> seq.properties['linear_motif'][0].positions
-[<SequencePosition, residue R at position 10>,
- <SequencePosition, residue R at position 11>,
- <SequencePosition, residue T at position 12>]
 ```
 
 Alternatively, and in a very similar fashion, it is possible to use the [gget Python
@@ -1005,33 +991,31 @@ using the CSV file works as you would expect:
 
 # adds mutations to the seq object
 >>> ma.add_mutations(seq)
-# adds PTM annotations to the sequence object
->>> ma.add_position_properties(seq)
+# adds annotations to the sequence object
+>>> ma.add_sequence_properties(seq)
 
 # alternatively, if we want to add genomic mutations metadata, we need to
 # explicitly add it in the metadata argument instead. The following commented
 # line adds mutations with the corresponding metadata to the seq obejct
 # >>> ma.add_mutations(seq, metadata=['genomic_mutations'])
 
-# adds structure or linear motif annotation to the sequence object
->>> ma.add_sequence_properties(seq)
 ```
 
 We can then verify:
 
 ```py
 
->>> seq.positions[0].mutations
-[<Mutation M1A from Manual annotations from test.csv>]
+>>> seq.variants_at_position(1)
+[<ProteinVariant p.Met1Ala from Manual annotations from test.csv>]
 
->>> seq.positions[2].properties['ptm_phosphorylation']
-<PositionProperty Phosphorylation Site from Manual annotations from test.csv>
+>>> seq.properties_at_position(3, 'ptm_phosphorylation')
+{'ptm_phosphorylation': [{'positions': [3], 'sources': [<cancermuts.datasources.ManualAnnotation object at ...>], 'value': None, 'metadata': {'function': 'asd', 'reference': ''}}]}
 
->>> seq.properties['linear_motif']
-[<SequenceProperty Linear motif from Manual annotations from test.csv, positions 10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25>]
+>>> seq.properties_at_position(10, 'linear_motif')
+{'linear_motif': [{'positions': [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25], 'sources': [<cancermuts.datasources.ManualAnnotation object at ...>], 'value': None, 'metadata': {'function': 'zzz', 'reference': '', 'type': 'zxc', 'id': ''}}]}
 
->>> seq.properties['structure']
-[<SequenceProperty Structure from Manual annotations from test.csv, positions 30,31,32,33,34,35,36,37,38,39,40>]
+>>> seq.properties_at_position(30, 'structure')
+{'structure': [{'positions': [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40], 'sources': [<cancermuts.datasources.ManualAnnotation object at ...>], 'value': None, 'metadata': {'function': 'xxx', 'reference': '', 'type': 'ert'}}]}
 ```
 
 ## Generating the final table
