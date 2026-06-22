@@ -143,14 +143,40 @@ class GenomicMutation(Metadata):
     allowed_bases = set(['A', 'C', 'G', 'T'])
 
     _mut_snv_regexp = '^[0-9XY]+:g\.[0-9]+[ACTG]>[ACTG]$'
-    _mut_insdel_regexp = '^[0-9XY]+:g\.[0-9]+_[0-9]+delins[ACTG]+$'
+    _mut_insdel_regexp = r'^[0-9XY]+:g\.[0-9]+(?:_[0-9]+)?delins[ACTG]+$'
     _mut_inv_regexp = '^[0-9XY]+:g\.[0-9]+_[0-9]+inv$'
+    _mut_del_regexp = '^[0-9XY]+:g\.[0-9]+(?:_[0-9]+)?del$'
+    _mut_repeat_regexp = r'^[0-9XY]+:g\.[0-9]+(?:_[0-9]+)?[ACTG]+\[[0-9]+\]$'
+    _mut_ins_regexp = '^[0-9XY]+:g\.[0-9]+_[0-9]+ins[ACTG]+$'
+    _mut_dup_regexp = r'^[0-9XY]+:g\.[0-9]+(?:_[0-9]+)?dup$'
+
     _mut_snv_prog = re.compile(_mut_snv_regexp)
     _mut_insdel_prog = re.compile(_mut_insdel_regexp)
     _mut_inv_prog = re.compile(_mut_inv_regexp)
+    _mut_del_prog = re.compile(_mut_del_regexp)
+    _mut_repeat_prog = re.compile(_mut_repeat_regexp)
+    _mut_ins_prog = re.compile(_mut_ins_regexp)
+    _mut_dup_prog = re.compile(_mut_dup_regexp)
+
     _mut_snv_parse = '{chr}:g.{coord:d}{ref:l}>{alt:l}'
-    _mut_insdel_parse = '{chr}:g.{coord_start:d}_{coord_end:d}delins{substitution}'
+    _mut_insdel_single_parse = '{chr}:g.{coord_start:d}delins{substitution}'
+    _mut_insdel_range_parse = '{chr}:g.{coord_start:d}_{coord_end:d}delins{substitution}'
     _mut_inv_parse = '{chr}:g.{coord_start:d}_{coord_end:d}inv'
+    _mut_ins_parse = '{chr}:g.{coord_start:d}_{coord_end:d}ins{insertion}'
+    _mut_dup_single_parse = '{chr}:g.{coord_start:d}dup'
+    _mut_dup_range_parse = '{chr}:g.{coord_start:d}_{coord_end:d}dup'
+    _mut_del_single_parse = '{chr}:g.{coord_start:d}del'
+    _mut_del_range_parse = '{chr}:g.{coord_start:d}_{coord_end:d}del'
+    _mut_repeat_single_parse = '{chr}:g.{coord_start:d}{repeat_unit}[{repeat_count:d}]'
+    _mut_repeat_range_parse = '{chr}:g.{coord_start:d}_{coord_end:d}{repeat_unit}[{repeat_count:d}]'
+
+    @staticmethod
+    def _normalise_chr(chromosome):
+        if chromosome == '23':
+            return 'X'
+        elif chromosome == '24':
+            return 'Y'
+        return chromosome
 
     @logger_init
     def __init__(self, source, genome_build, definition):
@@ -159,75 +185,119 @@ class GenomicMutation(Metadata):
         self.genome_build = genome_build
         self.definition = definition
 
+        self.chr = None
+        self.coord = None
+        self.coord_start = None
+        self.coord_end = None
+
+        self.ref = None
+        self.alt = None
+        self.substitution = None
+        self.insertion = None
+        self.repeat_unit = None
+        self.repeat_count = None
+
+        self.is_snv = False
+        self.is_insdel = False
+        self.is_inversion = False
+        self.is_deletion = False
+        self.is_insertion = False
+        self.is_duplication = False
+        self.is_repeat = False
+
         if self._mut_snv_prog.match(definition):
             tokens = parse(self._mut_snv_parse, definition)
-
-            if tokens['chr'] == '23':
-                self.chr = 'X'
-            elif tokens['chr'] == '24':
-                self.chr = 'Y'
-            else:
-                self.chr = tokens['chr']
-
+            self.chr = self._normalise_chr(tokens['chr'])
             self.coord = tokens['coord']
             self.ref = tokens['ref']
             self.alt = tokens['alt']
             self.is_snv = True
-            self.is_insdel = False
-            self.is_inversion = False
-
             self.definition=f"{self.chr}:g.{self.coord}{self.ref}>{self.alt}"
 
         elif self._mut_insdel_prog.match(definition):
-            tokens = parse(self._mut_insdel_parse, definition)
-
-            if tokens['chr'] == '23':
-                self.chr = 'X'
-            elif tokens['chr'] == '24':
-                self.chr = 'Y'
-            else:
-                self.chr = tokens['chr']
-
+            tokens = parse(self._mut_insdel_range_parse, definition)
+            if tokens is None:
+                tokens = parse(self._mut_insdel_single_parse, definition)
+            self.chr = self._normalise_chr(tokens['chr'])
+            self.coord = None
             self.coord_start = tokens['coord_start']
-            self.coord_end = tokens['coord_end']
+            if 'coord_end' in tokens.named:
+                self.coord_end = tokens['coord_end']
+            else:
+                self.coord_end = self.coord_start
             self.substitution = tokens['substitution']
-            self.is_snv = False
             self.is_insdel = True
-            self.is_inversion = False
-
-            self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}delins{self.substitution}"
+            if self.coord_start == self.coord_end:
+                self.definition = f"{self.chr}:g.{self.coord_start}delins{self.substitution}"
+            else:
+                self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}delins{self.substitution}"
 
         elif self._mut_inv_prog.match(definition):
             tokens = parse(self._mut_inv_parse, definition)
-
-            if tokens['chr'] == '23':
-                self.chr = 'X'
-            elif tokens['chr'] == '24':
-                self.chr = 'Y'
-            else:
-                self.chr = tokens['chr']
-
+            self.chr = self._normalise_chr(tokens['chr'])
             self.coord_start = tokens['coord_start']
             self.coord_end = tokens['coord_end']
-            self.substitution = None
-            self.is_snv = False
-            self.is_insdel = False
             self.is_inversion = True
-
             self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}inv"
 
-        else:
-            self.log.info("doing other")
-            self.chr = None
+        elif self._mut_ins_prog.match(definition):
+            tokens = parse(self._mut_ins_parse, definition)
+            self.chr = self._normalise_chr(tokens['chr'])
+            self.coord_start = tokens['coord_start']
+            self.coord_end = tokens['coord_end']
+            self.insertion = tokens['insertion']
+            self.is_insertion = True
+            self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}ins{self.insertion}"
+
+        elif self._mut_dup_prog.match(definition):
+            tokens = parse(self._mut_dup_range_parse, definition)
+            if tokens is None:
+                tokens = parse(self._mut_dup_single_parse, definition)
+            self.chr = self._normalise_chr(tokens['chr'])
+            self.coord_start = tokens['coord_start']
+            if 'coord_end' in tokens.named:
+                self.coord_end = tokens['coord_end']
+            else:
+                self.coord_end = self.coord_start
+            self.is_duplication = True
+            if self.coord_start == self.coord_end:
+                self.definition = f"{self.chr}:g.{self.coord_start}dup"
+            else:
+                self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}dup"
+
+        elif self._mut_del_prog.match(definition):
+            tokens = parse(self._mut_del_range_parse, definition)
+            if tokens is None:
+                tokens = parse(self._mut_del_single_parse, definition)
+            self.chr = self._normalise_chr(tokens['chr'])
+            self.coord_start = tokens['coord_start']
+            self.coord_end = (tokens['coord_end'] if 'coord_end' in tokens.named else self.coord_start)
+            self.is_deletion = True
+            if self.coord_start == self.coord_end:
+                self.definition = f"{self.chr}:g.{self.coord_start}del"
+            else:
+                self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}del"
+
+        elif self._mut_repeat_prog.match(definition):
+            tokens = parse(self._mut_repeat_range_parse, definition)
+            if tokens is None:
+                tokens = parse(self._mut_repeat_single_parse, definition)
+            self.chr = self._normalise_chr(tokens['chr'])
             self.coord = None
-            self.coord_start = None
-            self.coord_end = None
-            self.ref = None
-            self.alt = None
-            self.substitution = None
-            self.is_snv = False
-            self.is_insdel = False
-            self.is_inversion = False
+            self.coord_start = tokens['coord_start']
+            if 'coord_end' in tokens.named:
+                self.coord_end = tokens['coord_end']
+            else:
+                self.coord_end = self.coord_start
+            self.repeat_unit = tokens['repeat_unit']
+            self.repeat_count = tokens['repeat_count']
+            self.is_repeat = True
+            if self.coord_start == self.coord_end:
+                self.definition = f"{self.chr}:g.{self.coord_start}{self.repeat_unit}[{self.repeat_count}]"
+            else:
+                self.definition = f"{self.chr}:g.{self.coord_start}_{self.coord_end}{self.repeat_unit}[{self.repeat_count}]"
+        else:
+            self.log.info(f"unsupported genomic mutation format: {definition}")
 
     def get_value_str(self, fmt='csv'):
         if fmt == 'csv':
@@ -254,7 +324,8 @@ class GenomicMutation(Metadata):
                 if len(converted_coords) != 1:
                     raise TypeError("Could not convert genomic coordinates (liftOver returned %d coords)" % len(converted_coords))
                 return GenomicMutation(self.source, 'hg19', f"{self.chr}:g.{converted_coords[0][1]}{self.ref}>{self.alt}")
-            elif self.is_insdel:
+
+            elif self.is_insdel or self.is_deletion or self.is_insertion:
                 converted_coords_start = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.coord_start))
                 converted_coords_end   = lo_hg38_hg19.convert_coordinate('chr%s' % self.chr, int(self.coord_end))
                 if len(converted_coords_start) != 1:
@@ -262,7 +333,19 @@ class GenomicMutation(Metadata):
                 if len(converted_coords_end) != 1:
                     raise TypeError("Could not convert genomic coordinates (liftOver returned %d coords)" % len(converted_coords_end))
 
-                return GenomicMutation(self.source, 'hg19', f"{self.chr}:g.{converted_coords_start[0][1]}_{converted_coords_end[0][1]}delins{self.substitution}")
+                converted_start = converted_coords_start[0][1]
+                converted_end = converted_coords_end[0][1]
+
+                if self.is_insdel:
+                    return GenomicMutation(self.source, 'hg19', f"{self.chr}:g.{converted_start}_{converted_end}delins{self.substitution}")
+
+                elif self.is_deletion:
+                    return GenomicMutation(self.source, 'hg19', f"{self.chr}:g.{converted_start}_{converted_end}del")
+
+                elif self.is_insertion:
+                    if abs(converted_end - converted_start) != 1:
+                        raise TypeError("Could not convert insertion coordinates: converted positions are not adjacent")
+                    return GenomicMutation(self.source, 'hg19', f"{self.chr}:g.{converted_start}_{converted_end}ins{self.insertion}")
             else:
                 raise TypeError
 
@@ -275,14 +358,28 @@ class GenomicMutation(Metadata):
                 if len(converted_coords) != 1:
                     raise TypeError("Could not convert genomic coordinates (liftOver returned %d coords)" % len(converted_coords))
                 return GenomicMutation(self.source, 'hg38', f"{self.chr}:g.{converted_coords[0][1]}{self.ref}>{self.alt}")
-            elif self.is_insdel:
+
+            elif self.is_insdel or self.is_deletion or self.is_insertion:
                 converted_coords_start = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.coord_start))
                 converted_coords_end   = lo_hg19_hg38.convert_coordinate('chr%s' % self.chr, int(self.coord_end))
                 if len(converted_coords_start) != 1:
                     raise TypeError("Could not convert genomic coordinates (liftOver returned %d coords)" % len(converted_coords_start))
                 if len(converted_coords_end) != 1:
                     raise TypeError("Could not convert genomic coordinates (liftOver returned %d coords)" % len(converted_coords_end))
-                return GenomicMutation(self.source, 'hg38', f"{self.chr}:g.{converted_coords_start[0][1]}{converted_coords_end[0][1]}delins{self.substitution}")
+
+                converted_start = converted_coords_start[0][1]
+                converted_end = converted_coords_end[0][1]
+
+                if self.is_insdel:
+                    return GenomicMutation(self.source, 'hg38', f"{self.chr}:g.{converted_start}_{converted_end}delins{self.substitution}")
+
+                elif self.is_deletion:
+                    return GenomicMutation(self.source, 'hg38', f"{self.chr}:g.{converted_start}_{converted_end}del")
+
+                elif self.is_insertion:
+                    if abs(converted_end - converted_start) != 1:
+                        raise TypeError("Could not convert insertion coordinates: converted positions are not adjacent")
+                    return GenomicMutation(self.source, 'hg38', f"{self.chr}:g.{converted_start}_{converted_end}ins{self.insertion}")
             else:
                 raise TypeError
 
