@@ -109,6 +109,110 @@ class DynamicSource(Source, object):
     def __init__(self, *args, **kwargs):
         super(DynamicSource, self).__init__(*args, **kwargs)
 
+class DynamicMutationSource(DynamicSource, object):
+
+    _mutation_regexps = {"missense": re.compile(rf"^(?:p\.)?{aa}\d+{aa}$"),
+                         "deletion": re.compile(rf"^(?:p\.)?({aa}\d+del|{aa}\d+_{aa}\d+del)$"),
+                         "insertion": re.compile(rf"^(?:p\.)?({aa}\d+_{aa}\d+ins{aa}+|{aa}\d+(?:_{aa}\d+)?dup)$"),
+                         "delins": re.compile(rf"^(?:p\.)?({aa}\d+delins{aa}+|{aa}\d+_{aa}\d+delins{aa}+)$")}
+
+    def _mutation_type(self, mutation):
+        matches = [variant_type for variant_type, pattern in self._mutation_regexps.items()
+                   if pattern.fullmatch(mutation)]
+        if len(matches) > 1:
+            raise ValueError(f"mutation {mutation} matches multiple variant types: {matches}")
+        if len(matches) == 0:
+            return None
+        return matches[0]
+
+    def _protein_variant_parser(self, mutation, sequence):
+        match = re.fullmatch(rf"p\.({aa})(\d+)({aa})", mutation)
+        if match:
+            ref, pos, alt = match.groups()
+            if ref == alt:
+                raise ValueError(f"synonymous mutation {mutation}")
+            pos = int(pos)
+            return ProteinVariant(start=pos, end=pos, ref=ref, alt=alt, sources=[self])
+
+        match = re.fullmatch(rf"p\.({aa})(\d+)del", mutation)
+        if match:
+            ref, pos = match.groups()
+            pos = int(pos)
+            return ProteinVariant(start=pos, end=pos, ref=ref, alt="", sources=[self])
+
+        match = re.fullmatch(rf"p\.({aa})(\d+)_({aa})(\d+)del", mutation)
+        if match:
+            start_ref, start, end_ref, end = match.groups()
+            start = int(start)
+            end = int(end)
+            middle_ref = sequence.sequence[start:end - 1]
+            ref = start_ref + middle_ref + end_ref
+            return ProteinVariant(start=start, end=end, ref=ref, alt="", sources=[self])
+
+        match = re.fullmatch(rf"p\.({aa})(\d+)_({aa})(\d+)ins({aa}+)", mutation)
+        if match:
+            left_ref, start, right_ref, end, inserted = match.groups()
+            start = int(start)
+            end = int(end)
+            if end != start + 1:
+                raise ValueError(f"Invalid insertion coordinates in {mutation}: positions must be adjacent")
+            return ProteinVariant(start=start, end=start, ref=left_ref, alt=left_ref + inserted + right_ref, sources=[self])
+
+        match = re.fullmatch(rf"p\.({aa})(\d+)(?:_({aa})(\d+))?dup", mutation)
+        if match:
+            start_ref, start, end_ref, end = match.groups()
+            start = int(start)
+
+            if end is None:
+                end = start
+                end_ref = start_ref
+            else:
+                end = int(end)
+
+            duplicated = sequence.sequence[start - 1:end]
+            if duplicated[0] != start_ref or duplicated[-1] != end_ref:
+                raise ValueError(f"Invalid duplication reference residues in {mutation}")
+            if end >= len(sequence.sequence):
+                raise ValueError(f"Cannot represent C-terminal duplication as an internal insertion: {mutation}")
+
+            left_ref = sequence.sequence[end - 1]
+            right_ref = sequence.sequence[end]
+
+            return ProteinVariant(start=end, end=end, ref=left_ref, alt=left_ref + duplicated + right_ref, sources=[self])
+
+        match = re.fullmatch(rf"p\.({aa})(\d+)delins({aa}+)", mutation)
+        if match:
+            ref, pos, alt = match.groups()
+            pos = int(pos)
+            return ProteinVariant(start=pos, end=pos, ref=ref, alt=alt, sources=[self])
+
+        match = re.fullmatch(rf"p\.({aa})(\d+)_({aa})(\d+)delins({aa}+)", mutation)
+        if match:
+            start_ref, start, end_ref, end, alt = match.groups()
+            start = int(start)
+            end = int(end)
+            middle_ref = sequence.sequence[start:end - 1]
+            ref = start_ref + middle_ref + end_ref
+            return ProteinVariant(start=start, end=end, ref=ref, alt=alt, sources=[self])
+
+        raise ValueError(f"Unsupported protein mutation format: {mutation}")
+
+    def _validate_variant_types(self, variant_types):
+        if variant_types is None:
+            raise ValueError("variant_types cannot be None")
+        elif isinstance(variant_types, str):
+            variant_types = (variant_types,)
+
+        variant_types = tuple(dict.fromkeys(variant_types))
+        if len(variant_types) == 0:
+            raise ValueError("variant_types cannot be empty")
+
+        invalid_variant_types = set(variant_types) - ProteinVariant.supported_variant_types
+        if invalid_variant_types:
+            raise ValueError(f"Invalid variant type(s): {invalid_variant_types}")
+
+        return variant_types
+
 class StaticSource(Source, object):
     """Base class for implementing static data sources. Static data sources
     are local to the system in use and need to be provided manually. They
@@ -116,93 +220,6 @@ class StaticSource(Source, object):
 
     def __init__(self, *args, **kwargs):
         super(StaticSource, self).__init__(*args, **kwargs)
-
-def _protein_variant_parser(mutation, sequence, source):
-
-    match = re.fullmatch(rf"p\.({aa})(\d+)({aa})", mutation)
-    if match:
-        ref, pos, alt = match.groups()
-        if ref == alt:
-            raise ValueError(f"synonymous mutation {mutation}")
-        pos = int(pos)
-        return ProteinVariant(start=pos, end=pos, ref=ref, alt=alt, sources=[source])
-
-    match = re.fullmatch(rf"p\.({aa})(\d+)del", mutation)
-    if match:
-        ref, pos = match.groups()
-        pos = int(pos)
-        return ProteinVariant(start=pos, end=pos, ref=ref, alt="", sources=[source])
-
-    match = re.fullmatch(rf"p\.({aa})(\d+)_({aa})(\d+)del", mutation)
-    if match:
-        start_ref, start, end_ref, end = match.groups()
-        start = int(start)
-        end = int(end)
-        middle_ref = sequence.sequence[start:end - 1]
-        ref = start_ref + middle_ref + end_ref
-        return ProteinVariant(start=start, end=end, ref=ref, alt="", sources=[source])
-
-    match = re.fullmatch(rf"p\.({aa})(\d+)_({aa})(\d+)ins({aa}+)", mutation)
-    if match:
-        left_ref, start, right_ref, end, inserted = match.groups()
-        start = int(start)
-        end = int(end)
-        if end != start + 1:
-            raise ValueError(f"Invalid insertion coordinates in {mutation}: positions must be adjacent")
-        return ProteinVariant(start=start, end=start, ref=left_ref, alt=left_ref + inserted + right_ref, sources=[source])
-
-    match = re.fullmatch(rf"p\.({aa})(\d+)(?:_({aa})(\d+))?dup", mutation)
-    if match:
-        start_ref, start, end_ref, end = match.groups()
-        start = int(start)
-
-        if end is None:
-            end = start
-            end_ref = start_ref
-        else:
-            end = int(end)
-
-        duplicated = sequence.sequence[start - 1:end]
-        if duplicated[0] != start_ref or duplicated[-1] != end_ref:
-            raise ValueError(f"Invalid duplication reference residues in {mutation}")
-        if end >= len(sequence.sequence):
-            raise ValueError(f"Cannot represent C-terminal duplication as an internal insertion: {mutation}")
-
-        left_ref = sequence.sequence[end - 1]
-        right_ref = sequence.sequence[end]
-
-        return ProteinVariant(start=end, end=end, ref=left_ref, alt=left_ref + duplicated + right_ref, sources=[source])
-
-    match = re.fullmatch(rf"p\.({aa})(\d+)delins({aa}+)", mutation)
-    if match:
-        ref, pos, alt = match.groups()
-        pos = int(pos)
-        return ProteinVariant(start=pos, end=pos, ref=ref, alt=alt, sources=[source])
-
-    match = re.fullmatch(rf"p\.({aa})(\d+)_({aa})(\d+)delins({aa}+)", mutation)
-    if match:
-        start_ref, start, end_ref, end, alt = match.groups()
-        start = int(start)
-        end = int(end)
-        middle_ref = sequence.sequence[start:end - 1]
-        ref = start_ref + middle_ref + end_ref
-        return ProteinVariant(start=start, end=end, ref=ref, alt=alt, sources=[source])
-
-    raise ValueError(f"Unsupported protein mutation format: {mutation}")
-
-def _normalise_variant_types(variant_types):
-    if variant_types is None:
-        variant_types = ("missense",)
-    elif isinstance(variant_types, str):
-        variant_types = (variant_types,)
-
-    variant_types = set(variant_types)
-    invalid_variant_types = variant_types - ProteinVariant.supported_variant_types
-
-    if invalid_variant_types:
-        raise ValueError(f"Invalid variant type(s): {invalid_variant_types}")
-
-    return variant_types
 
 class UniProt(DynamicSource, object):
     """Class for the UniProt data source. It is used to download the protein
@@ -427,7 +444,7 @@ class UniProt(DynamicSource, object):
 
         return out
     
-class cBioPortal(DynamicSource, object):
+class cBioPortal(DynamicMutationSource, object):
 
     default_strand = '+'
 
@@ -456,12 +473,6 @@ class cBioPortal(DynamicSource, object):
         self._get_cancer_types()
         self._get_cancer_studies(cancer_studies)
         self._get_molecular_profiles()
-        self._mut_regexps = {"missense": re.compile(rf"^{aa}\d+{aa}$"),
-                             "deletion": re.compile(rf"^({aa}\d+del|{aa}\d+_{aa}\d+del)$"),
-                             "insertion": re.compile(rf"^({aa}\d+_{aa}\d+ins{aa}+|{aa}\d+(?:_{aa}\d+)?dup)$"),
-                             "delins": re.compile(rf"^({aa}\d+delins{aa}+|{aa}\d+_{aa}\d+delins{aa}+)$")}
-        self._mut_prog = self._mut_regexps["missense"]
-        self._mut_regexp = self._mut_regexps["missense"].pattern
 
     @property
     def cancer_types(self):
@@ -471,15 +482,9 @@ class cBioPortal(DynamicSource, object):
     def cancer_studies(self):
         return self._cache_cancer_studies
 
-    def _cbioportal_mutation_type(self, mutation):
-        for variant_type, pattern in self._mut_regexps.items():
-            if pattern.fullmatch(mutation):
-                return variant_type
-        return None
-
     def add_mutations(self, sequence, metadata=[], variant_types=("missense",)):
         _cBioPortal_supported_metadata = ['cancer_type', 'cancer_study', 'genomic_coordinates', 'genomic_mutations']
-        variant_types = _normalise_variant_types(variant_types)
+        variant_types = self._validate_variant_types(variant_types)
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("cBioPortal mutation annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
 
@@ -500,7 +505,7 @@ class cBioPortal(DynamicSource, object):
             mutation_indices = [i for i, existing_mutation in enumerate(mutations) if existing_mutation == mutation]
 
             try:
-                mutation_obj = _protein_variant_parser(f"p.{mutation}", sequence, self)
+                mutation_obj = self._protein_variant_parser(f"p.{mutation}", sequence)
             except ValueError as e:
                 self.log.warning(
                     f"mutation {mutation} could not be parsed "
@@ -519,7 +524,7 @@ class cBioPortal(DynamicSource, object):
                 self.log.debug("adding mutation %s" % str(mutation_obj))
                 sequence.add_variant(mutation_obj)
             except ValueError as e:
-                self.log.warning(f"mutation {mutation} failed wild-type validation "
+                self.log.warning(f"mutation {mutation} does not match the reference protein sequence "
                                  f"and will be skipped: {e}")
                 continue
 
@@ -579,19 +584,17 @@ class cBioPortal(DynamicSource, object):
 
         self._cache_genetic_profiles = result_df
 
-    def _get_mutation_data(self, gene_id, variant_types=("missense",)):
+    def _get_available_mutations(self, gene_id, metadata=[], variant_types=("missense",)):
 
         mutationMultipleStudyFilter = { "entrezGeneIds": [ gene_id ],
                                         "molecularProfileIds": self._cache_genetic_profiles.molecularProfileId.values.tolist()
                                       }
-
         result = self._client.Mutations.fetchMutationsInMultipleMolecularProfilesUsingPOST(mutationMultipleStudyFilter=mutationMultipleStudyFilter,
-                                                                                             projection='DETAILED').result()
+                                                                                           projection='DETAILED').result()
 
         df = pd.DataFrame(dict(
             [ (attr, [ getattr(entry, attr) for entry in result ]) for attr in dir(result[0]) ]))
 
-        variant_types = _normalise_variant_types(variant_types)
         df = df[df["proteinChange"].notna()]
 
         allowed_cbioportal_types = {"missense": "Missense_Mutation",
@@ -599,15 +602,13 @@ class cBioPortal(DynamicSource, object):
                                     "delins": "In_Frame_Del",
                                     "insertion": "In_Frame_Ins"}
 
+        # Keep only mutations whose cBioPortal mutation type and parsed protein consequence 
+        # match one of the requested variant types.
         keep = pd.Series(False, index=df.index)
         for variant_type in variant_types:
-            keep |= ((df["mutationType"] == allowed_cbioportal_types[variant_type]) & df["proteinChange"].apply(lambda mutation: self._cbioportal_mutation_type(mutation) == variant_type))
+            keep |= ((df["mutationType"] == allowed_cbioportal_types[variant_type]) & df["proteinChange"].apply(lambda mutation: self._mutation_type(mutation) == variant_type))
 
-        return df[keep]
-
-    def _get_available_mutations(self, gene_id, metadata=[], variant_types=("missense",)):
-
-        mutation_data = self._get_mutation_data(gene_id, variant_types=variant_types)
+        mutation_data = df[keep]
 
         out_metadata = dict(list(zip(metadata, [list() for i in range(len(metadata))])))
 
@@ -735,7 +736,7 @@ class cBioPortal(DynamicSource, object):
                         out_metadata['genomic_mutations'].append(gm)
         return mutations, out_metadata
 
-class ClinVar(DynamicSource, object):
+class ClinVar(DynamicMutationSource, object):
 
     # ClinVar Metadata
     _clinvar_supported_metadata = [
@@ -1391,7 +1392,7 @@ class ClinVar(DynamicSource, object):
         return genomic_mutations
 
     def _get_available_muts_and_md(self, sequence, clinvar_ids, metadata=[], cross_check=False, variant_types=("missense",)):
-        variant_types = _normalise_variant_types(variant_types)
+        variant_types = self._validate_variant_types(variant_types)
 
         # Initial object assignment:
         clinvar_variants = {}
@@ -1495,7 +1496,7 @@ class ClinVar(DynamicSource, object):
                 key_to_remove.append(clinvar_id)
                 continue
             try:
-                mutation_obj = _protein_variant_parser(self._normalise_clinvar_variants(result.group(1)), sequence, self)
+                mutation_obj = self._protein_variant_parser(self._normalise_clinvar_variants(result.group(1)), sequence)
             except ValueError as e:
                 self.log.warning(f"ClinVar ID {clinvar_id}: mutation {result.group(1)} "
                                      f"could not be parsed/validated and will be skipped: {e}")
@@ -1551,8 +1552,7 @@ class ClinVar(DynamicSource, object):
                             result = re.search(r"\((p\.[^)]+)\)", str(correct_variant))
                             if result is not None:
                                 try:
-                                    mutation_obj = _protein_variant_parser(self._normalise_clinvar_variants(result.group(1)), sequence,
-                                        self)
+                                    mutation_obj = self._protein_variant_parser(self._normalise_clinvar_variants(result.group(1)), sequence)
                                 except ValueError:
                                     mutation_obj = None
 
@@ -1691,7 +1691,7 @@ class ClinVar(DynamicSource, object):
                 self.log.error(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
                 raise TypeError(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
             refseq = sequence.aliases["refseq"]
-            variant_types = _normalise_variant_types(variant_types)
+            variant_types = self._validate_variant_types(variant_types)
             queries = {"missense":  ('("missense variant"[molecular consequence] OR '
                                      '"SO:0001583"[molecular consequence])'),
                         "deletion": ('("inframe deletion"[molecular consequence] OR '
@@ -1750,18 +1750,11 @@ class ClinVar(DynamicSource, object):
             "inconsistency_annotations": df2
         }
 
-class COSMIC(DynamicSource, object):
+class COSMIC(DynamicMutationSource, object):
     @logger_init
     def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, database_encoding=None, lazy_load_db=True):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
-
-        self._mut_regexps = {"missense": re.compile(rf"^p\.{aa}\d+{aa}$"),
-                             "deletion": re.compile(rf"^p\.({aa}\d+del|{aa}\d+_{aa}\d+del)$"),
-                             "insertion": re.compile(rf"^p\.({aa}\d+_{aa}\d+ins{aa}+|{aa}\d+(?:_{aa}\d+)?dup)$"),
-                             "delins": re.compile(rf"^p\.({aa}\d+delins{aa}+|{aa}\d+_{aa}\d+delins{aa}+)$"),}
-        self._mut_prog = self._mut_regexps["missense"]
-        self._mut_regexp = self._mut_regexps["missense"].pattern
         self._mut_snv_regexp = '^[0-9]+:g\.[0-9+][ACTG]>[ACTG]'
         self._mut_snv_prog = re.compile(self._mut_snv_regexp)
         self._cosmic_phenotype_id_kwd = ['COSMIC_PHENOTYPE_ID']
@@ -1811,12 +1804,6 @@ class COSMIC(DynamicSource, object):
         else:
             self._df = None
 
-    def _cosmic_mutation_type(self, mutation):
-        for variant_type, pattern in self._mut_regexps.items():
-            if pattern.fullmatch(mutation):
-                return variant_type
-        return None
-
     def _load_db_files(self, targeted_db_file, screenmut_db_file):
 
         targeted_screenmut_db_files = [targeted_db_file, screenmut_db_file]
@@ -1864,7 +1851,7 @@ class COSMIC(DynamicSource, object):
                        variant_types=("missense",)):
 
         mutations = []
-        variant_types = _normalise_variant_types(variant_types)
+        variant_types = self._validate_variant_types(variant_types)
         out_metadata = dict(list(zip(metadata, [list() for i in range(len(metadata))])))
 
         do_cancer_type = False
@@ -1933,12 +1920,12 @@ class COSMIC(DynamicSource, object):
 
         df = df[ df['MUTATION_AA'].notna() ]
 
-        df = df[df['MUTATION_AA'].apply(lambda mutation: self._cosmic_mutation_type(mutation) in variant_types)]
+        df = df[df['MUTATION_AA'].apply(lambda mutation: self._mutation_type(mutation) in variant_types)]
 
         for r in df.iterrows():
             r = r[1]
             mutations.append(r['MUTATION_AA'])
-            mutation_type = self._cosmic_mutation_type(r['MUTATION_AA'])
+            mutation_type = self._mutation_type(r['MUTATION_AA'])
 
             if do_cancer_type:
                 out_metadata['cancer_type'].append([r['PRIMARY_HISTOLOGY']])
@@ -2001,7 +1988,7 @@ class COSMIC(DynamicSource, object):
                     variant_types=("missense",)):
 
         _cosmic_supported_metadata = ['cancer_type', 'genomic_coordinates', 'genomic_mutations', 'cancer_site', 'cancer_histology']
-        variant_types = _normalise_variant_types(variant_types)
+        variant_types = self._validate_variant_types(variant_types)
 
         for md in metadata:
             if md not in _cosmic_supported_metadata:
@@ -2040,7 +2027,7 @@ class COSMIC(DynamicSource, object):
         for m in unique_mutations:
             mutation_indices = [i for i, x in enumerate(raw_mutations) if x == m]
             try:
-                mutation_obj = _protein_variant_parser(m, sequence, self)
+                mutation_obj = self._protein_variant_parser(m, sequence)
                 for md in metadata:
                     mutation_obj.metadata[md] = []
                     for mi in mutation_indices:
