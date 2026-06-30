@@ -473,6 +473,7 @@ class cBioPortal(DynamicMutationSource, object):
         self._get_cancer_types()
         self._get_cancer_studies(cancer_studies)
         self._get_molecular_profiles()
+        self._hgvsg_cache = {}
 
     @property
     def cancer_types(self):
@@ -481,6 +482,27 @@ class cBioPortal(DynamicMutationSource, object):
     @property
     def cancer_studies(self):
         return self._cache_cancer_studies
+
+    def _get_hgvsg(self, chrom, start, end, ref, alt, genome_build):
+        key = (genome_build, chrom, start, end, ref, alt)
+
+        if key in self._hgvsg_cache:
+            return self._hgvsg_cache[key]
+
+        if genome_build in ("GRCh37", "hg19"):
+            base_url = "https://www.genomenexus.org"
+        elif genome_build in ("GRCh38", "hg38"):
+            base_url = "https://grch38.genomenexus.org"
+
+        variant = f"{chrom},{start},{end},{ref},{alt}"
+        try:
+            hgvsg = rq.get(f"{base_url}/annotation/genomic/{variant}").json().get("hgvsg")
+        except Exception as e:
+            self.log.error(f"failed retrieving HGVSg from Genome Nexus for {variant}")
+            hgvsg = None
+
+        self._hgvsg_cache[key] = hgvsg
+        return hgvsg
 
     def add_mutations(self, sequence, metadata=[], variant_types=("missense",)):
         _cBioPortal_supported_metadata = ['cancer_type', 'cancer_study', 'genomic_coordinates', 'genomic_mutations']
@@ -684,9 +706,9 @@ class cBioPortal(DynamicMutationSource, object):
                 if do_cancer_study:
                     out_metadata['cancer_study'].extend([[cancer_study_id]]*len(this_mutations))
                 if do_genomic_coordinates:
-                    out_metadata['genomic_coordinates'].extend([[None]]*len(this_mutations))
+                    out_metadata['genomic_coordinates'].extend([None]*len(this_mutations))
                 if do_genomic_mutations:
-                    out_metadata['genomic_mutations'].extend([[None]]*len(this_mutations))
+                    out_metadata['genomic_mutations'].extend([None]*len(this_mutations))
 
             if len(cancer_study_mutation_ext_ids) > 0:
 
@@ -703,37 +725,23 @@ class cBioPortal(DynamicMutationSource, object):
                     if do_cancer_study:
                         out_metadata['cancer_study'].append([cancer_study_id])
                     if do_genomic_coordinates or do_genomic_mutations:
-                        gd = list(row[['chr',
-                                    'startPosition',
-                                    'endPosition',
-                                    'referenceAllele']].values)
+                        genome_build = "hg19" if row["ncbiBuild"] == "GRCh37" else "hg38"
 
-                        gd = ['hg19', str(gd[0]), str(int(gd[1])), str(int(gd[2])), str(gd[3])]
-                        out_metadata['genomic_coordinates'].append(gd)
-                    if do_genomic_mutations:
-                        if row['referenceAllele'] == '-' and row['variantAllele'] != '-':
-                            gm_fmt = f"{row['chr']}:g.{row['startPosition']}_{row['endPosition']}ins{row['variantAllele']}"
-                            gm = ['hg19', gm_fmt]
-                        elif row['variantAllele'] == '-' and row['referenceAllele'] != '-':
-                            if row['startPosition'] == row['endPosition']:
-                                gm_fmt = f"{row['chr']}:g.{row['startPosition']}del"
-                            else:
-                                gm_fmt = f"{row['chr']}:g.{row['startPosition']}_{row['endPosition']}del"
-                            gm = ['hg19', gm_fmt]
-                        elif  (row['referenceAllele'] != row['variantAllele'] and len(row['referenceAllele']) == len(row['variantAllele']) == 1
-                        and row['startPosition'] == row['endPosition']):
-                                gm_fmt = f"{row['chr']}:g.{row['startPosition']}{row['referenceAllele']}>{row['variantAllele']}"
-                                gm = ['hg19', gm_fmt]
-                        elif row['referenceAllele'] != '-' and row['variantAllele'] != '-' and row['referenceAllele'] != row['variantAllele']:
-                            if row['startPosition'] == row['endPosition']:
-                                gm_fmt = f"{row['chr']}:g.{row['startPosition']}delins{row['variantAllele']}"
-                            else:
-                                gm_fmt = f"{row['chr']}:g.{row['startPosition']}_{row['endPosition']}delins{row['variantAllele']}"
-                            gm = ['hg19', gm_fmt]
-                        else:
-                            gm = None
+                        chrom = row["chr"]
+                        start = row["startPosition"]
+                        end = row["endPosition"]
+                        ref = row["referenceAllele"]
+                        alt = row["variantAllele"]
 
-                        out_metadata['genomic_mutations'].append(gm)
+                        if do_genomic_coordinates:
+                            gd = [genome_build, str(chrom), str(int(start)), str(int(end)), str(ref)]
+                            out_metadata["genomic_coordinates"].append(gd)
+
+                        if do_genomic_mutations:
+                            hgvsg = self._get_hgvsg(chrom=chrom, start=start, end=end, ref=ref, alt=alt, genome_build=row["ncbiBuild"])
+                            gm = [genome_build, hgvsg] if hgvsg is not None else None
+                            out_metadata["genomic_mutations"].append(gm)
+
         return mutations, out_metadata
 
 class ClinVar(DynamicMutationSource, object):
@@ -1614,15 +1622,9 @@ class ClinVar(DynamicMutationSource, object):
                         out_metadata[rs_key].append(None)
             valid_gms = []
             for gm in data["genomic_annotations_obj"].values():
-                supported_genomic_annotation = (gm.is_snv
-                                               or gm.is_insdel
-                                               or gm.is_inversion
-                                               or gm.is_deletion
-                                               or gm.is_insertion
-                                               or gm.is_duplication
-                                               or gm.is_repeat)
+                supported_genomic_annotation = gm.mutation_type is not None
 
-                if gm.chr is None or not supported_genomic_annotation:
+                if not supported_genomic_annotation:
                     self.log.warning(f"ClinVar ID {clinvar_id}: genomic annotation '{gm.definition}' "
                                      f"for {gm.genome_build} is not in a supported genomic mutation "
                                      f"format and will not be added to genomic metadata")
@@ -1633,9 +1635,9 @@ class ClinVar(DynamicMutationSource, object):
             if "genomic_coordinates" in metadata:
                     out_metadata["genomic_coordinates"].append([[gm.genome_build,
                                                                  gm.chr,
-                                                                 gm.coord if gm.is_snv else gm.coord_start,
-                                                                 gm.coord if gm.is_snv else gm.coord_end,
-                                                                 gm.ref if gm.is_snv else None]
+                                                                 gm.start,
+                                                                 gm.end,
+                                                                 gm.ref if gm.mutation_type == "snv" else None]
                                                                  for gm in valid_gms])
             if "clinvar_variant_id" in metadata:
                 out_metadata["clinvar_variant_id"].append(clinvar_id)
@@ -2501,7 +2503,7 @@ class MyVariant(DynamicSource, object):
 
     def _get_revel_from_gm(self, mutation, gm):
 
-        if not gm.is_snv:
+        if gm.mutation_type != "snv":
             return None
 
         converted_coords = self._convert_hg38_to_hg19(gm)
@@ -3188,37 +3190,36 @@ class gnomAD(DynamicSource, object):
             except TypeError as e:
                 self.log.error(str(e))
                 continue
+            
+            data_tmp = data.copy()
+            data_tmp = data_tmp[data_tmp['chrom'].astype(str).str.replace("chr", "", regex=False) == str(variant.chr).replace("chr", "")].copy()
+            data_tmp['pos_numeric'] = pd.to_numeric(data_tmp['pos'], errors='coerce')
 
-            if variant.is_snv or variant.is_insdel:
+            if variant.mutation_type == "snv":
                 v_str = variant.get_value_str(fmt='gnomad')
+                this_df = data[data['variant_id'] == v_str]
 
-                if variant.is_snv:
-                    this_df = data[data['variant_id'] == v_str]
-                elif variant.is_insdel:
-                    this_df = data[data['edited_variant_id'] == v_str]
-
-            elif variant.is_insertion:
+            elif variant.mutation_type == "insertion":
                 v_str = variant.definition
-
-                data_tmp = data.copy()
-                data_tmp = data_tmp[data_tmp['chrom'].astype(str).str.replace("chr", "", regex=False) == str(variant.chr).replace("chr", "")].copy()
-                data_tmp['pos_numeric'] = pd.to_numeric(data_tmp['pos'], errors='coerce')
-
-                this_df = data_tmp[(data_tmp['pos_numeric'] == int(variant.coord_start)) &
+                this_df = data_tmp[(data_tmp['pos_numeric'] == int(variant.start)) &
                           (data_tmp['ref'].astype(str).str.len() == 1) &
-                          (data_tmp.apply(lambda row: str(row['alt']) == str(row['ref']) + variant.insertion, axis=1))]
+                          (data_tmp.apply(lambda row: str(row['alt']) == str(row['ref']) + str(variant.alt), axis=1))]
 
-            elif variant.is_deletion:
+            # in VCF deletions are anchored to previous nucleotide base
+            elif variant.mutation_type == "deletion":
                 v_str = variant.definition
-                deletion_length = int(variant.coord_end) - int(variant.coord_start) + 1
+                deletion_length = int(variant.end) - int(variant.start) + 1
+                this_df = data_tmp[(data_tmp['pos_numeric'] == int(variant.start) - 1) &
+                                   (data_tmp.apply(lambda row: len(str(row['ref'])) - len(str(row['alt'])) == deletion_length, axis=1))]
+ 
+            # delins are not anchored to previous nucleotide base 
+            elif variant.mutation_type == "delins":
+                v_str = variant.definition
+                deletion_length = int(variant.end) - int(variant.start) + 1
 
-                data_tmp = data.copy()
-                data_tmp = data_tmp[data_tmp['chrom'].astype(str).str.replace("chr", "", regex=False) == str(variant.chr).replace("chr", "")].copy()
-                data_tmp['pos_numeric'] = pd.to_numeric(data_tmp['pos'], errors='coerce')
-
-                this_df = data_tmp[(data_tmp['pos_numeric'] == int(variant.coord_start) - 1) &
-                                   (data_tmp['alt'].astype(str).str.len() == 1) &
-                                   (data_tmp.apply(lambda row: len(str(row['ref'])[len(str(row['alt'])):]) == deletion_length, axis=1))]
+                this_df = data_tmp[(data_tmp["pos_numeric"] == int(variant.start)) &
+                                   (data_tmp["ref"].astype(str).str.len() == deletion_length) &
+                                   (data_tmp["alt"].astype(str) == str(variant.alt))]
 
             else:
                 self.log.info(f"variant type not supported by gnomAD: {variant.definition}")
