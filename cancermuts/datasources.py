@@ -58,11 +58,13 @@ import gget
 from io import StringIO
 import xmltodict
 import fcntl
+from bioutils.assemblies import make_name_ac_map
+from hgvs import parser, normalizer, validator
+from hgvs.dataproviders import uta
+
 
 if sys.version_info[0] >= 3:
     unicode = str
-
-aa = r"[ACDEFGHIKLMNPQRSTVWY]"
 
 class Source(object):
     """Base class for implementing data sources.
@@ -111,11 +113,11 @@ class DynamicSource(Source, object):
 
 class DynamicMutationSource(DynamicSource, object):
 
+    aa = r"[ACDEFGHIKLMNPQRSTVWY]"
     _mutation_regexps = {"missense": re.compile(rf"^(?:p\.)?{aa}\d+{aa}$"),
                          "deletion": re.compile(rf"^(?:p\.)?({aa}\d+del|{aa}\d+_{aa}\d+del)$"),
                          "insertion": re.compile(rf"^(?:p\.)?({aa}\d+_{aa}\d+ins{aa}+|{aa}\d+(?:_{aa}\d+)?dup)$"),
                          "delins": re.compile(rf"^(?:p\.)?({aa}\d+delins{aa}+|{aa}\d+_{aa}\d+delins{aa}+)$")}
-
     def _mutation_type(self, mutation):
         matches = [variant_type for variant_type, pattern in self._mutation_regexps.items()
                    if pattern.fullmatch(mutation)]
@@ -126,7 +128,7 @@ class DynamicMutationSource(DynamicSource, object):
         return matches[0]
 
     def _protein_variant_parser(self, mutation, sequence):
-        match = re.fullmatch(rf"p\.({aa})(\d+)({aa})", mutation)
+        match = re.fullmatch(rf"p\.({self.aa})(\d+)({self.aa})", mutation)
         if match:
             ref, pos, alt = match.groups()
             if ref == alt:
@@ -134,13 +136,13 @@ class DynamicMutationSource(DynamicSource, object):
             pos = int(pos)
             return ProteinVariant(start=pos, end=pos, ref=ref, alt=alt, sources=[self])
 
-        match = re.fullmatch(rf"p\.({aa})(\d+)del", mutation)
+        match = re.fullmatch(rf"p\.({self.aa})(\d+)del", mutation)
         if match:
             ref, pos = match.groups()
             pos = int(pos)
             return ProteinVariant(start=pos, end=pos, ref=ref, alt="", sources=[self])
 
-        match = re.fullmatch(rf"p\.({aa})(\d+)_({aa})(\d+)del", mutation)
+        match = re.fullmatch(rf"p\.({self.aa})(\d+)_({self.aa})(\d+)del", mutation)
         if match:
             start_ref, start, end_ref, end = match.groups()
             start = int(start)
@@ -149,7 +151,7 @@ class DynamicMutationSource(DynamicSource, object):
             ref = start_ref + middle_ref + end_ref
             return ProteinVariant(start=start, end=end, ref=ref, alt="", sources=[self])
 
-        match = re.fullmatch(rf"p\.({aa})(\d+)_({aa})(\d+)ins({aa}+)", mutation)
+        match = re.fullmatch(rf"p\.({self.aa})(\d+)_({self.aa})(\d+)ins({self.aa}+)", mutation)
         if match:
             left_ref, start, right_ref, end, inserted = match.groups()
             start = int(start)
@@ -158,7 +160,7 @@ class DynamicMutationSource(DynamicSource, object):
                 raise ValueError(f"Invalid insertion coordinates in {mutation}: positions must be adjacent")
             return ProteinVariant(start=start, end=start, ref=left_ref, alt=left_ref + inserted + right_ref, sources=[self])
 
-        match = re.fullmatch(rf"p\.({aa})(\d+)(?:_({aa})(\d+))?dup", mutation)
+        match = re.fullmatch(rf"p\.({self.aa})(\d+)(?:_({self.aa})(\d+))?dup", mutation)
         if match:
             start_ref, start, end_ref, end = match.groups()
             start = int(start)
@@ -180,13 +182,13 @@ class DynamicMutationSource(DynamicSource, object):
 
             return ProteinVariant(start=end, end=end, ref=left_ref, alt=left_ref + duplicated + right_ref, sources=[self])
 
-        match = re.fullmatch(rf"p\.({aa})(\d+)delins({aa}+)", mutation)
+        match = re.fullmatch(rf"p\.({self.aa})(\d+)delins({self.aa}+)", mutation)
         if match:
             ref, pos, alt = match.groups()
             pos = int(pos)
             return ProteinVariant(start=pos, end=pos, ref=ref, alt=alt, sources=[self])
 
-        match = re.fullmatch(rf"p\.({aa})(\d+)_({aa})(\d+)delins({aa}+)", mutation)
+        match = re.fullmatch(rf"p\.({self.aa})(\d+)_({self.aa})(\d+)delins({self.aa}+)", mutation)
         if match:
             start_ref, start, end_ref, end, alt = match.groups()
             start = int(start)
@@ -197,21 +199,21 @@ class DynamicMutationSource(DynamicSource, object):
 
         raise ValueError(f"Unsupported protein mutation format: {mutation}")
 
-    def _validate_variant_types(self, variant_types):
+    def _valid_variant_types(self, variant_types):
         if variant_types is None:
-            raise ValueError("variant_types cannot be None")
-        elif isinstance(variant_types, str):
+            return False
+        if isinstance(variant_types, str):
             variant_types = (variant_types,)
+        try:
+            variant_types = tuple(variant_types)
+        except TypeError:
+            return False
+        return (bool(variant_types) and set(variant_types).issubset(ProteinVariant.supported_variant_types))
 
-        variant_types = tuple(dict.fromkeys(variant_types))
-        if len(variant_types) == 0:
-            raise ValueError("variant_types cannot be empty")
-
-        invalid_variant_types = set(variant_types) - ProteinVariant.supported_variant_types
-        if invalid_variant_types:
-            raise ValueError(f"Invalid variant type(s): {invalid_variant_types}")
-
-        return variant_types
+    def _normalize_variant_types(self, variant_types):
+        if isinstance(variant_types, str):
+            variant_types = (variant_types,)
+        return tuple(dict.fromkeys(variant_types))
 
 class StaticSource(Source, object):
     """Base class for implementing static data sources. Static data sources
@@ -473,7 +475,10 @@ class cBioPortal(DynamicMutationSource, object):
         self._get_cancer_types()
         self._get_cancer_studies(cancer_studies)
         self._get_molecular_profiles()
-        self._hgvsg_cache = {}
+        self.hdp = uta.connect()
+        self.hp = parser.Parser()
+        self.hn = normalizer.Normalizer(self.hdp)
+        self.hv = validator.Validator(self.hdp)
 
     @property
     def cancer_types(self):
@@ -483,30 +488,44 @@ class cBioPortal(DynamicMutationSource, object):
     def cancer_studies(self):
         return self._cache_cancer_studies
 
-    def _get_hgvsg(self, chrom, start, end, ref, alt, genome_build):
-        key = (genome_build, chrom, start, end, ref, alt)
+    def _cbioportal_to_hgvsg(self, chrom, start, end, ref, alt, chrom_map):
+        chrom = str(chrom).removeprefix("chr")
+        ac = chrom_map[chrom]
+        start = int(start)
+        end = int(end)
+        ref = ref.upper()
+        alt = alt.upper()
 
-        if key in self._hgvsg_cache:
-            return self._hgvsg_cache[key]
+        # SNV
+        if len(ref) == 1 and len(alt) == 1 and ref != "-" and alt != "-":
+            raw = f"{ac}:g.{start}{ref}>{alt}"
 
-        if genome_build in ("GRCh37", "hg19"):
-            base_url = "https://www.genomenexus.org"
-        elif genome_build in ("GRCh38", "hg38"):
-            base_url = "https://grch38.genomenexus.org"
+        # cBioPortal/MAF deletion
+        elif ref != "-" and alt == "-":
+            raw = (f"{ac}:g.{start}del" if start == end else f"{ac}:g.{start}_{end}del")
 
-        variant = f"{chrom},{start},{end},{ref},{alt}"
-        try:
-            hgvsg = rq.get(f"{base_url}/annotation/genomic/{variant}").json().get("hgvsg")
-        except Exception as e:
-            self.log.error(f"failed retrieving HGVSg from Genome Nexus for {variant}")
-            hgvsg = None
+        # cBioPortal/MAF insertion
+        elif ref == "-" and alt != "-":
+            raw = f"{ac}:g.{start}_{end}ins{alt}"
 
-        self._hgvsg_cache[key] = hgvsg
-        return hgvsg
+        # MNV / complex replacement
+        else:
+            raw = (f"{ac}:g.{start}delins{alt}" if start == end else f"{ac}:g.{start}_{end}delins{alt}")
+
+        var = self.hp.parse_hgvs_variant(raw)
+        var = self.hn.normalize(var)
+        self.hv.validate(var)
+
+        #normalise for compatibility with GenomicMutation
+        normalized_change = str(var).split(":g.", 1)[1]
+        return f"{chrom}:g.{normalized_change}"
 
     def add_mutations(self, sequence, metadata=[], variant_types=("missense",)):
         _cBioPortal_supported_metadata = ['cancer_type', 'cancer_study', 'genomic_coordinates', 'genomic_mutations']
-        variant_types = self._validate_variant_types(variant_types)
+        if not self._valid_variant_types(variant_types):
+            raise ValueError(f"Invalid variant_types: {variant_types}")
+        variant_types = self._normalize_variant_types(variant_types)
+
         if not sequence.is_canonical:
             raise UnexpectedIsoformError("cBioPortal mutation annotation only supports canonical isoforms. Please use a Sequence object for a canonical isoform")
 
@@ -659,6 +678,9 @@ class cBioPortal(DynamicMutationSource, object):
             out_metadata['genomic_mutations'] = []
             do_genomic_mutations = True
 
+            chrom_maps = {"GRCh37": make_name_ac_map("GRCh37.p13", primary_only=True),
+                          "GRCh38": make_name_ac_map("GRCh38.p14", primary_only=True),}
+
         for cancer_study in self._cache_cancer_studies.iterrows():
 
             cancer_study = cancer_study[1]
@@ -738,10 +760,17 @@ class cBioPortal(DynamicMutationSource, object):
                             out_metadata["genomic_coordinates"].append(gd)
 
                         if do_genomic_mutations:
-                            hgvsg = self._get_hgvsg(chrom=chrom, start=start, end=end, ref=ref, alt=alt, genome_build=row["ncbiBuild"])
-                            gm = [genome_build, hgvsg] if hgvsg is not None else None
-                            out_metadata["genomic_mutations"].append(gm)
+                            chrom_map = chrom_maps[row["ncbiBuild"]]
+                            try:
+                                hgvsg = self._cbioportal_to_hgvsg(chrom=chrom, start=start, end=end, ref=ref, alt=alt, chrom_map=chrom_map)
+                                gm = [genome_build, hgvsg]
 
+                            except Exception as e:
+                                self.log.warning(f"Could not convert cBioPortal variant "
+                                                 f"{chrom}:{start}-{end} {ref}>{alt} to HGVSg: {e}")
+                                gm = None
+
+                            out_metadata["genomic_mutations"].append(gm)
         return mutations, out_metadata
 
 class ClinVar(DynamicMutationSource, object):
@@ -1400,7 +1429,9 @@ class ClinVar(DynamicMutationSource, object):
         return genomic_mutations
 
     def _get_available_muts_and_md(self, sequence, clinvar_ids, metadata=[], cross_check=False, variant_types=("missense",)):
-        variant_types = self._validate_variant_types(variant_types)
+        if not self._valid_variant_types(variant_types):
+            raise ValueError(f"Invalid variant_types: {variant_types}")
+        variant_types = self._normalize_variant_types(variant_types)
 
         # Initial object assignment:
         clinvar_variants = {}
@@ -1693,7 +1724,10 @@ class ClinVar(DynamicMutationSource, object):
                 self.log.error(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
                 raise TypeError(f"Missing 'refseq' alias for gene {sequence.gene_id}; cannot parse ClinVar variants.")
             refseq = sequence.aliases["refseq"]
-            variant_types = self._validate_variant_types(variant_types)
+            if not self._valid_variant_types(variant_types):
+                raise ValueError(f"Invalid variant_types: {variant_types}")
+            variant_types = self._normalize_variant_types(variant_types)
+
             queries = {"missense":  ('("missense variant"[molecular consequence] OR '
                                      '"SO:0001583"[molecular consequence])'),
                         "deletion": ('("inframe deletion"[molecular consequence] OR '
@@ -1853,7 +1887,10 @@ class COSMIC(DynamicMutationSource, object):
                        variant_types=("missense",)):
 
         mutations = []
-        variant_types = self._validate_variant_types(variant_types)
+        if not self._valid_variant_types(variant_types):
+            raise ValueError(f"Invalid variant_types: {variant_types}")
+        variant_types = self._normalize_variant_types(variant_types)
+
         out_metadata = dict(list(zip(metadata, [list() for i in range(len(metadata))])))
 
         do_cancer_type = False
@@ -1990,7 +2027,9 @@ class COSMIC(DynamicMutationSource, object):
                     variant_types=("missense",)):
 
         _cosmic_supported_metadata = ['cancer_type', 'genomic_coordinates', 'genomic_mutations', 'cancer_site', 'cancer_histology']
-        variant_types = self._validate_variant_types(variant_types)
+        if not self._valid_variant_types(variant_types):
+            raise ValueError(f"Invalid variant_types: {variant_types}")
+        variant_types = self._normalize_variant_types(variant_types)
 
         for md in metadata:
             if md not in _cosmic_supported_metadata:
@@ -3137,10 +3176,29 @@ class gnomAD(DynamicSource, object):
         self._get_metadata(mutation, gene_id, 'gnomad_popmax_genome_allele_frequency')
 
     def _edit_variant_id(self, row):
-        split_id = row['variant_id'].split('-')
-        if len(split_id[2]) > 1 or len(split_id[3]) > 1:
-            split_id[2] = '?'
-        return "-".join(split_id)
+        chrom = str(row["chrom"]).removeprefix("chr")
+        pos = int(row["pos"])
+        ref = str(row["ref"]).upper()
+        alt = str(row["alt"]).upper()
+
+        # SNV
+        if len(ref) == 1 and len(alt) == 1:
+            return f"{chrom}-{pos}-{ref}-{alt}"
+
+        # Insertion: REF is the anchor and ALT is anchor + inserted sequence
+        if len(ref) == 1 and alt.startswith(ref):
+            inserted_sequence = alt[len(ref):]
+            return f"{chrom}-{pos}-?-?{inserted_sequence}"
+
+        # Deletion: ALT is the anchor and REF is anchor + deleted sequence
+        if len(alt) == 1 and ref.startswith(alt):
+            masked_ref = "?" * len(ref)
+            return f"{chrom}-{pos}-{masked_ref}-?"
+
+        # Delins / complex replacement
+        masked_ref = "?" * len(ref)
+        
+        return f"{chrom}-{pos}-{masked_ref}-{alt}"
 
     def _get_metadata(self, mutation, gene_id, md_type):
 
@@ -3183,63 +3241,40 @@ class gnomAD(DynamicSource, object):
             self.log.info(f"data for gene {gene_id} already in cache")
 
         for variant in mutation.metadata['genomic_mutations']:
-            if type(variant) is not GenomicMutation:
+            if not isinstance(variant, GenomicMutation) or variant.mutation_type is None:
                 continue
             try:
                 variant = variant.as_assembly(ref_assembly)
             except TypeError as e:
                 self.log.error(str(e))
                 continue
-            
-            data_tmp = data.copy()
-            data_tmp = data_tmp[data_tmp['chrom'].astype(str).str.replace("chr", "", regex=False) == str(variant.chr).replace("chr", "")].copy()
-            data_tmp['pos_numeric'] = pd.to_numeric(data_tmp['pos'], errors='coerce')
 
-            if variant.mutation_type == "snv":
-                v_str = variant.get_value_str(fmt='gnomad')
-                this_df = data[data['variant_id'] == v_str]
-
-            elif variant.mutation_type == "insertion":
-                v_str = variant.definition
-                this_df = data_tmp[(data_tmp['pos_numeric'] == int(variant.start)) &
-                          (data_tmp['ref'].astype(str).str.len() == 1) &
-                          (data_tmp.apply(lambda row: str(row['alt']) == str(row['ref']) + str(variant.alt), axis=1))]
-
-            # in VCF deletions are anchored to previous nucleotide base
-            elif variant.mutation_type == "deletion":
-                v_str = variant.definition
-                deletion_length = int(variant.end) - int(variant.start) + 1
-                this_df = data_tmp[(data_tmp['pos_numeric'] == int(variant.start) - 1) &
-                                   (data_tmp.apply(lambda row: len(str(row['ref'])) - len(str(row['alt'])) == deletion_length, axis=1))]
- 
-            # delins are not anchored to previous nucleotide base 
-            elif variant.mutation_type == "delins":
-                v_str = variant.definition
-                deletion_length = int(variant.end) - int(variant.start) + 1
-
-                this_df = data_tmp[(data_tmp["pos_numeric"] == int(variant.start)) &
-                                   (data_tmp["ref"].astype(str).str.len() == deletion_length) &
-                                   (data_tmp["alt"].astype(str) == str(variant.alt))]
-
-            else:
-                self.log.info(f"variant type not supported by gnomAD: {variant.definition}")
+            v_str = variant.get_value_str(fmt="gnomad")
+            if v_str is None:
+                self.log.info(f"variant type not supported by gnomAD:{variant.definition}")
                 continue
+
+            this_df = data[data["edited_variant_id"] == v_str]
 
             if len(this_df) == 0:
                 af = None
                 self.log.info("no entry found for %s" % v_str)
+
             elif len(this_df) > 1:
-                self.log.warning("more than one entry for %s! Skipping" % v_str)
                 af = None
-            elif len(this_df) == 1:
-                if pd.isna(this_df[exac_key[md_type]].values[0]):
+                self.log.warning("more than one entry for %s! Skipping" % v_str)
+
+            else:
+                af = this_df[exac_key[md_type]].values[0]
+                if pd.isna(af):
                     af = None
                     self.log.info("nan entry found for %s" % v_str)
                 else:
-                    af = this_df[exac_key[md_type]].values[0]
                     self.log.info("entry found for %s" % v_str)
+
             if af is not None:
                 mutation.metadata[md_type].append(metadata_classes[md_type](self, af))
+
 
     def _get_gnomad_data(self, gene_id, reference_genome, dataset):
         headers = { "content-type": "application/json" }

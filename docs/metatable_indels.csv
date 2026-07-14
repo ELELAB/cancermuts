@@ -182,7 +182,7 @@
 180,181,Q,QHLQL,ClinVar,,,,,,,,,,,,,,,,"hg19,17:56774185-56774193, hg38,17:58696824-58696832","hg19,17:g.56774185_56774193dup, hg38,17:g.58696824_58696832dup",,,,,,,,3312384,Uncertain significance,Hereditary cancer-predisposing syndrome,1,,,,,,
 181,182,L,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 182,183,I,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-183,184,A,,cBioPortal,,,,,,,,,,,,,,es_dsrct_msk_2023,Ewing Sarcoma,"hg19,17:56774198-56774200","hg19,17:g.56774198_56774200del",,,,,,,,,,,,,,,,,
+183,184,A,,cBioPortal,,,,,,,,,,,,,,es_dsrct_msk_2023,Ewing Sarcoma,"hg19,17:56774198-56774200","hg19,17:g.56774200_56774202del",,,,,,,,,,,,,,,,,
 184,185,E,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 185,186,K,KKH,ClinVar,,,,,,,,,,,,,,,,"hg19,17:56774205-56774207, hg38,17:58696844-58696846","hg19,17:g.56774205_56774207dup, hg38,17:g.58696844_58696846dup",,,,,,,,482173,Uncertain significance,"Hereditary cancer-predisposing syndrome;not provided;Breast-ovarian cancer, familial, susceptibility to, 3;Fanconi anemia complementation group O",2,,,,,,
 186,187,H,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,

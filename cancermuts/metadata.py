@@ -140,21 +140,16 @@ class GenomicMutation(Metadata):
     description = "Genomic mutation"
     header = "genomic_mutation"
 
-    _mut_snv_prog = re.compile(r'^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?P<ref>[ACTG])>(?P<alt>[ACTG])$')
-    _mut_delins_prog = re.compile(r'^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?:_(?P<end>[0-9]+))?delins(?P<alt>[ACTG]+)$')
-    _mut_inv_prog = re.compile(r'^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)_(?P<end>[0-9]+)inv$')
-    _mut_del_prog = re.compile(r'^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?:_(?P<end>[0-9]+))?del$')
-    _mut_ins_prog = re.compile(r'^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)_(?P<end>[0-9]+)ins(?P<alt>[ACTG]+)$')
-    _mut_dup_prog = re.compile(r'^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?:_(?P<end>[0-9]+))?dup$')
-    _mut_repeat_prog = re.compile(r'^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?:_(?P<end>[0-9]+))?(?P<repeat_unit>[ACTG]+)\[(?P<repeat_count>[0-9]+)\]$')
+    mutation_type = None
+    _pattern = None
+    _mutation_classes = ()
 
-    @staticmethod
-    def _normalise_chr(chromosome):
-        if chromosome == '23':
-            return 'X'
-        elif chromosome == '24':
-            return 'Y'
-        return chromosome
+    def __new__(cls, source, genome_build, definition):
+        if cls is GenomicMutation and isinstance(definition, str):
+            for mutation_class in cls._mutation_classes:
+                if mutation_class._pattern.fullmatch(definition):
+                    return object.__new__(mutation_class)
+        return object.__new__(cls)
 
     @logger_init
     def __init__(self, source, genome_build, definition):
@@ -168,77 +163,41 @@ class GenomicMutation(Metadata):
         self.end = None
         self.ref = None
         self.alt = None
-        self.mutation_type = None
-        self._parse_definition(definition)
 
-    def _set_common_fields(self, tokens, mutation_type):
-        self.mutation_type = mutation_type
+        if type(self) is GenomicMutation:
+            self.log.info(f"unsupported genomic mutation format: {definition}")
+            return
+
+        match = self._pattern.fullmatch(definition)
+        tokens = match.groupdict()
+
         self.chr = self._normalise_chr(tokens["chr"])
         self.start = int(tokens["start"])
-        self.end = int(tokens["end"]) if tokens.get("end") is not None else self.start
-        self.ref = tokens.get("ref")
-        self.alt = tokens.get("alt")
+        self.end = ( int(tokens["end"]) if tokens.get("end") is not None
+                                        else self.start)
 
-    def _position_string(self):
-        if self.start == self.end:
-            return str(self.start)
-        else:
-            return f"{self.start}_{self.end}"
+        self._set_specific_fields(tokens)
+        self.definition = self._build_definition(self.chr, self.start, self.end)
 
-    def _parse_definition(self, definition):
-        match = self._mut_snv_prog.match(definition)
-        if match:
-            self._set_common_fields(match.groupdict(), "snv")
-            self.definition = f"{self.chr}:g.{self.start}{self.ref}>{self.alt}"
-            return
 
-        match = self._mut_delins_prog.match(definition)
-        if match:
-            self._set_common_fields(match.groupdict(), "delins")
-            self.definition = f"{self.chr}:g.{self._position_string()}delins{self.alt}"
-            return
+    @staticmethod
+    def _normalise_chr(chromosome):
+        if chromosome == "23":
+            return "X"
+        if chromosome == "24":
+            return "Y"
+        return chromosome
 
-        match = self._mut_inv_prog.match(definition)
-        if match:
-            self._set_common_fields(match.groupdict(), "inversion")
-            self.definition = f"{self.chr}:g.{self._position_string()}inv"
-            return
+    @staticmethod
+    def _position_string(start, end):
+        if start == end:
+            return str(start)
+        return f"{start}_{end}"
 
-        match = self._mut_ins_prog.match(definition)
-        if match:
-            self._set_common_fields(match.groupdict(), "insertion")
-            self.definition = f"{self.chr}:g.{self.start}_{self.end}ins{self.alt}"
-            return
-
-        match = self._mut_dup_prog.match(definition)
-        if match:
-            self._set_common_fields(match.groupdict(), "duplication")
-            self.definition = f"{self.chr}:g.{self._position_string()}dup"
-            return
-
-        match = self._mut_del_prog.match(definition)
-        if match:
-            self._set_common_fields(match.groupdict(), "deletion")
-            self.definition = f"{self.chr}:g.{self._position_string()}del"
-            return
-
-        match = self._mut_repeat_prog.match(definition)
-        if match:
-            tokens = match.groupdict()
-            tokens["alt"] = f"{tokens['repeat_unit']}[{tokens['repeat_count']}]"
-            self._set_common_fields(tokens, "repeat")
-            self.definition = f"{self.chr}:g.{self._position_string()}{self.alt}"
-            return
-
-        self.log.info(f"unsupported genomic mutation format: {definition}")
-
-    def get_value_str(self, fmt='csv'):
-        if fmt == 'csv':
+    def get_value_str(self, fmt="csv"):
+        if fmt == "csv":
             return f"{self.genome_build},{self.definition}"
-        if fmt == 'gnomad':
-            if self.mutation_type == "snv":
-                return f"{self.chr}-{self.start}-{self.ref}-{self.alt}"
-            return None
+        return None
 
     def get_coord(self):
         return self.start
@@ -247,73 +206,56 @@ class GenomicMutation(Metadata):
         if self.genome_build == target_build:
             return self
 
-        if self.genome_build == 'hg38' and target_build == 'hg19':
+        if self.mutation_type is None:
+            raise TypeError("Cannot convert an unsupported genomic mutation")
+
+        if self.genome_build == "hg38" and target_build == "hg19":
             lo = lo_hg38_hg19
-        elif self.genome_build == 'hg19' and target_build == 'hg38':
+        elif self.genome_build == "hg19" and target_build == "hg38":
             lo = lo_hg19_hg38
         else:
             raise TypeError
 
-        converted_coords_start = lo.convert_coordinate('chr%s' % self.chr, int(self.start))
-        converted_coords_end = lo.convert_coordinate('chr%s' % self.chr, int(self.end))
+        converted_coords_start = lo.convert_coordinate(f"chr{self.chr}", int(self.start))
+        converted_coords_end = lo.convert_coordinate(f"chr{self.chr}", int(self.end))
 
         if len(converted_coords_start) != 1:
-            raise TypeError("Could not convert genomic coordinates (liftOver returned %d coords)" % len(converted_coords_start))
+            raise TypeError("Could not convert genomic coordinates "
+                           f"(liftOver returned {len(converted_coords_start)} start coordinates)")
+
         if len(converted_coords_end) != 1:
-            raise TypeError("Could not convert genomic coordinates (liftOver returned %d coords)" % len(converted_coords_end))
+            raise TypeError("Could not convert genomic coordinates "
+                           f"(liftOver returned {len(converted_coords_end)} end coordinates)")
 
         converted_start = converted_coords_start[0][1]
         converted_end = converted_coords_end[0][1]
+        definition = self._build_definition(self.chr, converted_start, converted_end,)
 
-        if converted_start == converted_end:
-            position = str(converted_start)
-        else:
-            position = f"{converted_start}_{converted_end}"
-
-        if self.mutation_type == "snv":
-            definition = f"{self.chr}:g.{converted_start}{self.ref}>{self.alt}"
-
-        elif self.mutation_type == "delins":
-            definition = f"{self.chr}:g.{position}delins{self.alt}"
-
-        elif self.mutation_type == "deletion":
-            definition = f"{self.chr}:g.{position}del"
-
-        elif self.mutation_type == "insertion":
-            if abs(converted_end - converted_start) != 1:
-                raise TypeError("Could not convert insertion coordinates: converted positions are not adjacent")
-            definition = f"{self.chr}:g.{converted_start}_{converted_end}ins{self.alt}"
-
-        elif self.mutation_type == "duplication":
-            definition = f"{self.chr}:g.{position}dup"
-
-        elif self.mutation_type == "inversion":
-            definition = f"{self.chr}:g.{position}inv"
-
-        elif self.mutation_type == "repeat":
-            definition = f"{self.chr}:g.{position}{self.alt}"
-
-        else:
-            raise TypeError
-
-        return GenomicMutation(self.source, target_build, definition)
+        return type(self)(self.source, target_build, definition,)
 
     def as_hg19(self):
-        return self._as_build('hg19')
+        return self._as_build("hg19")
 
     def as_hg38(self):
-        return self._as_build('hg38')
+        return self._as_build("hg38")
 
     def as_assembly(self, assembly):
-        if assembly == 'hg19' or assembly == 'GRCh37':
+        if assembly in ("hg19", "GRCh37"):
             return self.as_hg19()
-        elif assembly == 'hg38' or assembly == 'GRCh38':
+
+        if assembly in ("hg38", "GRCh38"):
             return self.as_hg38()
-        else:
-            raise TypeError
+        raise TypeError
+
+    def _set_specific_fields(self, tokens):
+        return None
+
+    def _build_definition(self, chrom, start, end):
+        raise NotImplementedError
 
     def __repr__(self):
-        return "<GenomicMutation %s from %s>" % (self.get_value_str(), self.source.name)
+        return (f"<GenomicMutation {self.get_value_str()} "
+                f"from {self.source.name}>")
 
     def __str__(self):
         return self.__repr__()
@@ -325,6 +267,113 @@ class GenomicMutation(Metadata):
 
     def __hash__(self):
         return hash((self.source, self.definition))
+
+class GenomicSNV(GenomicMutation):
+
+    mutation_type = "snv"
+    _pattern = re.compile(r"^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?P<ref>[ACTG])>(?P<alt>[ACTG])$")
+
+    def _set_specific_fields(self, tokens):
+        self.ref = tokens["ref"]
+        self.alt = tokens["alt"]
+
+    def _build_definition(self, chrom, start, end):
+        return f"{chrom}:g.{start}{self.ref}>{self.alt}"
+
+    def get_value_str(self, fmt="csv"):
+        if fmt == "gnomad":
+            return f"{self.chr}-{self.start}-{self.ref}-{self.alt}"
+        return super(GenomicSNV, self).get_value_str(fmt)
+
+class GenomicDelins(GenomicMutation):
+
+    mutation_type = "delins"
+    _pattern = re.compile(r"^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?:_(?P<end>[0-9]+))?delins(?P<alt>[ACTG]+)$")
+
+    def _set_specific_fields(self, tokens):
+        self.alt = tokens["alt"]
+
+    def _build_definition(self, chrom, start, end):
+        return f"{chrom}:g.{self._position_string(start, end)}delins{self.alt}"
+
+    def get_value_str(self, fmt="csv"):
+        if fmt == "gnomad":
+            deletion_length = self.end - self.start + 1
+            masked_ref = "?" * deletion_length
+
+            return f"{self.chr}-{self.start}-{masked_ref}-{self.alt}"
+
+        return super().get_value_str(fmt)
+
+class GenomicInversion(GenomicMutation):
+
+    mutation_type = "inversion"
+    _pattern = re.compile(r"^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)_(?P<end>[0-9]+)inv$")
+
+    def _build_definition(self, chrom, start, end):
+        return f"{chrom}:g.{self._position_string(start, end)}inv"
+
+class GenomicDeletion(GenomicMutation):
+
+    mutation_type = "deletion"
+    _pattern = re.compile(r"^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?:_(?P<end>[0-9]+))?del$")
+
+    def _build_definition(self, chrom, start, end):
+        return f"{chrom}:g.{self._position_string(start, end)}del"
+
+    def get_value_str(self, fmt="csv"):
+        if fmt == "gnomad":
+            deletion_length = self.end - self.start + 1
+            masked_ref = "?" * (deletion_length + 1)
+
+            return f"{self.chr}-{self.start - 1}-{masked_ref}-?"
+
+        return super().get_value_str(fmt)
+
+class GenomicInsertion(GenomicMutation):
+
+    mutation_type = "insertion"
+    _pattern = re.compile(r"^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)_(?P<end>[0-9]+)ins(?P<alt>[ACTG]+)$")
+
+    def _set_specific_fields(self, tokens):
+        self.alt = tokens["alt"]
+
+    def _build_definition(self, chrom, start, end):
+        return f"{chrom}:g.{start}_{end}ins{self.alt}"
+
+    def get_value_str(self, fmt="csv"):
+        if fmt == "gnomad":
+            return f"{self.chr}-{self.start}-?-?{self.alt}"
+        return super().get_value_str(fmt)
+
+class GenomicDuplication(GenomicMutation):
+
+    mutation_type = "duplication"
+    _pattern = re.compile(r"^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?:_(?P<end>[0-9]+))?dup$")
+
+    def _build_definition(self, chrom, start, end):
+        return f"{chrom}:g.{self._position_string(start, end)}dup"
+
+class GenomicRepeat(GenomicMutation):
+
+    mutation_type = "repeat"
+    _pattern = re.compile(r"^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?:_(?P<end>[0-9]+))?(?P<repeat_unit>[ACTG]+)\[(?P<repeat_count>[0-9]+)\]$")
+
+    def _set_specific_fields(self, tokens):
+        self.repeat_unit = tokens["repeat_unit"]
+        self.repeat_count = int(tokens["repeat_count"])
+        self.alt = f"{self.repeat_unit}[{self.repeat_count}]"
+
+    def _build_definition(self, chrom, start, end):
+        return f"{chrom}:g.{self._position_string(start, end)}{self.alt}"
+
+GenomicMutation._mutation_classes = (GenomicSNV,
+                                     GenomicDelins,
+                                     GenomicInversion,
+                                     GenomicInsertion,
+                                     GenomicDuplication,
+                                     GenomicDeletion,
+                                     GenomicRepeat)
 
 class Revel(Metadata):
 
