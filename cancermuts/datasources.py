@@ -632,6 +632,10 @@ class ClinVar(DynamicSource, object):
         'clinvar_germline_classification', 'clinvar_germline_condition', 'clinvar_germline_review_status', 'genomic_mutations',
         'clinvar_variant_id', 'genomic_coordinates', 'clinvar_oncogenicity_condition', 'clinvar_oncogenicity_classification',
         'clinvar_oncogenicity_review_status', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status', 'clinvar_clinical_impact_classification']
+
+    _supported_genome_builds = { "GRCh37" : "hg19",
+                                 "GRCh38" : "hg38" }
+
     @logger_init
     def __init__(self, ncbi_requests_per_second=2, ncbi_rate_limit_lock_file="/tmp/cancermuts_ncbi_rate_limit.lock", ncbi_api_key=None):
         description = "ClinVar mutation database"
@@ -1228,6 +1232,7 @@ class ClinVar(DynamicSource, object):
         """
         Parse ClinVar-style annotation strings into GenomicMutation objects.
 
+        - Filters out unsupported genome builds
         - Converts genome builds (GRCh38 → hg38, GRCh37 → hg19)
         - Handles both SNVs and indels
 
@@ -1246,11 +1251,11 @@ class ClinVar(DynamicSource, object):
             try:
                 genome_build, hgvs = ann.split(",")
 
-                # Normalize genome build
-                if genome_build == "GRCh38":
-                    genome_build = "hg38"
-                elif genome_build == "GRCh37":
-                    genome_build = "hg19"
+                try:
+                    genome_build = self._supported_genome_builds[genome_build]
+                except KeyError:
+                    self.log.warning(f"genomic variant with genome build {genome_build} was skipped")
+                    continue
 
                 # Extract just the part after 'NC_...:g.' (e.g., "123A>G" or "123_124delinsAA")
                 hgvs_match = re.search(r"NC_0*(\d+)\.\d+:g\.(.+)", hgvs)
