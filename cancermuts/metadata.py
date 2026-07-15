@@ -145,10 +145,14 @@ class GenomicMutation(Metadata):
     _mutation_classes = ()
 
     def __new__(cls, source, genome_build, definition):
+    # GenomicMutation acts as a factory: when the class is
+    # instantiated, return the registered mutation subclass whose
+    # pattern matches the provided definition.
         if cls is GenomicMutation and isinstance(definition, str):
             for mutation_class in cls._mutation_classes:
                 if mutation_class._pattern.fullmatch(definition):
                     return object.__new__(mutation_class)
+        # Used when no pattern matches or a subclass is instantiated directly.
         return object.__new__(cls)
 
     @logger_init
@@ -165,7 +169,7 @@ class GenomicMutation(Metadata):
         self.alt = None
 
         if type(self) is GenomicMutation:
-            self.log.info(f"unsupported genomic mutation format: {definition}")
+            self.log.warning(f"unsupported genomic mutation format: {definition}")
             return
 
         match = self._pattern.fullmatch(definition)

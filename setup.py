@@ -30,5 +30,8 @@ setup(name='cancermuts',
                         'pandas',
                         'parse',
                         'urllib3',
-                        'future']
+                        'future',
+                        'hgvs',
+                        'bioutils'
+                        ]
      )

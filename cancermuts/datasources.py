@@ -208,7 +208,7 @@ class DynamicMutationSource(DynamicSource, object):
             variant_types = tuple(variant_types)
         except TypeError:
             return False
-        return (bool(variant_types) and set(variant_types).issubset(ProteinVariant.supported_variant_types))
+        return len(variant_types) != 0 and set(variant_types).issubset(ProteinVariant.supported_variant_types)
 
     def _normalize_variant_types(self, variant_types):
         if isinstance(variant_types, str):
@@ -475,10 +475,10 @@ class cBioPortal(DynamicMutationSource, object):
         self._get_cancer_types()
         self._get_cancer_studies(cancer_studies)
         self._get_molecular_profiles()
-        self.hdp = uta.connect()
-        self.hp = parser.Parser()
-        self.hn = normalizer.Normalizer(self.hdp)
-        self.hv = validator.Validator(self.hdp)
+        self._hgvs_data_provider = uta.connect()
+        self._hgvs_parser = parser.Parser()
+        self._hgvs_normalizer = normalizer.Normalizer(self._hgvs_data_provider)
+        self._hgvs_validator = validator.Validator(self._hgvs_data_provider)
 
     @property
     def cancer_types(self):
@@ -512,9 +512,9 @@ class cBioPortal(DynamicMutationSource, object):
         else:
             raw = (f"{ac}:g.{start}delins{alt}" if start == end else f"{ac}:g.{start}_{end}delins{alt}")
 
-        var = self.hp.parse_hgvs_variant(raw)
-        var = self.hn.normalize(var)
-        self.hv.validate(var)
+        var = self._hgvs_parser.parse_hgvs_variant(raw)
+        var = self._hgvs_normalizer.normalize(var)
+        self._hgvs_validator.validate(var)
 
         #normalise for compatibility with GenomicMutation
         normalized_change = str(var).split(":g.", 1)[1]
@@ -3186,12 +3186,12 @@ class gnomAD(DynamicSource, object):
             return f"{chrom}-{pos}-{ref}-{alt}"
 
         # Insertion: REF is the anchor and ALT is anchor + inserted sequence
-        if len(ref) == 1 and alt.startswith(ref):
+        elif len(ref) == 1 and alt.startswith(ref) and len(alt) > 1:
             inserted_sequence = alt[len(ref):]
             return f"{chrom}-{pos}-?-?{inserted_sequence}"
 
         # Deletion: ALT is the anchor and REF is anchor + deleted sequence
-        if len(alt) == 1 and ref.startswith(alt):
+        elif len(alt) == 1 and ref.startswith(alt):
             masked_ref = "?" * len(ref)
             return f"{chrom}-{pos}-{masked_ref}-?"
 

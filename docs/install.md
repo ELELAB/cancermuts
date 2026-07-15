@@ -19,6 +19,8 @@ Furthermore, Cancermuts relies on a number of open source packages, such as:
 * parse
 * urllib3
 * future
+* hgvs
+* bioutils
 
 Please refer to the `setup.py` file in the distribution for an up to date
 list of requirements. It should be noted that requirements are installed
