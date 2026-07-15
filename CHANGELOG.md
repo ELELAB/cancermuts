@@ -10,6 +10,14 @@ The project uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 ### Changed
 ### Fixed
 
+## [2.0.1] - 2026-07-15
+
+### Added
+### Changed
+### Fixed
+
+- Changed ClinVar data source class to filter out genomic variants using unsupported genome assemblies
+
 ## [2.0.0] - 2026-06-16
 
 ### Added
