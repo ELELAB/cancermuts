@@ -20,9 +20,12 @@ The project uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 - Extended gnomAD annotation to supported insertions, deletions, and deletion-insertion variants.
 - Added an indel retrieval tutorial and corresponding example output.
 
-## Changed
+### Changed
 - Restricted REVEL annotation to missense variants.
 - Updated the documentation to describe indel retrieval and the variant_types argument.
+
+### Fixed
+- Fixed cBioPortal hg38 genomic mutations being incorrectly annotated as hg19.
 
 ## [2.0.1] - 2026-07-15
 
