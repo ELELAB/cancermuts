@@ -98,7 +98,7 @@ from cancermuts.table import Table
 
 tbl = Table()
 
-df = tbl.to_dataframe(seq)
+df = tbl.to_dataframe(seq, hgvsp=True)
 
 df.to_csv("metatable_indels.csv")
 

@@ -235,7 +235,7 @@ class Table:
                                                         'clinvar_clinical_impact_classification', 'clinvar_clinical_impact_condition', 'clinvar_clinical_impact_review_status'],
                     sequence_properties=['ptm_phosphorylation', 'ptm_methylation', 'ptm_ubiquitination', 'ptm_cleavage', 'ptm_nitrosylation',
                                          'ptm_acetylation', 'ptm_sumoylation', 'ptm_glycosylation',
-                                         'mobidb_disorder_propensity', 'linear_motif', 'structure']):
+                                         'mobidb_disorder_propensity', 'linear_motif', 'structure'], hgvsp=False):
 
         position_rows = []
 
@@ -285,12 +285,16 @@ class Table:
                   self.headers['wt'],
                   self.headers['mutated'],
                   self.headers['mut_sources']]
+        if hgvsp == True:
+            df['HGVSp'] = df['variant_hgvs']
+            header.append('HGVSp')
 
         for property_name in sequence_properties:
             header.append(self.headers[property_name])
             if property_name == 'ptm_glycosylation':
                 header.append('glycosylation_subtype')
         header.append(self.headers['ptm_sources'])
+
         for md in mutation_metadata:
             header.append(self.headers[md])
         return df[header]
