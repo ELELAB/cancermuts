@@ -3,7 +3,7 @@
 This tutorial will show an example showcasing the usage of Cancermuts on a
 well-known autophagy marker protein, MAP1LC3B (or more simply, LC3B).
 
-We will download associated cancer mutations from both cBioPortal and COSMIC
+We will download associated cancer mutations from cBioPortal, COSMIC and ClinVar
 and annotate proteins and mutations with all the data sources available in
 Cancermuts.
 
@@ -86,7 +86,7 @@ Python script available in the `docs` folder, called `tutorial.py`. In order
 to run it, you should have installed the Cancermuts package and activated the
 virtual environment in which it is installed (see Installation). This tutorial
 script follows the tutorial steps and has been written using a single cancer
-type as reference (colorectal cancer).
+type as reference (colorectal cancer) to retrieve missense variants.
 
 {% hint style='tip' %}
 Depending on the location of the files required by Cancermuts on your system,
@@ -132,6 +132,24 @@ $ python tutorial_alternative_isoforms.py
 ```
 It loads a specific AMBRA1 isoform (since LC3B lacks characterized non-canonical isoforms) and
 ends after successfully downloading and displaying the isoform sequence.
+
+### Indels tutorial
+
+By default, Cancermuts retrieves missense variants. In-frame indels can also be retrieved by specifying
+the variant_types argument when adding mutations from supported data sources. The currently supported
+protein variant types are "missense", "deletion", "insertion" and "delins".
+
+We provide a dedicated example script for this use case in the tutorial_indels.py file.
+It is run in the same way as the other tutorial scripts:
+
+```
+$ python tutorial_indels.py
+```
+
+The script uses RAD51C as an example and retrieves in-frame deletions, insertions and delins variants
+from cBioPortal, COSMIC and ClinVar. The result should be a metatable_indels.csv output file together with
+a my_table_indels.pdf figure.
+
 
 ## Tutorial steps
 
@@ -191,7 +209,7 @@ False
 >>> seq.aliases["refseq"] = "NP_073729"
 ```
 
-### Collecting cancer mutations
+### Collecting missense cancer mutations
 
 Now that we have the Sequence ready, we can start adding annotations to it.
 We will first download cancer mutations from cBioPortal, COSMIC and ClinVar.
@@ -471,11 +489,96 @@ Each mutation is recorded in a ProteinVariant object that can be further explore
 
 ```
 
+### Collecting in-frame indel cancer mutations
+
+The examples above show how to retrieve missense variants, which are the default variant type in Cancermuts.
+The same data sources can also be used to retrieve in-frame deletions, insertions and delins variants by passing
+the `variant_types` argument to `add_mutations`.
+
+For example, in the `tutorial_indels.py` script we define the indel variant types as follows:
+
+```py
+>>> indel_types = ("deletion", "insertion", "delins")
+```
+
+These variant types can then be passed to cBioPortal, COSMIC and ClinVar:
+
+```py
+>>> cb.add_mutations(seq,
+                     metadata=["cancer_type", "cancer_study", "genomic_mutations"],
+                     variant_types=indel_types)
+```
+
+```py
+>>> cosmic.add_mutations(seq,
+                         genome_assembly_version="GRCh38",
+                         metadata=["genomic_coordinates", "genomic_mutations", "cancer_site", "cancer_histology"],
+                         variant_types=indel_types)
+```
+
+```py
+>>> clinvar.add_mutations(seq,
+                          metadata=["clinvar_germline_classification",
+                                    "clinvar_germline_condition",
+                                    "clinvar_germline_review_status",
+                                    "genomic_mutations",
+                                    "clinvar_variant_id",
+						            "genomic_coordinates",
+						            "clinvar_oncogenicity_condition",
+						            "clinvar_oncogenicity_classification",
+						            "clinvar_oncogenicity_review_status",
+						            "clinvar_clinical_impact_condition",
+						            "clinvar_clinical_impact_review_status",
+						            "clinvar_clinical_impact_classification"],
+						            variant_types=indel_types)
+```
+
+In-frame insertions are represented internally using a left-anchored representation. For example, the protein variant `p.Ser12_Val13insAla` is stored as:
+
+```py
+start = 12
+end = 12
+ref = "S"
+alt = "SAV"
+```
+
+Here, `ref` contains the left flanking residue, while `alt` contains the left flanking residue, the inserted residue or residues, and the right flanking residue.
+
+Protein duplications are internally represented as insertions.
+
+After running the indel tutorial, the retrieved variants can be inspected in the same way as missense variants:
+
+```py
+>>> seq.variants_at_position(176)
+[<ProteinVariant p.Cys176_Gln181delinsLys from cBioPortal, COSMIC>]
+
+>>> seq.variants_at_position(184)
+[<ProteinVariant p.Ala184del from cBioPortal>]
+
+>>> seq.variants_at_position(338)
+[<ProteinVariant p.Leu338_Lys342delinsGln from ClinVar>]
+```
+
+The corresponding metadata are also stored in the same way as for missense variants:
+
+```py
+>>> seq.variants_at_position(38)[0].metadata['genomic_mutations']
+[<GenomicMutation hg38,17:g.58692755_58692756insCCTCAG from COSMIC>]
+
+>>> seq.variants_at_position(6)[0].metadata['clinvar_germline_condition']
+[ClinvarGermlineCondition(source=<cancermuts.datasources.ClinVar object at 0x7fbf936c61a0>, conditions=['Hereditary cancer-predisposing syndrome'])]
+```
+
+As for missense variants, the final annotated sequence can be converted into a metatable and plotted using the `Table` class.
+
+
 ### Additional mutation metadata
 
 Cancermuts allows to enrich the downloaded mutations with further metadata. We
 will see now how to download the REVEL pathogenicity score and the gnomAD allele
-frequency for each specific variant.
+frequency for each specific variant. REVEL scores are available only for
+missense variants, whereas gnomAD allele frequencies can also be retrieved
+for in-frame indels when genomic mutation metadata are available.
 
 #### REVEL score from MyVariant
 
