@@ -27,6 +27,7 @@ from .log import logger_init
 import pyliftover
 from parse import parse
 import re
+from Bio.Seq import Seq
 
 lo_hg38_hg19 = pyliftover.LiftOver('hg38', 'hg19')
 lo_hg19_hg38 = pyliftover.LiftOver('hg19', 'hg38')
@@ -141,6 +142,7 @@ class GenomicMutation(Metadata):
     header = "genomic_mutation"
 
     mutation_type = None
+    requires_reference_sequence = False
     _pattern = None
     _mutation_classes = ()
 
@@ -284,13 +286,14 @@ class GenomicSNV(GenomicMutation):
     def _build_definition(self, chrom, start, end):
         return f"{chrom}:g.{start}{self.ref}>{self.alt}"
 
-    def get_value_str(self, fmt="csv"):
+    def get_value_str(self, fmt="csv", reference_sequence=None, normalize_vcf=None):
         if fmt == "gnomad":
-            return f"{self.chr}-{self.start}-{self.ref}-{self.alt}"
-        return super(GenomicSNV, self).get_value_str(fmt)
+            chrom, pos, ref, alt = normalize_vcf((self.chr, self.start, self.ref, self.alt))
+            return f"{chrom}-{pos}-{ref}-{alt}"
+        return super().get_value_str(fmt)
 
 class GenomicDelins(GenomicMutation):
-
+    requires_reference_sequence = True
     mutation_type = "delins"
     _pattern = re.compile(r"^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?:_(?P<end>[0-9]+))?delins(?P<alt>[ACTG]+)$")
 
@@ -300,42 +303,89 @@ class GenomicDelins(GenomicMutation):
     def _build_definition(self, chrom, start, end):
         return f"{chrom}:g.{self._position_string(start, end)}delins{self.alt}"
 
-    def get_value_str(self, fmt="csv"):
+    def get_value_str(self, fmt="csv", reference_sequence=None, normalize_vcf=None):
         if fmt == "gnomad":
-            deletion_length = self.end - self.start + 1
-            masked_ref = "?" * deletion_length
+            if reference_sequence is None:
+                raise ValueError("Reference sequence is required for a delins")
 
-            return f"{self.chr}-{self.start}-{masked_ref}-{self.alt}"
+            ref = reference_sequence.upper()
+            alt = self.alt.upper()
+
+            if len(ref) != self.end - self.start + 1:
+                raise ValueError("Reference sequence length does not match delins interval")
+
+            if ref == alt:
+                return None
+
+            chrom, pos, ref, alt = normalize_vcf((self.chr, self.start, ref, alt))
+            return f"{chrom}-{pos}-{ref}-{alt}"
 
         return super().get_value_str(fmt)
 
 class GenomicInversion(GenomicMutation):
-
+    
+    requires_reference_sequence = True
     mutation_type = "inversion"
     _pattern = re.compile(r"^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)_(?P<end>[0-9]+)inv$")
 
     def _build_definition(self, chrom, start, end):
         return f"{chrom}:g.{self._position_string(start, end)}inv"
 
+    def get_value_str(self, fmt="csv", reference_sequence=None, normalize_vcf=None):
+        if fmt == "gnomad":
+            if reference_sequence is None:
+                raise ValueError("Reference sequence is required for an inversion")
+            ref = reference_sequence.upper()
+
+            if len(ref) != self.end - self.start + 1:
+                raise ValueError("Reference sequence length does not match inversion interval")
+            alt = str(Seq(ref).reverse_complement())
+
+            if ref == alt:
+                return None
+            
+            chrom, pos, ref, alt = normalize_vcf((self.chr, self.start, ref, alt))
+            return f"{chrom}-{pos}-{ref}-{alt}"
+
+        return super().get_value_str(fmt)
+
 class GenomicDeletion(GenomicMutation):
 
+    requires_reference_sequence = True
     mutation_type = "deletion"
     _pattern = re.compile(r"^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?:_(?P<end>[0-9]+))?del$")
 
     def _build_definition(self, chrom, start, end):
         return f"{chrom}:g.{self._position_string(start, end)}del"
 
-    def get_value_str(self, fmt="csv"):
+    def get_value_str(self, fmt="csv", reference_sequence=None, normalize_vcf=None,):
         if fmt == "gnomad":
-            deletion_length = self.end - self.start + 1
-            masked_ref = "?" * (deletion_length + 1)
+            if reference_sequence is None:
+                raise ValueError("Reference sequence is required for a deletion")
 
-            return f"{self.chr}-{self.start - 1}-{masked_ref}-?"
+            ref = reference_sequence.upper()
+            if self.start > 1:
+                expected_length = self.end - self.start + 2
+                if len(ref) != expected_length:
+                    raise ValueError("Reference sequence length does not match deletion interval plus left anchor")
+                pos = self.start - 1
+                alt = ref[0]
+            else:
+                expected_length = self.end + 1
+
+                if len(ref) != expected_length:
+                    raise ValueError("Reference sequence length does not match deletion interval plus right anchor")
+                pos = 1
+                alt = ref[-1]
+
+            chrom, pos, ref, alt = normalize_vcf((self.chr, pos, ref, alt))
+            return f"{chrom}-{pos}-{ref}-{alt}"
 
         return super().get_value_str(fmt)
 
 class GenomicInsertion(GenomicMutation):
 
+    requires_reference_sequence = True
     mutation_type = "insertion"
     _pattern = re.compile(r"^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)_(?P<end>[0-9]+)ins(?P<alt>[ACTG]+)$")
 
@@ -344,22 +394,53 @@ class GenomicInsertion(GenomicMutation):
 
     def _build_definition(self, chrom, start, end):
         return f"{chrom}:g.{start}_{end}ins{self.alt}"
-
-    def get_value_str(self, fmt="csv"):
+    
+    def get_value_str(self, fmt="csv", reference_sequence=None, normalize_vcf=None):
         if fmt == "gnomad":
-            return f"{self.chr}-{self.start}-?-?{self.alt}"
+            if reference_sequence is None:
+                raise ValueError("Reference sequence is required for an insertion")
+
+            if self.end != self.start + 1:
+                raise ValueError(
+                    f"Insertion coordinates are not adjacent: {self.definition}")
+
+            anchor = reference_sequence.upper()
+
+            if len(anchor) != 1:
+                raise ValueError("Insertion reference anchor must be one base")
+
+            chrom, pos, ref, alt = normalize_vcf((self.chr, self.start, anchor, anchor + self.alt.upper()))
+            return f"{chrom}-{pos}-{ref}-{alt}"
         return super().get_value_str(fmt)
 
 class GenomicDuplication(GenomicMutation):
 
+    requires_reference_sequence = True
     mutation_type = "duplication"
     _pattern = re.compile(r"^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?:_(?P<end>[0-9]+))?dup$")
 
     def _build_definition(self, chrom, start, end):
         return f"{chrom}:g.{self._position_string(start, end)}dup"
 
+
+    def get_value_str(self, fmt="csv", reference_sequence=None, normalize_vcf=None,):
+        if fmt == "gnomad":
+            if reference_sequence is None:
+                raise ValueError("Reference sequence is required for a duplication")
+            duplicated = reference_sequence.upper()
+
+            if len(duplicated) != self.end - self.start + 1:
+                raise ValueError("Reference sequence length does not match duplication interval")
+
+            anchor = duplicated[-1]
+            chrom, pos, ref, alt = normalize_vcf((self.chr, self.end, anchor, anchor + duplicated))
+            return f"{chrom}-{pos}-{ref}-{alt}"
+
+        return super().get_value_str(fmt)
+
 class GenomicRepeat(GenomicMutation):
 
+    requires_reference_sequence = True
     mutation_type = "repeat"
     _pattern = re.compile(r"^(?P<chr>[0-9XY]+):g\.(?P<start>[0-9]+)(?:_(?P<end>[0-9]+))?(?P<repeat_unit>[ACTG]+)\[(?P<repeat_count>[0-9]+)\]$")
 
@@ -370,6 +451,32 @@ class GenomicRepeat(GenomicMutation):
 
     def _build_definition(self, chrom, start, end):
         return f"{chrom}:g.{self._position_string(start, end)}{self.alt}"
+
+
+    def get_value_str(self, fmt="csv", reference_sequence=None, normalize_vcf=None):
+        if fmt == "gnomad":
+            if reference_sequence is None:
+                raise ValueError("Reference sequence is required for a repeat")
+
+            ref = reference_sequence.upper()
+            unit = self.repeat_unit.upper()
+
+            if len(ref) % len(unit) != 0:
+                raise ValueError("Repeat interval is not divisible by repeat-unit length")
+
+            reference_count = len(ref) // len(unit)
+
+            if ref != unit * reference_count:
+                raise ValueError(f"Reference interval does not consist of consecutive {unit} repeat units")
+
+            if reference_count == self.repeat_count:
+                return None
+            alt = unit * self.repeat_count
+            chrom, pos, ref, alt = normalize_vcf((self.chr, self.start, ref, alt))
+
+            return f"{chrom}-{pos}-{ref}-{alt}"
+
+        return super().get_value_str(fmt)
 
 GenomicMutation._mutation_classes = (GenomicSNV,
                                      GenomicDelins,

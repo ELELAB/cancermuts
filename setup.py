@@ -32,6 +32,7 @@ setup(name='cancermuts',
                         'urllib3',
                         'future',
                         'hgvs',
-                        'bioutils'
+                        'bioutils',
+                        'pysam'
                         ]
      )

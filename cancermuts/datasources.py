@@ -32,7 +32,7 @@ import time
 import requests as rq
 from bioservices.uniprot import UniProt as bsUniProt
 from Bio.PDB.Polypeptide import three_to_index, index_to_one
-from Bio import SeqIO
+from Bio import SeqIO, Seq
 import numpy as np
 import pandas as pd
 from .core import Sequence, ProteinVariant
@@ -61,7 +61,8 @@ import fcntl
 from bioutils.assemblies import make_name_ac_map
 from hgvs import parser, normalizer, validator
 from hgvs.dataproviders import uta
-
+import tempfile
+from pysam import bcftools
 
 if sys.version_info[0] >= 3:
     unicode = str
@@ -110,6 +111,9 @@ class DynamicSource(Source, object):
 
     def __init__(self, *args, **kwargs):
         super(DynamicSource, self).__init__(*args, **kwargs)
+
+    chrom_maps = {"GRCh37": make_name_ac_map("GRCh37.p13", primary_only=True),
+                  "GRCh38": make_name_ac_map("GRCh38.p14", primary_only=True)}
 
 class DynamicMutationSource(DynamicSource, object):
 
@@ -511,7 +515,6 @@ class cBioPortal(DynamicMutationSource, object):
         # MNV / complex replacement
         else:
             raw = (f"{ac}:g.{start}delins{alt}" if start == end else f"{ac}:g.{start}_{end}delins{alt}")
-
         var = self._hgvs_parser.parse_hgvs_variant(raw)
         var = self._hgvs_normalizer.normalize(var)
         self._hgvs_validator.validate(var)
@@ -678,9 +681,6 @@ class cBioPortal(DynamicMutationSource, object):
             out_metadata['genomic_mutations'] = []
             do_genomic_mutations = True
 
-            chrom_maps = {"GRCh37": make_name_ac_map("GRCh37.p13", primary_only=True),
-                          "GRCh38": make_name_ac_map("GRCh38.p14", primary_only=True),}
-
         for cancer_study in self._cache_cancer_studies.iterrows():
 
             cancer_study = cancer_study[1]
@@ -760,7 +760,7 @@ class cBioPortal(DynamicMutationSource, object):
                             out_metadata["genomic_coordinates"].append(gd)
 
                         if do_genomic_mutations:
-                            chrom_map = chrom_maps[row["ncbiBuild"]]
+                            chrom_map = self.chrom_maps[row["ncbiBuild"]]
                             try:
                                 hgvsg = self._cbioportal_to_hgvsg(chrom=chrom, start=start, end=end, ref=ref, alt=alt, chrom_map=chrom_map)
                                 gm = [genome_build, hgvsg]
@@ -3078,6 +3078,9 @@ class gnomAD(DynamicSource, object):
     _exome_genome_support = ['2.1', '2.1_controls', '2.1_non-neuro', '2.1_non-cancer', '2.1_non-topmed']
     _genome_support = ['3']
 
+    _reference_fastas = {"GRCh37": "/data/databases/genome_annotation/hg19.fa",
+                         "GRCh38": "/data/databases/genome_annotation/hg38.fa"}
+
     @logger_init
     def __init__(self, version='2.1'):
 
@@ -3094,6 +3097,8 @@ class gnomAD(DynamicSource, object):
                                     'gnomad_genome_allele_frequency' : self._get_genome_allele_freq,
                                     'gnomad_popmax_exome_allele_frequency' : self._get_popmax_exome_allele_freq,
                                     'gnomad_popmax_genome_allele_frequency' : self._get_popmax_genome_allele_freq}
+        self._hgvs_data_provider = uta.connect()
+        self._hgvs_parser = parser.Parser()
 
         gnomADExomeAlleleFrequency.set_version_in_desc(self._version_str[version])
         gnomADGenomeAlleleFrequency.set_version_in_desc(self._version_str[version])
@@ -3144,6 +3149,30 @@ class gnomAD(DynamicSource, object):
                 self.log.debug("adding metadata %s to %s" % (md_types[i], var))
                 add_this_metadata(var, gene_id)
 
+    def _normalize_vcf_allele(self, allele, assembly):
+        """Left-align and normalize one VCF allele with bcftools."""
+        chrom, pos, ref, alt = allele
+
+        chrom = str(chrom).removeprefix("chr")
+        contig = f"chr{chrom}"
+
+        vcf = ("##fileformat=VCFv4.2\n"
+              f"##contig=<ID={contig}>\n"
+               "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+             f"{contig}\t{pos}\t.\t{ref}\t{alt}\t.\tPASS\t.\n")
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".vcf") as temp_vcf:
+            temp_vcf.write(vcf)
+            temp_vcf.flush()
+
+            output = bcftools.norm("-f", self._reference_fastas[assembly], "-c", "e", "-Ov", temp_vcf.name)
+
+        record = next(line for line in output.splitlines()
+                      if line and not line.startswith("#"))
+
+        chrom, pos, _, ref, alt, *_ = record.split("\t")
+        return (chrom.removeprefix("chr"), int(pos), ref, alt)        
+
     def _get_exome_allele_freq(self, mutation, gene_id):
         self.log.info("getting exome allele frequency")
         self._get_metadata(mutation, gene_id, 'gnomad_exome_allele_frequency')
@@ -3180,30 +3209,44 @@ class gnomAD(DynamicSource, object):
         self.log.info("getting popmax genome allele frequency")
         self._get_metadata(mutation, gene_id, 'gnomad_popmax_genome_allele_frequency')
 
-    def _edit_variant_id(self, row):
-        chrom = str(row["chrom"]).removeprefix("chr")
-        pos = int(row["pos"])
-        ref = str(row["ref"]).upper()
-        alt = str(row["alt"]).upper()
+    def _get_reference_sequence(self, variant, assembly, max_repeat_units=1000):
+        # Retrieve the reference sequence needed to construct a VCF allele.
+        chrom = str(variant.chr).removeprefix("chr")
+        accession = self.chrom_maps[assembly][chrom]
 
-        # SNV
-        if len(ref) == 1 and len(alt) == 1:
-            return f"{chrom}-{pos}-{ref}-{alt}"
+        if (variant.mutation_type == "repeat" and variant.start == variant.end):
+            unit = variant.repeat_unit.upper()
+            unit_length = len(unit)
+            sequence_start = variant.start - 1
+            sequence = self._hgvs_data_provider.get_seq(accession, sequence_start, sequence_start + unit_length * max_repeat_units,).upper()
+            reference_count = 0
 
-        # Insertion: REF is the anchor and ALT is anchor + inserted sequence
-        elif len(ref) == 1 and alt.startswith(ref) and len(alt) > 1:
-            inserted_sequence = alt[len(ref):]
-            return f"{chrom}-{pos}-?-?{inserted_sequence}"
+            while reference_count < max_repeat_units:
+                unit_start = reference_count * unit_length
+                unit_end = unit_start + unit_length
+                if sequence[unit_start:unit_end] != unit:
+                    break
+                reference_count += 1
 
-        # Deletion: ALT is the anchor and REF is anchor + deleted sequence
-        elif len(alt) == 1 and ref.startswith(alt):
-            masked_ref = "?" * len(ref)
-            return f"{chrom}-{pos}-{masked_ref}-?"
+            if reference_count == 0:
+                raise ValueError(f"Reference sequence at {variant.chr}:{variant.start} does not start with repeat unit {unit}")
+            if reference_count == max_repeat_units:
+                raise ValueError(f"Reference repeat tract exceeded {max_repeat_units} units")
+            return sequence[:reference_count * unit_length]
 
-        # Delins / complex replacement
-        masked_ref = "?" * len(ref)
-        
-        return f"{chrom}-{pos}-{masked_ref}-{alt}"
+        if variant.mutation_type == "deletion":
+            if variant.start > 1:
+                # Left anchor plus deleted interval.
+                return self._hgvs_data_provider.get_seq(accession, variant.start - 2, variant.end,).upper()
+
+            # Deletion begins at position 1: deleted interval plus right anchor.
+            return self._hgvs_data_provider.get_seq(accession, 0, variant.end + 1,).upper()
+
+        if variant.mutation_type == "insertion":
+            # Base immediately before the inserted sequence.
+            return self._hgvs_data_provider.get_seq(accession, variant.start - 1, variant.start).upper()
+
+        return self._hgvs_data_provider.get_seq(accession, variant.start - 1, variant.end).upper()
 
     def _get_metadata(self, mutation, gene_id, md_type):
 
@@ -3245,37 +3288,49 @@ class gnomAD(DynamicSource, object):
 
             self.log.info(f"data for gene {gene_id} already in cache")
 
-        for variant in mutation.metadata['genomic_mutations']:
-            if not isinstance(variant, GenomicMutation) or variant.mutation_type is None:
+        for variant in mutation.metadata["genomic_mutations"]:
+            if (not isinstance(variant, GenomicMutation)
+                or variant.mutation_type is None):
                 continue
             try:
                 variant = variant.as_assembly(ref_assembly)
-            except TypeError as e:
-                self.log.error(str(e))
+            except Exception as e:  
+                self.log.warning(f"Could not convert genomic variant {variant.definition} to {ref_assembly}: {e}")
                 continue
 
-            v_str = variant.get_value_str(fmt="gnomad")
-            if v_str is None:
-                self.log.info(f"variant type not supported by gnomAD:{variant.definition}")
+            reference_sequence = None
+            if variant.requires_reference_sequence:
+                try:
+                    reference_sequence = self._get_reference_sequence(variant, ref_assembly,)
+                except Exception as e:
+                    self.log.warning(f"Could not retrieve reference sequence for {variant.definition}: {e}")
+                    continue
+                
+            try:
+                variant_id = variant.get_value_str(fmt="gnomad", reference_sequence=reference_sequence, normalize_vcf=lambda allele:
+                                                   self._normalize_vcf_allele(allele, ref_assembly))
+            except Exception as e:
+                self.log.warning(f"Could not construct normalized VCF allele for {variant.definition}: {e}")
                 continue
 
-            this_df = data[data["edited_variant_id"] == v_str]
+            this_df = data[data["variant_id"] == variant_id]
 
             if len(this_df) == 0:
                 af = None
-                self.log.info("no entry found for %s" % v_str)
+                self.log.info(f"no entry found for {variant_id}")
 
             elif len(this_df) > 1:
                 af = None
-                self.log.warning("more than one entry for %s! Skipping" % v_str)
+                self.log.warning(f"more than one entry for {variant_id}! Skipping")
 
             else:
                 af = this_df[exac_key[md_type]].values[0]
+
                 if pd.isna(af):
                     af = None
-                    self.log.info("nan entry found for %s" % v_str)
+                    self.log.info(f"nan entry found for {variant_id}")
                 else:
-                    self.log.info("entry found for %s" % v_str)
+                    self.log.info(f"entry found for {variant_id}")
 
             if af is not None:
                 mutation.metadata[md_type].append(metadata_classes[md_type](self, af))
@@ -3364,8 +3419,6 @@ class gnomAD(DynamicSource, object):
         if variants.empty:
             self.log.warning('No variants were available for the specified gene')
             return None
-
-        variants['edited_variant_id'] = variants.apply(self._edit_variant_id, axis=1)
 
         if self._gnomad_version in self._exome_genome_support:
             variants['total_ac'] = variants['exome_ac'] + variants['genome_ac']
