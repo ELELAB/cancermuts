@@ -503,6 +503,7 @@ class cBioPortal(DynamicMutationSource, object):
 
     def _cbioportal_to_hgvsg(self, chrom, start, end, ref, alt, chrom_map):
         chrom = str(chrom).removeprefix("chr")
+        chrom = GenomicMutation._normalise_chr(chrom)
         ac = chrom_map[chrom]
         start = int(start)
         end = int(end)
