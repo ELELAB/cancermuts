@@ -454,6 +454,9 @@ class cBioPortal(DynamicMutationSource, object):
 
     default_strand = '+'
 
+    _supported_genome_builds = { "GRCh37" : "hg19",
+                                 "GRCh38" : "hg38" }
+
     @logger_init
     def __init__(self, cancer_studies=None):
         description = "cBioPortal"
@@ -483,6 +486,12 @@ class cBioPortal(DynamicMutationSource, object):
         self._hgvs_parser = parser.Parser()
         self._hgvs_normalizer = normalizer.Normalizer(self._hgvs_data_provider)
         self._hgvs_validator = validator.Validator(self._hgvs_data_provider)
+
+        # building inverse relationships which we will need later
+        tmp_builds = self._supported_genome_builds.copy()
+        for k,v in self._supported_genome_builds.items():
+            tmp_builds[v] = k
+        self._supported_genome_builds = tmp_builds
 
     @property
     def cancer_types(self):
@@ -690,6 +699,7 @@ class cBioPortal(DynamicMutationSource, object):
             cancer_study_id = cancer_study.studyId
             cancer_type     = cancer_study.cancerType
             cancer_type_id  = cancer_study.cancerTypeId
+            cancer_study_genome_build = cancer_study.referenceGenome
 
             if do_cancer_type:
                 if cancer_type_id is None:
@@ -747,7 +757,11 @@ class cBioPortal(DynamicMutationSource, object):
                     if do_cancer_study:
                         out_metadata['cancer_study'].append([cancer_study_id])
                     if do_genomic_coordinates or do_genomic_mutations:
-                        genome_build = "hg19" if row["ncbiBuild"] == "GRCh37" else "hg38"
+                        try:
+                            genome_build = self._supported_genome_builds[row["ncbiBuild"]]
+                        except KeyError:
+                            self.log.warning(f"genomic mutation in {cancer_study} has unrecognized genome assembly {row["ncbiBuild"]}; will default to study assembly ({cancer_study_genome_build})")
+                            genome_build = cancer_study_genome_build
 
                         chrom = row["chr"]
                         start = row["startPosition"]
@@ -760,7 +774,8 @@ class cBioPortal(DynamicMutationSource, object):
                             out_metadata["genomic_coordinates"].append(gd)
 
                         if do_genomic_mutations:
-                            chrom_map = self.chrom_maps[row["ncbiBuild"]]
+                            # map back to NCBI build string
+                            chrom_map = self.chrom_maps[self._supported_genome_builds[genome_build]]
                             try:
                                 hgvsg = self._cbioportal_to_hgvsg(chrom=chrom, start=start, end=end, ref=ref, alt=alt, chrom_map=chrom_map)
                                 gm = [genome_build, hgvsg]
