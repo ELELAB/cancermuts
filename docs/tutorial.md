@@ -653,7 +653,7 @@ We can then annotate our sequence with the local REVEL database:
 We can now check that REVEL scores have been annotated for our mutations:
 
 ```py
->>> seq.variants_at_position(65)[0].metadata['revel_score'])
+>>> seq.variants_at_position(65)[0].metadata['revel_score']
 [<Revel, 0.575>]
 ```
 
@@ -683,7 +683,7 @@ populations (referred to as popmax). This works as you would expect by now:
 here, we specify the `version` argument to specify the version of gnomAD to be
 considered. Please refer to the API documentation for all the available versions.
 
-A local reference genome FASTA file should be provided when initializing the
+A local reference genome FASTA file should be provided with `reference_fasta` when initializing the
 gnomAD datasource. See `install.md` for instructions on downloading the reference genome.
 The reference assembly must be compatible with the selected gnomAD version.
 For example, gnomAD 2.1 requires a GRCh37/hg19 reference, whereas gnomAD 3 requires a
