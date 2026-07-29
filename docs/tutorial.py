@@ -102,7 +102,7 @@ print(seq.variants_at_position(65)[0].metadata['revel_score'])
 # add annotations from gnomAD
 from cancermuts.datasources import gnomAD
 
-gnomad = gnomAD(version='2.1', reference_fasta="/data/databases/genome_annotation/hg19.fa")
+gnomad = gnomAD(version='2.1', reference_genome_fasta="/data/databases/genome_annotation/hg19.fa")
 gnomad.add_metadata(seq, md_type=[
     'gnomad_exome_allele_frequency',
     'gnomad_genome_allele_frequency',

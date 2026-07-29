@@ -3103,14 +3103,14 @@ class gnomAD(DynamicSource, object):
     _genome_support = ['3']
 
     @logger_init
-    def __init__(self, version='2.1', reference_fasta=None):
+    def __init__(self, version='2.1', reference_genome_fasta=None):
 
         self._gnomad_version = str(version)
         if self._gnomad_version not in self._versions.keys():
             self.log.error("gnomAD version %s not supported by the current implementation" % version)
             raise TypeError
 
-        self._reference_fasta = reference_fasta
+        self._reference_genome_fasta = reference_genome_fasta
         super(gnomAD, self).__init__(name='gnomAD', version=version, description=self.description)
 
         self._gnomad_endpoint = 'https://gnomad.broadinstitute.org/api/'
@@ -3174,11 +3174,11 @@ class gnomAD(DynamicSource, object):
     def _normalize_vcf_allele(self, allele):
         """Left-align and normalize one VCF allele with bcftools."""
 
-        if self._reference_fasta is None:
+        if self._reference_genome_fasta is None:
             assembly = self._assembly[self._gnomad_version]
             raise ValueError(f"A {assembly} reference FASTA is required to normalize "
                             f"indels for gnomAD {self._gnomad_version}. Provide it "
-                             "with the reference_fasta argument.")
+                             "with the reference_genome_fasta argument.")
         chrom, pos, ref, alt = allele
 
         chrom = str(chrom).removeprefix("chr")
@@ -3193,7 +3193,7 @@ class gnomAD(DynamicSource, object):
             temp_vcf.write(vcf)
             temp_vcf.flush()
 
-            output = bcftools.norm("-f", self._reference_fasta, "-c", "e", "-Ov", temp_vcf.name)
+            output = bcftools.norm("-f", self._reference_genome_fasta, "-c", "e", "-Ov", temp_vcf.name)
 
         record = next(line for line in output.splitlines()
                       if line and not line.startswith("#"))
