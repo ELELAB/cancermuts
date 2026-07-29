@@ -288,8 +288,7 @@ class GenomicSNV(GenomicMutation):
 
     def get_value_str(self, fmt="csv", reference_sequence=None, normalize_vcf=None):
         if fmt == "gnomad":
-            chrom, pos, ref, alt = normalize_vcf((self.chr, self.start, self.ref, self.alt))
-            return f"{chrom}-{pos}-{ref}-{alt}"
+            return f"{self.chr}-{self.start}-{self.ref}-{self.alt}"
         return super().get_value_str(fmt)
 
 class GenomicDelins(GenomicMutation):
@@ -307,6 +306,8 @@ class GenomicDelins(GenomicMutation):
         if fmt == "gnomad":
             if reference_sequence is None:
                 raise ValueError("Reference sequence is required for a delins")
+            if normalize_vcf is None:
+                raise ValueError("normalize_vcf is required for gnomAD formatting")
 
             ref = reference_sequence.upper()
             alt = self.alt.upper()
@@ -335,6 +336,8 @@ class GenomicInversion(GenomicMutation):
         if fmt == "gnomad":
             if reference_sequence is None:
                 raise ValueError("Reference sequence is required for an inversion")
+            if normalize_vcf is None:
+                raise ValueError("normalize_vcf is required for gnomAD formatting")
             ref = reference_sequence.upper()
 
             if len(ref) != self.end - self.start + 1:
@@ -358,10 +361,12 @@ class GenomicDeletion(GenomicMutation):
     def _build_definition(self, chrom, start, end):
         return f"{chrom}:g.{self._position_string(start, end)}del"
 
-    def get_value_str(self, fmt="csv", reference_sequence=None, normalize_vcf=None,):
+    def get_value_str(self, fmt="csv", reference_sequence=None, normalize_vcf=None):
         if fmt == "gnomad":
             if reference_sequence is None:
                 raise ValueError("Reference sequence is required for a deletion")
+            if normalize_vcf is None:
+                raise ValueError("normalize_vcf is required for gnomAD formatting")
 
             ref = reference_sequence.upper()
             if self.start > 1:
@@ -394,11 +399,13 @@ class GenomicInsertion(GenomicMutation):
 
     def _build_definition(self, chrom, start, end):
         return f"{chrom}:g.{start}_{end}ins{self.alt}"
-    
+
     def get_value_str(self, fmt="csv", reference_sequence=None, normalize_vcf=None):
         if fmt == "gnomad":
             if reference_sequence is None:
                 raise ValueError("Reference sequence is required for an insertion")
+            if normalize_vcf is None:
+                raise ValueError("normalize_vcf is required for gnomAD formatting")
 
             if self.end != self.start + 1:
                 raise ValueError(
@@ -423,10 +430,12 @@ class GenomicDuplication(GenomicMutation):
         return f"{chrom}:g.{self._position_string(start, end)}dup"
 
 
-    def get_value_str(self, fmt="csv", reference_sequence=None, normalize_vcf=None,):
+    def get_value_str(self, fmt="csv", reference_sequence=None, normalize_vcf=None):
         if fmt == "gnomad":
             if reference_sequence is None:
                 raise ValueError("Reference sequence is required for a duplication")
+            if normalize_vcf is None:
+                raise ValueError("normalize_vcf is required for gnomAD formatting")
             duplicated = reference_sequence.upper()
 
             if len(duplicated) != self.end - self.start + 1:
@@ -457,6 +466,8 @@ class GenomicRepeat(GenomicMutation):
         if fmt == "gnomad":
             if reference_sequence is None:
                 raise ValueError("Reference sequence is required for a repeat")
+            if normalize_vcf is None:
+                raise ValueError("normalize_vcf is required for gnomAD formatting")
 
             ref = reference_sequence.upper()
             unit = self.repeat_unit.upper()

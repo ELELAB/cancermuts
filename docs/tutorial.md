@@ -673,7 +673,7 @@ populations (referred to as popmax). This works as you would expect by now:
 ```py
 >>> from cancermuts.datasources import gnomAD
 
->>> gnomad = gnomAD(version='2.1')
+>>> gnomad = gnomAD(version='2.1', reference_fasta="/path/to/hg19.fa")
 >>> gnomad.add_metadata(seq, md_type=['gnomad_exome_allele_frequency',
 	                              'gnomad_genome_allele_frequency',
                                   'gnomad_popmax_exome_allele_frequency',
@@ -682,6 +682,17 @@ populations (referred to as popmax). This works as you would expect by now:
 
 here, we specify the `version` argument to specify the version of gnomAD to be
 considered. Please refer to the API documentation for all the available versions.
+
+A local reference genome FASTA file should be provided when initializing the
+gnomAD datasource. See `install.md` for instructions on downloading the reference genome.
+The reference assembly must be compatible with the selected gnomAD version.
+For example, gnomAD 2.1 requires a GRCh37/hg19 reference, whereas gnomAD 3 requires a
+GRCh38/hg38 reference.
+
+The reference FASTA is used to normalize VCF alleles when the available genomic
+mutation is not represented as a simple SNV. This may also occur for protein-level
+missense variants, since a missense consequence is not necessarily caused by a single-nucleotide
+genomic substitution.
 
 The `md_type` keyword allows to select which metadata type(s) to annotate, i.e.
 choose between exome or genome allele frequency (or both as in the example) and whether

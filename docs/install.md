@@ -245,23 +245,25 @@ The dataset integrates information from multiple resources curated in GlyGen. Wh
 
 5. Keep note of the location of this directory as it will come handy in the tutorial
 
-### Reference genomes for gnomAD annotation
+### Reference genome for gnomAD annotation
 
-gnomAD annotation of genomic indels and other non-SNV variants requires
-local GRCh37 and GRCh38 reference FASTA files. Cancermuts uses these
-references to reconstruct and left-normalize VCF alleles through the
-bcftools functionality provided by `pysam`.
+gnomAD annotation of genomic indels and other non-SNV variants requires a
+local reference genome FASTA file. Cancermuts uses this reference to left-normalize
+VCF alleles through the bcftools functionality provided by pysam.
 
-The FASTA paths must be configured in the gnomAD datasource:
+The required reference assembly depends on the selected gnomAD version:
 
-```python
-_reference_fastas = {"GRCh37": "/path/to/hg19.fa",
-                     "GRCh38": "/path/to/hg38.fa"}
-  ```
+- gnomAD 2.1 (default) uses GRCh37/hg19.
+- gnomAD 3 uses GRCh38/hg38.
 
-They can be obtained with:
+The reference genomes can be downloaded from UCSC:
+```
+wget https://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/hg19.fa.gz
+wget https://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
+```
 
-```python
-wget http://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/hg19.fa.gz
-wget http://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
-  ```
+Decompress the required file:
+```
+gunzip hg19.fa.gz
+gunzip hg38.fa.gz
+```

@@ -33,10 +33,10 @@ cb.add_mutations(seq,
                  variant_types=indel_types)
 
 # let us check out some of the mutations
-print(seq.variants_at_position(176)) 
-print(seq.variants_at_position(184)) 
-print(seq.variants_at_position(176)[0].sources) 
-print(seq.variants_at_position(176)[0].alt) 
+print(seq.variants_at_position(176))
+print(seq.variants_at_position(184))
+print(seq.variants_at_position(176)[0].sources)
+print(seq.variants_at_position(176)[0].alt)
 print(seq.variants_at_position(176)[0].metadata)
 
 # add mutations from COSMIC
@@ -52,10 +52,10 @@ cosmic.add_mutations(seq,
                      variant_types=indel_types)
 
 # let's check them out
-print(seq.variants_at_position(38))  
-print(seq.variants_at_position(176)) 
-print(seq.variants_at_position(38)[0]) 
-print(seq.variants_at_position(38)[0].sources) 
+print(seq.variants_at_position(38))
+print(seq.variants_at_position(176))
+print(seq.variants_at_position(38)[0])
+print(seq.variants_at_position(38)[0].sources)
 print(seq.variants_at_position(38)[0].metadata['genomic_mutations'])
 
 # add mutations from ClinVar
@@ -85,7 +85,7 @@ print(seq.variants_at_position(6)[0].metadata['clinvar_germline_condition'])
 # add annotations from gnomAD
 from cancermuts.datasources import gnomAD
 
-gnomad = gnomAD(version='2.1')
+gnomad = gnomAD(version='2.1', reference_fasta="/data/databases/genome_annotation/hg19.fa")
 gnomad.add_metadata(seq, md_type=['gnomad_exome_allele_frequency',
                                   'gnomad_genome_allele_frequency',
                                   'gnomad_popmax_exome_allele_frequency',

@@ -61,8 +61,10 @@ import fcntl
 from bioutils.assemblies import make_name_ac_map
 from hgvs import parser, normalizer, validator
 from hgvs.dataproviders import uta
+from hgvs.exceptions import HGVSDataNotAvailableError
 import tempfile
 from pysam import bcftools
+from pysam.utils import SamtoolsError
 
 if sys.version_info[0] >= 3:
     unicode = str
@@ -484,7 +486,6 @@ class cBioPortal(DynamicMutationSource, object):
         self._get_molecular_profiles()
         self._hgvs_data_provider = uta.connect()
         self._hgvs_parser = parser.Parser()
-        self._hgvs_normalizer = normalizer.Normalizer(self._hgvs_data_provider)
         self._hgvs_validator = validator.Validator(self._hgvs_data_provider)
 
         # building inverse relationships which we will need later
@@ -526,7 +527,6 @@ class cBioPortal(DynamicMutationSource, object):
         else:
             raw = (f"{ac}:g.{start}delins{alt}" if start == end else f"{ac}:g.{start}_{end}delins{alt}")
         var = self._hgvs_parser.parse_hgvs_variant(raw)
-        var = self._hgvs_normalizer.normalize(var)
         self._hgvs_validator.validate(var)
 
         #normalise for compatibility with GenomicMutation
@@ -761,7 +761,7 @@ class cBioPortal(DynamicMutationSource, object):
                         try:
                             genome_build = self._supported_genome_builds[row["ncbiBuild"]]
                         except KeyError:
-                            self.log.warning(f"genomic mutation in {cancer_study} has unrecognized genome assembly {row["ncbiBuild"]}; will default to study assembly ({cancer_study_genome_build})")
+                            self.log.warning(f"genomic mutation in {cancer_study} has unrecognized genome assembly {row['ncbiBuild']}; will default to study assembly ({cancer_study_genome_build})")
                             genome_build = cancer_study_genome_build
 
                         chrom = row["chr"]
@@ -3094,17 +3094,15 @@ class gnomAD(DynamicSource, object):
     _exome_genome_support = ['2.1', '2.1_controls', '2.1_non-neuro', '2.1_non-cancer', '2.1_non-topmed']
     _genome_support = ['3']
 
-    _reference_fastas = {"GRCh37": "/data/databases/genome_annotation/hg19.fa",
-                         "GRCh38": "/data/databases/genome_annotation/hg38.fa"}
-
     @logger_init
-    def __init__(self, version='2.1'):
+    def __init__(self, version='2.1', reference_fasta=None):
 
         self._gnomad_version = str(version)
         if self._gnomad_version not in self._versions.keys():
             self.log.error("gnomAD version %s not supported by the current implementation" % version)
             raise TypeError
 
+        self._reference_fasta = reference_fasta
         super(gnomAD, self).__init__(name='gnomAD', version=version, description=self.description)
 
         self._gnomad_endpoint = 'https://gnomad.broadinstitute.org/api/'
@@ -3165,8 +3163,14 @@ class gnomAD(DynamicSource, object):
                 self.log.debug("adding metadata %s to %s" % (md_types[i], var))
                 add_this_metadata(var, gene_id)
 
-    def _normalize_vcf_allele(self, allele, assembly):
+    def _normalize_vcf_allele(self, allele):
         """Left-align and normalize one VCF allele with bcftools."""
+
+        if self._reference_fasta is None:
+            assembly = self._assembly[self._gnomad_version]
+            raise ValueError(f"A {assembly} reference FASTA is required to normalize "
+                            f"indels for gnomAD {self._gnomad_version}. Provide it "
+                             "with the reference_fasta argument.")
         chrom, pos, ref, alt = allele
 
         chrom = str(chrom).removeprefix("chr")
@@ -3181,7 +3185,7 @@ class gnomAD(DynamicSource, object):
             temp_vcf.write(vcf)
             temp_vcf.flush()
 
-            output = bcftools.norm("-f", self._reference_fastas[assembly], "-c", "e", "-Ov", temp_vcf.name)
+            output = bcftools.norm("-f", self._reference_fasta, "-c", "e", "-Ov", temp_vcf.name)
 
         record = next(line for line in output.splitlines()
                       if line and not line.startswith("#"))
@@ -3310,7 +3314,7 @@ class gnomAD(DynamicSource, object):
                 continue
             try:
                 variant = variant.as_assembly(ref_assembly)
-            except Exception as e:  
+            except TypeError as e:
                 self.log.warning(f"Could not convert genomic variant {variant.definition} to {ref_assembly}: {e}")
                 continue
 
@@ -3318,14 +3322,13 @@ class gnomAD(DynamicSource, object):
             if variant.requires_reference_sequence:
                 try:
                     reference_sequence = self._get_reference_sequence(variant, ref_assembly,)
-                except Exception as e:
+                except (KeyError, ValueError, HGVSDataNotAvailableError) as e:
                     self.log.warning(f"Could not retrieve reference sequence for {variant.definition}: {e}")
                     continue
                 
             try:
-                variant_id = variant.get_value_str(fmt="gnomad", reference_sequence=reference_sequence, normalize_vcf=lambda allele:
-                                                   self._normalize_vcf_allele(allele, ref_assembly))
-            except Exception as e:
+                variant_id = variant.get_value_str(fmt="gnomad", reference_sequence=reference_sequence, normalize_vcf=self._normalize_vcf_allele)
+            except (ValueError, SamtoolsError, StopIteration,) as e:
                 self.log.warning(f"Could not construct normalized VCF allele for {variant.definition}: {e}")
                 continue
 
