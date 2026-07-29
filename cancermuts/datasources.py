@@ -761,7 +761,7 @@ class cBioPortal(DynamicMutationSource, object):
                         try:
                             genome_build = self._supported_genome_builds[row["ncbiBuild"]]
                         except KeyError:
-                            self.log.warning(f"genomic mutation in {cancer_study} has unrecognized genome assembly {row['ncbiBuild']}; will default to study assembly ({cancer_study_genome_build})")
+                            self.log.warning(f"genomic mutation in {cancer_study_id} has unrecognized genome assembly {row['ncbiBuild']}; will default to study assembly {cancer_study_genome_build}")
                             genome_build = cancer_study_genome_build
 
                         chrom = row["chr"]
@@ -769,6 +769,14 @@ class cBioPortal(DynamicMutationSource, object):
                         end = row["endPosition"]
                         ref = row["referenceAllele"]
                         alt = row["variantAllele"]
+
+                        if chrom == 'NA' or start == 'NA' or end == 'NA' or ref == 'NA' or alt == 'NA':
+                            self.log.warning(f"Mutation {chrom}:{start}-{end} {ref}>{alt} contains NA in the cBioPortal; it will be skipped")
+                            if do_genomic_coordinates:
+                                out_metadata["genomic_coordinates"].append(None)
+                            if do_genomic_mutations:
+                                out_metadata["genomic_mutations"].append(None)
+                            continue
 
                         if do_genomic_coordinates:
                             gd = [genome_build, str(chrom), str(int(start)), str(int(end)), str(ref)]
