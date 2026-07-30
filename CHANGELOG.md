@@ -9,7 +9,7 @@ The project uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 ### Added
 ### Changed
 ### Fixed
-- Improve error handling in `UniProt._get_aliases()` so unresolved aliases are returned as `None` entries instead of causing the entire function to return `None`.
+- Improve UniProt alias error handling by returning unresolved aliases as `None` entries and raising a `ValueError` when required alias conversions cannot be resolved.
 
 ## [2.1.0] - 2026-07-16
 

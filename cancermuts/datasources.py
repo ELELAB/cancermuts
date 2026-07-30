@@ -463,7 +463,7 @@ class UniProt(DynamicSource, object):
 
             if t_keyword is not None:
                 self.log.info('using extracted keyword %s to parse results' % t_keyword)
-                out[t] = results['to'].get(t_keyword)
+                out[t] = results['to'][t_keyword]
             else:
                 out[t] = results['to']
 
