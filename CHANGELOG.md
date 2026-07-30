@@ -10,6 +10,26 @@ The project uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 ### Changed
 ### Fixed
 
+## [2.1.0] - 2026-07-16
+
+### Added
+- Added support for retrieving and annotating in-frame deletions, insertions, and deletion-insertion variants from cBioPortal, COSMIC, and ClinVar.
+- Added a variant_types argument for selecting the protein variant types to retrieve (default: missense).
+- Added parsing and internal representations for supported protein and genomic variant types.
+- Added genomic annotation and assembly-conversion support for indels.
+- Extended gnomAD annotation to supported insertions, deletions, and deletion-insertion variants.
+- Added an indel retrieval tutorial and corresponding example output.
+
+### Changed
+- Restricted REVEL annotation to missense variants.
+- Updated the documentation to describe indel retrieval and the variant_types argument.
+- Changed cBioPortal to use study-wise genome assembly information if per-mutation is not available.
+
+### Fixed
+- Fixed cBioPortal hg38 genomic mutations being incorrectly annotated as hg19.
+- Fixed handling of mutations with NAs in cBioPortal.
+
+
 ## [2.0.1] - 2026-07-15
 
 ### Fixed

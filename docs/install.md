@@ -19,6 +19,9 @@ Furthermore, Cancermuts relies on a number of open source packages, such as:
 * parse
 * urllib3
 * future
+* hgvs
+* bioutils
+* pysam
 
 Please refer to the `setup.py` file in the distribution for an up to date
 list of requirements. It should be noted that requirements are installed
@@ -241,3 +244,26 @@ The dataset integrates information from multiple resources curated in GlyGen. Wh
    This step is recommended if only high-confidence, experimentally validated glycosylation sites are desired. However, the Cancermuts GlyGen datasource works with both filtered and unfiltered datasets.
 
 5. Keep note of the location of this directory as it will come handy in the tutorial
+
+### Reference genome for gnomAD annotation
+
+gnomAD annotation of genomic indels and other non-SNV variants requires a
+local reference genome FASTA file. Cancermuts uses this reference to left-normalize
+VCF alleles through the bcftools functionality provided by pysam.
+
+The required reference assembly depends on the selected gnomAD version:
+
+- gnomAD 2.1 (default) uses GRCh37/hg19.
+- gnomAD 3 uses GRCh38/hg38.
+
+The reference genomes can be downloaded from UCSC:
+```
+wget https://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/hg19.fa.gz
+wget https://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
+```
+
+Decompress the required file:
+```
+gunzip hg19.fa.gz
+gunzip hg38.fa.gz
+```
