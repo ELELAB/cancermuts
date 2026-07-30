@@ -247,6 +247,8 @@ class UniProt(DynamicSource, object):
         elif upid is not None:
             self.log.info("UniProt AC will be mapped from UniProt ID")
             this_upac = self._get_aliases(upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
+            if this_upac is None:
+                raise ValueError(f"Could not resolve UniProt primary accession for {upid}")
         else:
             self.log.info("retrieving UniProt ID for human gene %s" % gene_id)
             try:
@@ -264,9 +266,12 @@ class UniProt(DynamicSource, object):
                 self.log.info("will use Uniprot ID %s" % this_upid)
 
             this_upac = self._get_aliases(this_upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
-
+            if this_upac is None:
+                raise ValueError(f"Could not resolve UniProt primary accession for {this_upid}")
         if upid is None:
             this_upid = self._get_aliases(this_upac, ['UniProtKB_uniProtkbId'])['UniProtKB_uniProtkbId']
+            if this_upid is None:
+                raise ValueError(f"Could not resolve UniProt primary accession for {this_upac}")
         else:
             this_upid = upid
 
