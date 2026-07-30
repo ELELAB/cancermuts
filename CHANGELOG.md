@@ -23,9 +23,12 @@ The project uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 ### Changed
 - Restricted REVEL annotation to missense variants.
 - Updated the documentation to describe indel retrieval and the variant_types argument.
+- Changed cBioPortal to use study-wise genome assembly information if per-mutation is not available.
 
 ### Fixed
 - Fixed cBioPortal hg38 genomic mutations being incorrectly annotated as hg19.
+- Fixed handling of mutations with NAs in cBioPortal.
+
 
 ## [2.0.1] - 2026-07-15
 
