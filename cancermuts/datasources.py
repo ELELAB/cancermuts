@@ -429,13 +429,25 @@ class UniProt(DynamicSource, object):
                 t_keyword = None
                 t_query = t
             self.log.info("fetching alias, fr=%s, to=%s, query=%s" % (fr, t_query, gene_id))
-            responses = self._uniprot_service.mapping( fr = fr,
-                                                       to = t_query,
-                                                       query = gene_id )['results']
+
+            mapping_result = self._uniprot_service.mapping(
+                fr=fr,
+                to=t_query,
+                query=gene_id)
+
+            if mapping_result is None:
+                self.log.warning(
+                    f"UniProt mapping returned no response for {gene_id} "
+                    f"when requesting {t}")
+                out[t] = None
+                continue
+
+            responses = mapping_result.get('results', [])
 
             if len(responses) == 0:
                 self.log.warning(f"No {t} found for {gene_id}")
-                return None
+                out[t] = None
+                continue
 
             if len(responses) > 1:
                 self.log.warning(f"Multiple {t} found for {gene_id}. Found {t}: {', '.join(response['to'] for response in responses)}. No {t} will be assigned.")
@@ -446,7 +458,7 @@ class UniProt(DynamicSource, object):
 
             if t_keyword is not None:
                 self.log.info('using extracted keyword %s to parse results' % t_keyword)
-                out[t] = results['to'][t_keyword]
+                out[t] = results['to'].get(t_keyword)
             else:
                 out[t] = results['to']
 
