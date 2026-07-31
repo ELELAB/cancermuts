@@ -271,7 +271,7 @@ class UniProt(DynamicSource, object):
         if upid is None:
             this_upid = self._get_aliases(this_upac, ['UniProtKB_uniProtkbId'])['UniProtKB_uniProtkbId']
             if this_upid is None:
-                raise ValueError(f"Could not resolve UniProt primary accession for {this_upac}")
+                raise ValueError(f"Could not resolve UniProt ID for accession {this_upac}")
         else:
             this_upid = upid
 
