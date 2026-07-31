@@ -247,6 +247,8 @@ class UniProt(DynamicSource, object):
         elif upid is not None:
             self.log.info("UniProt AC will be mapped from UniProt ID")
             this_upac = self._get_aliases(upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
+            if this_upac is None:
+                raise ValueError(f"Could not resolve UniProt primary accession for {upid}")
         else:
             self.log.info("retrieving UniProt ID for human gene %s" % gene_id)
             try:
@@ -264,9 +266,12 @@ class UniProt(DynamicSource, object):
                 self.log.info("will use Uniprot ID %s" % this_upid)
 
             this_upac = self._get_aliases(this_upid, ['UniProtKB_primaryAccession'])['UniProtKB_primaryAccession']
-
+            if this_upac is None:
+                raise ValueError(f"Could not resolve UniProt primary accession for {this_upid}")
         if upid is None:
             this_upid = self._get_aliases(this_upac, ['UniProtKB_uniProtkbId'])['UniProtKB_uniProtkbId']
+            if this_upid is None:
+                raise ValueError(f"Could not resolve UniProt ID for accession {this_upac}")
         else:
             this_upid = upid
 
@@ -429,13 +434,25 @@ class UniProt(DynamicSource, object):
                 t_keyword = None
                 t_query = t
             self.log.info("fetching alias, fr=%s, to=%s, query=%s" % (fr, t_query, gene_id))
-            responses = self._uniprot_service.mapping( fr = fr,
-                                                       to = t_query,
-                                                       query = gene_id )['results']
+
+            mapping_result = self._uniprot_service.mapping(
+                fr=fr,
+                to=t_query,
+                query=gene_id)
+
+            if mapping_result is None:
+                self.log.warning(
+                    f"UniProt mapping returned no response for {gene_id} "
+                    f"when requesting {t}")
+                out[t] = None
+                continue
+
+            responses = mapping_result.get('results', [])
 
             if len(responses) == 0:
                 self.log.warning(f"No {t} found for {gene_id}")
-                return None
+                out[t] = None
+                continue
 
             if len(responses) > 1:
                 self.log.warning(f"Multiple {t} found for {gene_id}. Found {t}: {', '.join(response['to'] for response in responses)}. No {t} will be assigned.")
