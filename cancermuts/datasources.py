@@ -329,11 +329,9 @@ class UniProt(DynamicSource, object):
                 fasta_id = this_upac
                 self.log.info(f"No canonical isoform found for {this_upac}; using base accession")
 
-        this_entrez = self._get_aliases(this_upac, ['GeneID'])
+        this_entrez = self._get_aliases(this_upac, ['GeneID'])['GeneID']
 
         if this_entrez is not None:
-            this_entrez = this_entrez['GeneID']
-
             aliases = {'uniprot'     : this_upid,
                        'entrez'      : this_entrez,
                        'uniprot_acc' : this_upac }
