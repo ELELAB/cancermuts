@@ -15,5 +15,4 @@
 # You should have received a copy of the GNU General Public License
 # along with Nome-Programma.  If not, see <http://www.gnu.org/licenses/>.
 
-
-__version__ = "2.1.0"
+__version__ = "2.1.1"

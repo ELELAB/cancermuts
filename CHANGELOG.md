@@ -10,6 +10,11 @@ The project uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 ### Changed
 ### Fixed
 
+## [2.1.1] - 2026-08-06
+
+### Fixed
+- Improve UniProt alias error handling by returning unresolved aliases as `None` entries and raising a `ValueError` when required alias conversions cannot be resolved.
+
 ## [2.1.0] - 2026-07-16
 
 ### Added
