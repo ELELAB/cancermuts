@@ -150,15 +150,15 @@ class Sequence(object):
             raise ValueError(f"Variant {var.hgvs} is outside sequence bounds: "
                              f"{var.start}-{var.end} for sequence of length {len(self.sequence)}")
         if self.sequence[var.start - 1:var.end] != var.ref:
-            raise ValueError(f"WT mismatch for {var.hgvs}: expected {var.ref} at "
-                             f"{var.start}-{var.end}, got {self.sequence[var.start - 1:var.end]}")
+            raise ValueError(f"WT mismatch for {var.hgvs}: expected {self.sequence[var.start - 1:var.end]} "
+                             f"as wild-type sequence at {var.start}-{var.end}, got {var.ref} from data source")
         if var.variant_type == "insertion":
             right_pos = var.start + 1
             if right_pos > len(self.sequence):
                 raise ValueError(f"Variant {var.hgvs} is outside sequence bounds")
             if self.sequence[right_pos - 1] != var.alt[-1]:
-                raise ValueError(f"WT mismatch for {var.hgvs}: expected right flank {var.alt[-1]} at "
-                                 f"position {right_pos}, got {self.sequence[right_pos - 1]}")
+                raise ValueError(f"WT mismatch for {var.hgvs}: expected right flank {self.sequence[right_pos - 1]} "
+                                 f"as wild-type sequence at position {right_pos}, got {var.alt[-1]} from data source")
 
     def add_variant(self, var):
         """
