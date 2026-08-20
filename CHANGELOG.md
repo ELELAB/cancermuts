@@ -9,6 +9,7 @@ The project uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 ### Added
 ### Changed
 ### Fixed
+- Improved variant-sequence mismatch messages to report the expected wild-type sequence and variant coordinates.
 
 ## [2.1.1] - 2026-08-06
 
