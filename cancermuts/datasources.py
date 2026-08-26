@@ -35,6 +35,7 @@ from Bio.PDB.Polypeptide import three_to_index, index_to_one
 from Bio import SeqIO, Seq
 import numpy as np
 import pandas as pd
+import polars as pl
 from .core import Sequence, ProteinVariant
 from .properties import *
 from .metadata import *
@@ -2704,34 +2705,30 @@ class RevelDatabase(StaticSource, object):
     def _filter_revel_by_chromosomes(self, chrom):
         file_path = self._revel_file
 
-        with open(file_path, "r") as f:
-            header_line = next(f).rstrip("\n")
-            header = header_line.split(",")
+        cols = ["chr","hg19_pos","grch38_pos","ref","alt",
+            "aaref","aaalt","REVEL","Ensembl_transcriptid"]
 
-            cols = ["chr","hg19_pos","grch38_pos","ref","alt",
-                "aaref","aaalt","REVEL","Ensembl_transcriptid"]
+        # scan_csv does lazy read, reads data with .collect()
+        lazy_df = pl.scan_csv(
+            file_path,
+            schema_overrides={col: pl.String for col in cols}
+            )
 
-            missing = [c for c in cols if c not in header]
-            if missing:
-                raise ValueError(f"[REVEL] Missing columns in file: {missing}")
+        missing = [c for c in cols if c not in lazy_df.collect_schema().names()]
+        if missing:
+            raise ValueError(f"[REVEL] Missing columns in file: {missing}")
 
-            prefix = f"{chrom},"
+        df = (lazy_df
+            .select(cols)
+            .filter(pl.col("chr") == str(chrom))
+            .collect()
+            )
 
-            filtered_lines = []
-            for line in f:
-                if line.startswith(prefix):
-                    filtered_lines.append(line)
+        if df.is_empty():
+            self.log.warning(f"[REVEL] No entries found for chromosome {chrom}")
+            return pl.DataFrame(schema={col: pl.String for col in cols})
 
-        if not filtered_lines:
-            self.log.warning(f"[REVEL] No entries found for chromosomes {chrom}")
-            return pd.DataFrame(columns=cols)
-
-        buffer = StringIO()
-        buffer.write(header_line + "\n")
-        buffer.writelines(filtered_lines)
-        buffer.seek(0)
-
-        return pd.read_csv(buffer, dtype=str)
+        return df
 
     def add_metadata(self, sequence, md_type=['revel_score']):
         if type(md_type) is str:
@@ -2776,13 +2773,13 @@ class RevelDatabase(StaticSource, object):
 
         # Build a working DataFrame from just the needed chromosomes
         if needed_chroms:
-            df = pd.concat(
-                [self._revel_cache_by_chr[c] for c in needed_chroms],
-                ignore_index=True
+            df = pl.concat(
+                [self._revel_cache_by_chr[c] for c in needed_chroms]
             )
         else:
-            df = pd.DataFrame(columns=["chr", "hg19_pos", "grch38_pos", "ref", "alt",
-                                       "aaref", "aaalt", "REVEL", "Ensembl_transcriptid"])
+            cols = ["chr", "hg19_pos", "grch38_pos", "ref", "alt",
+                    "aaref", "aaalt", "REVEL", "Ensembl_transcriptid"]
+            df = pl.DataFrame(schema={col: pl.String for col in cols})
 
         for mutation, gms, transcript_id in mutation_entries:
             mutation.metadata['revel_score'] = []
@@ -2806,53 +2803,58 @@ class RevelDatabase(StaticSource, object):
                         mutation.metadata['revel_score'].append(Revel(source=self, score=s))
                     continue
 
-                df_filtered = df[df[coord_col].astype(str) == str(gm.get_coord())]
-                df_filtered = df_filtered[df_filtered["chr"].astype(str) == str(gm.chr)]
-                df_filtered = df_filtered[df_filtered["alt"] == gm.alt]
+                df_filtered = df.filter(
+                    (pl.col(coord_col).cast(pl.String) == str(gm.get_coord())) &
+                    (pl.col("chr").cast(pl.String) == str(gm.chr)) &
+                    (pl.col("alt") == gm.alt))
 
                 # Some rows have multiple IDs separated by ';', so we use a regex with:
                 #   (^|;) ensures the match is either at the start of the string or follows a semicolon
                 #   ($|;) ensures the match ends at the end of the string or is followed by a semicolon
-                df_filtered = df_filtered[df_filtered["Ensembl_transcriptid"].astype(str).str.contains(
-                    rf'(^|;){(transcript_id)}($|;)', na=False)]
+                df_filtered = df_filtered.filter(
+                    pl.col("Ensembl_transcriptid")
+                    .cast(pl.String)
+                    .str.contains(rf'(^|;){transcript_id}($|;)'))
 
-                if df_filtered.empty:
+                if df_filtered.is_empty():
                     self.log.warning(f"[REVEL] No REVEL match at chr={gm.chr}, pos={gm.get_coord()}, alt={gm.alt}, "
                         f"transcript={transcript_id}")
                     mutation_cache[gm] = ()
                     continue
 
-                ref_mismatches = df_filtered[df_filtered["ref"] != gm.ref]
-                if not ref_mismatches.empty:
+                ref_mismatches = df_filtered.filter(pl.col("ref") != gm.ref)
+                if not ref_mismatches.is_empty():
                     self.log.warning(f"[REVEL] Reference base mismatch for {mutation}: expected {gm.ref}, "
-                        f"got {set(ref_mismatches['ref'])} at chr={gm.chr}, pos={gm.get_coord()} "
+                        f"got {ref_mismatches['ref'].unique().to_list()} at chr={gm.chr}, pos={gm.get_coord()} "
                         f"(transcript {transcript_id})")
                     mutation_cache[gm] = ()
                     continue
 
-                aa_mismatches = df_filtered[df_filtered["aaref"] != mutation.ref]
-                if not aa_mismatches.empty:
+                aa_mismatches = df_filtered.filter(pl.col("aaref") != mutation.ref)
+                if not aa_mismatches.is_empty():
                     self.log.warning(f"[REVEL] Amino acid reference mismatch for {mutation}: expected "
-                        f"{mutation.ref}, got {set(aa_mismatches['aaref'])} "
+                        f"{mutation.ref}, got {aa_mismatches['aaref'].unique().to_list()} "
                         f"at chr={gm.chr}, pos={gm.get_coord()} (transcript {transcript_id})")
                     mutation_cache[gm] = ()
                     continue
 
-                df_final = df_filtered[df_filtered["aaalt"] == mutation.alt]
-                if df_final.empty:
+                df_final = df_filtered.filter(pl.col("aaalt") == mutation.alt)
+                if df_final.is_empty():
                     self.log.warning(f"[REVEL] No match with expected alt amino acid {mutation.alt} "
                         f"for {mutation} at chr={gm.chr}, pos={gm.get_coord()}")
                     mutation_cache[gm] = ()
                     continue
 
-                if df_final["REVEL"].nunique(dropna=True) > 1:
+
+                if df_final["REVEL"].drop_nulls().n_unique() > 1:
                     self.log.warning(
                         f"[REVEL] Multiple REVEL scores found for {mutation} at chr={gm.chr}, "
-                        f"pos={gm.get_coord()}, transcript={transcript_id}: {df_final['REVEL'].unique().tolist()}"
-                    )
+                        f"pos={gm.get_coord()}, transcript={transcript_id}: "
+                        f"{df_final['REVEL'].unique().to_list()}"
+                        )
 
                 parsed_scores = []
-                for score_str in df_final["REVEL"].dropna():
+                for score_str in df_final["REVEL"].drop_nulls():
                     if score_str in [".", "NA"]:
                         self.log.warning(f"[REVEL] Invalid REVEL score value '{score_str}' for {mutation} "
                         f"at chr={gm.chr}, pos={gm.get_coord()}, transcript={transcript_id}")
