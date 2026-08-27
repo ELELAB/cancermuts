@@ -2700,35 +2700,6 @@ class RevelDatabase(StaticSource, object):
 
         self._revel_file = revel_file
         self._supported_metadata = {'revel_score': self._get_revel}
-        self._revel_cache_by_chr = {}
-
-    def _filter_revel_by_chromosomes(self, chrom):
-        file_path = self._revel_file
-
-        cols = ["chr","hg19_pos","grch38_pos","ref","alt",
-            "aaref","aaalt","REVEL","Ensembl_transcriptid"]
-
-        # scan_csv does lazy read, reads data with .collect()
-        lazy_df = pl.scan_csv(
-            file_path,
-            schema_overrides={col: pl.String for col in cols}
-            )
-
-        missing = [c for c in cols if c not in lazy_df.collect_schema().names()]
-        if missing:
-            raise ValueError(f"[REVEL] Missing columns in file: {missing}")
-
-        df = (lazy_df
-            .select(cols)
-            .filter(pl.col("chr") == str(chrom))
-            .collect()
-            )
-
-        if df.is_empty():
-            self.log.warning(f"[REVEL] No entries found for chromosome {chrom}")
-            return pl.DataFrame(schema={col: pl.String for col in cols})
-
-        return df
 
     def add_metadata(self, sequence, md_type=['revel_score']):
         if type(md_type) is str:
@@ -2766,20 +2737,29 @@ class RevelDatabase(StaticSource, object):
                 if hasattr(gm, 'chr') and gm.chr is not None:
                     needed_chroms.add(str(gm.chr))
 
-        # Ensure the cache has all needed chromosome slices
-        for chrom in needed_chroms:
-            if chrom not in self._revel_cache_by_chr:
-                self._revel_cache_by_chr[chrom] = self._filter_revel_by_chromosomes(chrom)
+
+        cols = ["chr", "hg19_pos", "grch38_pos", "ref", "alt",
+                "aaref", "aaalt", "REVEL", "Ensembl_transcriptid"]
+
+        # Lazily scan the REVEL database
+        lazy_df = pl.scan_csv(
+            self._revel_file,
+            schema_overrides={"chr": pl.String},
+            null_values=[".", "NA"]
+        )
+
+        # Check that all required columns are present
+        missing = [c for c in cols if c not in lazy_df.collect_schema().names()]
+        if missing:
+            raise ValueError(f"[REVEL] Missing columns in file: {missing}")
 
         # Build a working DataFrame from just the needed chromosomes
-        if needed_chroms:
-            df = pl.concat(
-                [self._revel_cache_by_chr[c] for c in needed_chroms]
-            )
-        else:
-            cols = ["chr", "hg19_pos", "grch38_pos", "ref", "alt",
-                    "aaref", "aaalt", "REVEL", "Ensembl_transcriptid"]
-            df = pl.DataFrame(schema={col: pl.String for col in cols})
+        df = (
+            lazy_df
+            .select(cols)
+            .filter(pl.col("chr").is_in(needed_chroms))
+            .collect()
+        )
 
         for mutation, gms, transcript_id in mutation_entries:
             mutation.metadata['revel_score'] = []
@@ -2804,8 +2784,8 @@ class RevelDatabase(StaticSource, object):
                     continue
 
                 df_filtered = df.filter(
-                    (pl.col(coord_col).cast(pl.String) == str(gm.get_coord())) &
-                    (pl.col("chr").cast(pl.String) == str(gm.chr)) &
+                    (pl.col(coord_col) == int(gm.get_coord())) &
+                    (pl.col("chr") == str(gm.chr)) &
                     (pl.col("alt") == gm.alt))
 
                 # Some rows have multiple IDs separated by ';', so we use a regex with:
@@ -2813,7 +2793,6 @@ class RevelDatabase(StaticSource, object):
                 #   ($|;) ensures the match ends at the end of the string or is followed by a semicolon
                 df_filtered = df_filtered.filter(
                     pl.col("Ensembl_transcriptid")
-                    .cast(pl.String)
                     .str.contains(rf'(^|;){transcript_id}($|;)'))
 
                 if df_filtered.is_empty():
@@ -2854,25 +2833,22 @@ class RevelDatabase(StaticSource, object):
                         )
 
                 parsed_scores = []
-                for score_str in df_final["REVEL"].drop_nulls():
-                    if score_str in [".", "NA"]:
-                        self.log.warning(f"[REVEL] Invalid REVEL score value '{score_str}' for {mutation} "
-                        f"at chr={gm.chr}, pos={gm.get_coord()}, transcript={transcript_id}")
-                        continue
 
-                    try:
-                        score = float(score_str)
-                        parsed_scores.append(score)
-                        self.log.info(
-                            f"[REVEL] Match for {mutation}: chr={gm.chr}, pos={gm.get_coord()}, "
-                            f"ref={gm.ref}, alt={gm.alt}, aaref={mutation.ref}, "
-                            f"aaalt={mutation.alt}, transcript={transcript_id}, score={score}")
-                    except ValueError:
-                        self.log.warning(f"[REVEL] Could not parse REVEL score '{score_str}' for {mutation}")
+                for score in df_final["REVEL"].drop_nulls():
+                    parsed_scores.append(score)
+
+                    self.log.info(
+                        f"[REVEL] Match for {mutation}: chr={gm.chr}, pos={gm.get_coord()}, "
+                        f"ref={gm.ref}, alt={gm.alt}, aaref={mutation.ref}, "
+                        f"aaalt={mutation.alt}, transcript={transcript_id}, score={score}"
+                    )
 
                 mutation_cache[gm] = tuple(parsed_scores)
+
                 for s in parsed_scores:
-                    mutation.metadata['revel_score'].append(Revel(source=self, score=s))
+                    mutation.metadata['revel_score'].append(
+                        Revel(source=self, score=s)
+                    )
 
 class ELMDatabase(DynamicSource, object):
     def __init__(self):
