@@ -35,6 +35,7 @@ from Bio.PDB.Polypeptide import three_to_index, index_to_one
 from Bio import SeqIO, Seq
 import numpy as np
 import pandas as pd
+import polars as pl 
 from .core import Sequence, ProteinVariant
 from .properties import *
 from .metadata import *
@@ -1884,37 +1885,102 @@ class COSMIC(DynamicMutationSource, object):
         else:
             self._df = None
 
-    def _load_db_files(self, targeted_db_file, screenmut_db_file):
+    def _load_db_files(self, targeted_db_file, screenmut_db_file, gene_id=None):
 
         targeted_screenmut_db_files = [targeted_db_file, screenmut_db_file]
-        targeted_screenmut_db_filenames = [os.path.basename(self._targeted_database_file), os.path.basename(self._screen_mutant_database_file)]
+        targeted_screenmut_db_filenames = [
+            os.path.basename(self._targeted_database_file),
+            os.path.basename(self._screen_mutant_database_file)
+        ]
 
         targeted_screenmut_dataframes = []
+
         for fi, file in enumerate(targeted_screenmut_db_files):
-            self.log.info(f"Parsing database file {targeted_screenmut_db_filenames[fi]}...")
+            self.log.info(
+                f"Parsing database file {targeted_screenmut_db_filenames[fi]}..."
+            )
+
             try:
-                df_tmp = pd.read_csv(file, sep='\\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=self._encoding)
-                df_tmp['TRANSCRIPT_ACCESSION'] = df_tmp['TRANSCRIPT_ACCESSION'].map(lambda x: x.split('.', 1)[0] if isinstance(x, str) else x)
+                df_tmp = pl.scan_csv(
+                    file,
+                    separator="\t",
+                    null_values="NS",
+                    encoding=self._encoding if self._encoding is not None else "utf8",
+                ).select(self._use_cols_database_files)
+
+                if gene_id is not None:
+                    df_tmp = df_tmp.filter(
+                        pl.col("GENE_SYMBOL") == gene_id
+                    )
+
+                df_tmp = (
+                    df_tmp
+                    .with_columns(
+                        pl.col("TRANSCRIPT_ACCESSION")
+                        .str.split(".")
+                        .list.first()
+                    )
+                    .collect()
+                )
+
                 targeted_screenmut_dataframes.append(df_tmp)
-            except:
-                self.log.error(f"Couldn't parse database file {targeted_screenmut_db_filenames[fi]}")
-                raise TypeError(f"Couldn't parse database file {targeted_screenmut_db_filenames[fi]}")
 
-        tmp_targeted_screenmut_df = pd.concat(targeted_screenmut_dataframes, ignore_index=True, sort=False)
+            except Exception:
+                self.log.error(
+                    f"Couldn't parse database file "
+                    f"{targeted_screenmut_db_filenames[fi]}"
+                )
+                raise TypeError(
+                    f"Couldn't parse database file "
+                    f"{targeted_screenmut_db_filenames[fi]}"
+                )
 
-        classification_db_filename = os.path.basename(self._classification_database_file)
-        self.log.info(f"Parsing database file {classification_db_filename}...")
+        tmp_targeted_screenmut_df = pl.concat(
+            targeted_screenmut_dataframes,
+            how="diagonal"
+        )
+
+        classification_db_filename = os.path.basename(
+            self._classification_database_file
+        )
+
+        self.log.info(
+            f"Parsing database file {classification_db_filename}..."
+        )
+
         try:
-            classification_df = pd.read_csv(self._classification_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_classification_files, encoding=self._encoding)
-        except ValueError:
-            self.log.error(f"Couldn't parse database file {classification_db_filename}")
-            raise TypeError(f"Couldn't parse database file {classification_db_filename}")
+            classification_df = pl.read_csv(
+                self._classification_database_file,
+                separator="\t",
+                null_values="NS",
+                columns=self._use_cols_classification_files,
+                encoding=self._encoding if self._encoding is not None else "utf8",
+            )
+
+        except Exception:
+            self.log.error(
+                f"Couldn't parse database file {classification_db_filename}"
+            )
+            raise TypeError(
+                f"Couldn't parse database file {classification_db_filename}"
+            )
 
         try:
-            df = tmp_targeted_screenmut_df.merge(classification_df, on='COSMIC_PHENOTYPE_ID', sort=False)
-        except KeyError:
-            self.log.error("Couldn't merge database files due to missing or incorrectly named join columns")
-            raise TypeError("Couldn't merge database files due to missing or incorrectly named join columns")
+            df = tmp_targeted_screenmut_df.join(
+                classification_df,
+                on="COSMIC_PHENOTYPE_ID",
+                how="inner"
+            )
+
+        except Exception:
+            self.log.error(
+                "Couldn't merge database files due to missing or incorrectly "
+                "named join columns"
+            )
+            raise TypeError(
+                "Couldn't merge database files due to missing or incorrectly "
+                "named join columns"
+            )
 
         return df
 
@@ -1956,58 +2022,85 @@ class COSMIC(DynamicMutationSource, object):
             do_histology = True
 
         if self._df is not None:
-            df = self._df[(self._df['GENE_SYMBOL'] == gene_id)]
+            df = self._df.filter(
+                pl.col("GENE_SYMBOL") == gene_id
+            )
 
         else:
-            filtered_lines_t = []
-            filtered_lines_s = []
-            with open(self._targeted_database_file, "r", encoding=self._encoding) as t, open(self._screen_mutant_database_file, "r", encoding=self._encoding) as s:
+            df = self._load_db_files(
+                self._targeted_database_file,
+                self._screen_mutant_database_file,
+                gene_id=gene_id
+            )
 
-                filtered_lines_t.append(t.readline())
-                filtered_lines_s.append(s.readline())
-                filtered_lines_t += [ line for line in t if line.startswith(f'{gene_id}\t') ]
-                filtered_lines_s += [ line for line in s if line.startswith(f'{gene_id}\t') ]
-
-            if len(filtered_lines_s) == 1 and len(filtered_lines_t) == 1:
-                raise ValueError(f"The given gene_id {gene_id} is not present in the database files")
-
-            filtered_targeted_database_file = StringIO("".join(filtered_lines_t))
-            filtered_screenmut_database_file = StringIO("".join(filtered_lines_s))
-
-            df = self._load_db_files(filtered_targeted_database_file, filtered_screenmut_database_file)
-
+            if df.is_empty():
+                raise ValueError(
+                    f"The given gene_id {gene_id} is not present in the database files"
+                )
 
         self.log.info(f"Filtering by transcript_accession={transcript_accession}")
-        df = df[df['TRANSCRIPT_ACCESSION'] == transcript_accession]
-        if df.empty:
-            self.log.warning(f"No COSMIC mutations for gene {gene_id} with TRANSCRIPT_ACCESSION={transcript_accession}; returning empty results")
+
+        df = df.filter(
+            pl.col("TRANSCRIPT_ACCESSION") == transcript_accession
+        )
+
+        if df.is_empty():
+            self.log.warning(
+                f"No COSMIC mutations for gene {gene_id} with "
+                f"TRANSCRIPT_ACCESSION={transcript_accession}; returning empty results"
+            )
             return [], out_metadata
 
         if cancer_types is not None:
-            df = df[ df['PRIMARY_HISTOLOGY'].isin(cancer_types) ]
+            df = df.filter(
+                pl.col("PRIMARY_HISTOLOGY").is_in(cancer_types)
+            )
+
         if cancer_histology_subtype_1 is not None:
-            df = df[ df['HISTOLOGY_SUBTYPE_1'].isin(cancer_histology_subtype_1) ]
+            df = df.filter(
+                pl.col("HISTOLOGY_SUBTYPE_1").is_in(cancer_histology_subtype_1)
+            )
+
         if cancer_histology_subtype_2 is not None:
-            df = df[ df['HISTOLOGY_SUBTYPE_2'].isin(cancer_histology_subtype_2) ]
+            df = df.filter(
+                pl.col("HISTOLOGY_SUBTYPE_2").is_in(cancer_histology_subtype_2)
+            )
+
         if cancer_histology_subtype_3 is not None:
-            df = df[ df['HISTOLOGY_SUBTYPE_3'].isin(cancer_histology_subtype_3) ]
+            df = df.filter(
+                pl.col("HISTOLOGY_SUBTYPE_3").is_in(cancer_histology_subtype_3)
+            )
 
         if cancer_sites is not None:
-            df = df[ df['PRIMARY_SITE'].isin(cancer_sites) ]
+            df = df.filter(
+                pl.col("PRIMARY_SITE").is_in(cancer_sites)
+            )
+
         if cancer_site_subtype_1 is not None:
-            df = df[ df['SITE_SUBTYPE_1'].isin(cancer_site_subtype_1) ]
+            df = df.filter(
+                pl.col("SITE_SUBTYPE_1").is_in(cancer_site_subtype_1)
+            )
+
         if cancer_site_subtype_2 is not None:
-            df = df[ df['SITE_SUBTYPE_2'].isin(cancer_site_subtype_2) ]
+            df = df.filter(
+                pl.col("SITE_SUBTYPE_2").is_in(cancer_site_subtype_2)
+            )
+
         if cancer_site_subtype_3 is not None:
-            df = df[ df['SITE_SUBTYPE_3'].isin(cancer_site_subtype_3) ]
+            df = df.filter(
+                pl.col("SITE_SUBTYPE_3").is_in(cancer_site_subtype_3)
+            )
 
-        df = df[ df['MUTATION_AA'].notna() ]
+        df = df.filter(pl.col("MUTATION_AA").is_not_null())
 
-        df = df[df['MUTATION_AA'].apply(lambda mutation: self._mutation_type(mutation) in variant_types)]
+        df = df.filter(pl.col("MUTATION_AA").map_elements(
+            lambda mutation: self._mutation_type(mutation) in variant_types,
+            return_dtype=pl.Boolean,
+            )
+        )
 
-        for r in df.iterrows():
-            r = r[1]
-            mutations.append(r['MUTATION_AA'])
+        for r in df.iter_rows(named=True):
+            mutations.append(r["MUTATION_AA"])
             mutation_type = self._mutation_type(r['MUTATION_AA'])
 
             if do_cancer_type:
@@ -2036,13 +2129,13 @@ class COSMIC(DynamicMutationSource, object):
                 gd.append(genomic_ref)
 
             if do_genomic_coordinates:
-                if any(pd.isna(x) for x in gd[:4]):
+                if any(x is None for x in gd[:4]):
                     out_metadata['genomic_coordinates'].append(None)
                 else:
                     out_metadata['genomic_coordinates'].append(gd)
 
             if do_genomic_mutations:
-                if gd is None or pd.isna(r['HGVSG']):
+                if gd is None or r["HGVSG"] is None:
                     self.log.warning("couldn't annotate genomic mutation")
                     gm = None
                 else:
