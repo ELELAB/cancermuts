@@ -2731,13 +2731,6 @@ class RevelDatabase(StaticSource, object):
 
     def _get_revel(self, mutation_entries):
 
-        needed_chroms = set()
-        for _, gms, _ in mutation_entries:
-            for gm in gms:
-                if hasattr(gm, 'chr') and gm.chr is not None:
-                    needed_chroms.add(str(gm.chr))
-
-
         cols = ["chr", "hg19_pos", "grch38_pos", "ref", "alt",
                 "aaref", "aaalt", "REVEL", "Ensembl_transcriptid"]
 
@@ -2753,18 +2746,78 @@ class RevelDatabase(StaticSource, object):
         if missing:
             raise ValueError(f"[REVEL] Missing columns in file: {missing}")
 
-        # Build a working DataFrame from just the needed chromosomes
-        df = (
-            lazy_df
-            .select(cols)
-            .filter(pl.col("chr").is_in(needed_chroms))
-            .collect()
+        # Build one DataFrame containing all genomic mutations
+        mutation_rows = []
+
+        for mutation, _, _ in mutation_entries:
+            mutation.metadata['revel_score'] = []
+
+        for mutation_idx, (mutation, gms, transcript_id) in enumerate(mutation_entries):
+            for gm_idx, gm in enumerate(gms):
+                if not all(
+                    hasattr(gm, attr)
+                    for attr in ["genome_build", "chr", "get_coord", "ref", "alt"]
+                ):
+                    continue
+
+                if gm.genome_build not in ("hg19", "hg38"):
+                    continue
+
+                mutation_rows.append({
+                    "mutation_idx": mutation_idx,
+                    "gm_idx": gm_idx,
+                    "chr": str(gm.chr),
+                    "coord": int(gm.get_coord()),
+                    "alt": gm.alt,
+                    "genome_build": gm.genome_build,
+                })
+
+        if not mutation_rows:
+            return
+
+        df_mutations = pl.DataFrame(mutation_rows)
+
+        mut_hg19 = df_mutations.filter(
+            pl.col("genome_build") == "hg19"
         )
 
-        for mutation, gms, transcript_id in mutation_entries:
-            mutation.metadata['revel_score'] = []
+        mut_hg38 = df_mutations.filter(
+            pl.col("genome_build") == "hg38"
+        )
+
+        revel_lf = lazy_df.select(cols)
+
+        joined_frames = []
+
+        if not mut_hg19.is_empty():
+            joined_frames.append(
+                mut_hg19.lazy()
+                .join(
+                    revel_lf,
+                    left_on=["chr", "coord", "alt"],
+                    right_on=["chr", "hg19_pos", "alt"],
+                    how="left",
+                )
+                .collect()
+            )
+
+        if not mut_hg38.is_empty():
+            joined_frames.append(
+                mut_hg38.lazy()
+                .join(
+                    revel_lf,
+                    left_on=["chr", "coord", "alt"],
+                    right_on=["chr", "grch38_pos", "alt"],
+                    how="left",
+                )
+                .collect()
+            )
+
+        df = pl.concat(joined_frames, how="diagonal")
+
+        for mutation_idx, (mutation, gms, transcript_id) in enumerate(mutation_entries):
             mutation_cache = {}
-            for gm in gms:
+            for gm_idx, gm in enumerate(gms):
                 if not all(hasattr(gm, attr) for attr in ['genome_build', 'chr', 'get_coord', 'ref', 'alt']):
                     self.log.warning(f"[REVEL] Skipping genomic mutation without complete coordinate information: {gm}")
                     continue
@@ -2784,9 +2837,9 @@ class RevelDatabase(StaticSource, object):
                     continue
 
                 df_filtered = df.filter(
-                    (pl.col(coord_col) == int(gm.get_coord())) &
-                    (pl.col("chr") == str(gm.chr)) &
-                    (pl.col("alt") == gm.alt))
+                    (pl.col("mutation_idx") == mutation_idx) &
+                    (pl.col("gm_idx") == gm_idx)
+                )
 
                 # Some rows have multiple IDs separated by ';', so we use a regex with:
                 #   (^|;) ensures the match is either at the start of the string or follows a semicolon
@@ -2834,7 +2887,14 @@ class RevelDatabase(StaticSource, object):
 
                 parsed_scores = []
 
-                for score in df_final["REVEL"].drop_nulls():
+                for score in df_final["REVEL"]:
+                    if score is None:
+                        self.log.warning(
+                                f"[REVEL] Null REVEL score for {mutation} at chr={gm.chr}, "
+                                f"pos={gm.get_coord()}, transcript={transcript_id}"
+                                )
+                        continue
+
                     parsed_scores.append(score)
 
                     self.log.info(
@@ -3903,4 +3963,3 @@ class ManualAnnotation(StaticSource):
             else:
                 sequence.add_property(row['type'], positions=positions, sources=[self], name=row['name'], function=row['function'],
                                       reference=row['reference'])
-
