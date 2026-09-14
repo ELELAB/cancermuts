@@ -8,6 +8,7 @@ The project uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 
 ### Added
 ### Changed
+- Improved performance of RevelDatabase module by switching database parsing from pandas to polars
 ### Fixed
 
 ## [2.1.2] - 2026-08-20
