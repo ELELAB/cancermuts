@@ -8,6 +8,7 @@ The project uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 
 ### Added
 ### Changed
+- Migrated COSMIC datasources from pandas to polars, with lazy loading and filtering support. 
 ### Fixed
 
 ## [2.1.2] - 2026-08-20
