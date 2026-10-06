@@ -1833,7 +1833,7 @@ class ClinVar(DynamicMutationSource, object):
         }
 class COSMIC(DynamicMutationSource, object):
     @logger_init
-    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, database_encoding="utf8", lazy_load_db=True):
+    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, lazy_load_db=True):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
         self._mut_snv_regexp = '^[0-9]+:g\.[0-9+][ACTG]>[ACTG]'
@@ -1872,36 +1872,23 @@ class COSMIC(DynamicMutationSource, object):
         self._screen_mutant_database_file = screen_mutant_database_file
         self._classification_database_file = classification_database_file
 
-        if database_encoding is None or isinstance(database_encoding, str):
-            self._encoding = database_encoding
-        else:
-            self.log.error(
-                'encoding for COSMIC database files must be None, '
-                'or a single string that applies to all files'
-            )
-            raise TypeError(
-                'encoding for COSMIC database files must be None, '
-                'or a single string that applies to all files'
-            )
-
         for file in database_files:
             try:
                 fh = open(file, 'r')
                 fh.close()
             except Exception as e:
                 self.log.error(f"Couldn't open database file {e}")
-                raise
+                raise e
 
         if not lazy_load_db:
-            self._df = self._load_db_files(
-                self._targeted_database_file,
-                self._screen_mutant_database_file
-            )
+            self._df = self._load_db_files()
         else:
             self._df = None
-
-    def _load_db_files(self, targeted_db_file, screenmut_db_file, lazy=False):
-        targeted_screenmut_db_files = [targeted_db_file, screenmut_db_file]
+    def _load_db_files(self, lazy=False):
+        targeted_screenmut_db_files = [
+            self._targeted_database_file,
+            self._screen_mutant_database_file
+        ]
         targeted_screenmut_db_filenames = [
             os.path.basename(self._targeted_database_file),
             os.path.basename(self._screen_mutant_database_file)
@@ -1918,7 +1905,6 @@ class COSMIC(DynamicMutationSource, object):
                 file,
                 separator="\t",
                 null_values="NS",
-                encoding=self._encoding,
             ).select(self._use_cols_database_files)
 
             df_tmp = df_tmp.with_columns(
@@ -1946,7 +1932,6 @@ class COSMIC(DynamicMutationSource, object):
             self._classification_database_file,
             separator="\t",
             null_values="NS",
-            encoding=self._encoding,
         ).select(self._use_cols_classification_files)
 
         df = tmp_targeted_screenmut_df.join(
@@ -2008,11 +1993,7 @@ class COSMIC(DynamicMutationSource, object):
         if self._df is not None:
             df = self._df
         else:
-            df = self._load_db_files(
-                self._targeted_database_file,
-                self._screen_mutant_database_file,
-                lazy=True
-            )
+            df = self._load_db_files(lazy=True)
 
         df = df.filter(
             pl.col("GENE_SYMBOL") == gene_symbol
