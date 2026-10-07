@@ -3,6 +3,7 @@
 # (c) 2023 Katrine Meldgård <katrine@meldgaard.dk>
 # (c) 2025 Pablo Sanchez-Izquierdo
 # (c) 2026 Beatrice Drago
+# (c) 2026 Emma Qingjie Andersen
 # This file is part of cancermuts
 # The function '_get_popmax_af' is taken and modified from the 'gnomad2csv' script
 # which is part of the ELELAB/CSB-scripts repository
@@ -1830,10 +1831,9 @@ class ClinVar(DynamicMutationSource, object):
             "entry_not_found": df_not_found,
             "inconsistency_annotations": df2
         }
-
 class COSMIC(DynamicMutationSource, object):
     @logger_init
-    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, database_encoding=None, lazy_load_db=True):
+    def __init__(self, targeted_database_file, screen_mutant_database_file, classification_database_file, lazy_load_db=True):
         description = "COSMIC Database"
         super(COSMIC, self).__init__(name='COSMIC', version='v87', description=description)
         self._mut_snv_regexp = '^[0-9]+:g\.[0-9+][ACTG]>[ACTG]'
@@ -1842,189 +1842,258 @@ class COSMIC(DynamicMutationSource, object):
         self._site_kwd = ['PRIMARY_SITE', 'SITE_SUBTYPE_1', 'SITE_SUBTYPE_2', 'SITE_SUBTYPE_3']
         self._histology_kwd = ['PRIMARY_HISTOLOGY', 'HISTOLOGY_SUBTYPE_1', 'HISTOLOGY_SUBTYPE_2', 'HISTOLOGY_SUBTYPE_3']
 
-        self._use_cols_database_files = ['GENE_SYMBOL',
-                                'TRANSCRIPT_ACCESSION',
-                                'COSMIC_PHENOTYPE_ID',
-                                 'MUTATION_AA',
-                                 'CHROMOSOME',
-                                 'GENOME_START',
-                                 'GENOME_STOP',
-                                 'MUTATION_CDS',
-                                 'STRAND',
-                                 'HGVSG']
+        self._use_cols_database_files = [
+            'GENE_SYMBOL',
+            'TRANSCRIPT_ACCESSION',
+            'COSMIC_PHENOTYPE_ID',
+            'MUTATION_AA',
+            'CHROMOSOME',
+            'GENOME_START',
+            'GENOME_STOP',
+            'MUTATION_CDS',
+            'STRAND',
+            'HGVSG'
+        ]
 
         self._use_cols_classification_files = self._cosmic_phenotype_id_kwd + self._site_kwd + self._histology_kwd
 
-        database_files = [targeted_database_file,screen_mutant_database_file,
-                          classification_database_file]
+        database_files = [
+            targeted_database_file,
+            screen_mutant_database_file,
+            classification_database_file
+        ]
+
         for file in database_files:
             if not isinstance(file, str):
                 self.log.error('COSMIC database file must be a string.')
-                raise TypeError('COSMIC database file  must be a string.')
+                raise TypeError('COSMIC database file must be a string.')
 
         self._targeted_database_file = targeted_database_file
         self._screen_mutant_database_file = screen_mutant_database_file
         self._classification_database_file = classification_database_file
 
-        if database_encoding is None or isinstance(database_encoding, str):
-            self._encoding = database_encoding
-        else:
-            self.log.error('encoding for COSMIC database files must be None, or a single string that applies to all files')
-            raise TypeError('encoding for COSMIC database files must be None, or a single string that applies to all files')
-
         for file in database_files:
             try:
-                file = open(file, 'r')
-                file.close()
+                fh = open(file, 'r')
+                fh.close()
             except Exception as e:
                 self.log.error(f"Couldn't open database file {e}")
-                raise
+                raise e
 
         if not lazy_load_db:
-            self._df = self._load_db_files(self._targeted_database_file, self._screen_mutant_database_file)
+            self._df = self._load_db_files()
         else:
             self._df = None
-
-    def _load_db_files(self, targeted_db_file, screenmut_db_file):
-
-        targeted_screenmut_db_files = [targeted_db_file, screenmut_db_file]
-        targeted_screenmut_db_filenames = [os.path.basename(self._targeted_database_file), os.path.basename(self._screen_mutant_database_file)]
+    def _load_db_files(self, lazy=False):
+        targeted_screenmut_db_files = [
+            self._targeted_database_file,
+            self._screen_mutant_database_file
+        ]
+        targeted_screenmut_db_filenames = [
+            os.path.basename(self._targeted_database_file),
+            os.path.basename(self._screen_mutant_database_file)
+        ]
 
         targeted_screenmut_dataframes = []
+
         for fi, file in enumerate(targeted_screenmut_db_files):
-            self.log.info(f"Parsing database file {targeted_screenmut_db_filenames[fi]}...")
-            try:
-                df_tmp = pd.read_csv(file, sep='\\t', dtype='str', na_values='NS', usecols=self._use_cols_database_files, encoding=self._encoding)
-                df_tmp['TRANSCRIPT_ACCESSION'] = df_tmp['TRANSCRIPT_ACCESSION'].map(lambda x: x.split('.', 1)[0] if isinstance(x, str) else x)
-                targeted_screenmut_dataframes.append(df_tmp)
-            except:
-                self.log.error(f"Couldn't parse database file {targeted_screenmut_db_filenames[fi]}")
-                raise TypeError(f"Couldn't parse database file {targeted_screenmut_db_filenames[fi]}")
+            self.log.info(
+                f"Parsing database file {targeted_screenmut_db_filenames[fi]}..."
+            )
 
-        tmp_targeted_screenmut_df = pd.concat(targeted_screenmut_dataframes, ignore_index=True, sort=False)
+            df_tmp = pl.scan_csv(
+                file,
+                separator="\t",
+                null_values="NS",
+            ).select(self._use_cols_database_files)
 
-        classification_db_filename = os.path.basename(self._classification_database_file)
-        self.log.info(f"Parsing database file {classification_db_filename}...")
-        try:
-            classification_df = pd.read_csv(self._classification_database_file, sep='\t', dtype='str', na_values='NS', usecols=self._use_cols_classification_files, encoding=self._encoding)
-        except ValueError:
-            self.log.error(f"Couldn't parse database file {classification_db_filename}")
-            raise TypeError(f"Couldn't parse database file {classification_db_filename}")
+            df_tmp = df_tmp.with_columns(
+                pl.col("TRANSCRIPT_ACCESSION")
+                .str.split(".")
+                .list.first()
+            )
 
-        try:
-            df = tmp_targeted_screenmut_df.merge(classification_df, on='COSMIC_PHENOTYPE_ID', sort=False)
-        except KeyError:
-            self.log.error("Couldn't merge database files due to missing or incorrectly named join columns")
-            raise TypeError("Couldn't merge database files due to missing or incorrectly named join columns")
+            targeted_screenmut_dataframes.append(df_tmp)
+
+        tmp_targeted_screenmut_df = pl.concat(
+            targeted_screenmut_dataframes,
+            how="diagonal"
+        )
+
+        classification_db_filename = os.path.basename(
+            self._classification_database_file
+        )
+
+        self.log.info(
+            f"Parsing database file {classification_db_filename}..."
+        )
+
+        classification_df = pl.scan_csv(
+            self._classification_database_file,
+            separator="\t",
+            null_values="NS",
+        ).select(self._use_cols_classification_files)
+
+        df = tmp_targeted_screenmut_df.join(
+            classification_df,
+            on="COSMIC_PHENOTYPE_ID",
+            how="inner",
+        )
+
+        if not lazy:
+            df = df.collect()
 
         return df
 
-    def _parse_db_files(self, gene_id, transcript_accession, genome_assembly_version = 'GRCh38',
-                       cancer_types=None,
-                       cancer_histology_subtype_1=None,
-                       cancer_histology_subtype_2=None,
-                       cancer_histology_subtype_3=None,
-                       cancer_sites=None,
-                       cancer_site_subtype_1=None,
-                       cancer_site_subtype_2=None,
-                       cancer_site_subtype_3=None,
-                       metadata=[],
-                       variant_types=("missense",)):
+    def _parse_db_files(self, gene_symbol, transcript_accession, genome_assembly_version='GRCh38',
+                        cancer_types=None,
+                        cancer_histology_subtype_1=None,
+                        cancer_histology_subtype_2=None,
+                        cancer_histology_subtype_3=None,
+                        cancer_sites=None,
+                        cancer_site_subtype_1=None,
+                        cancer_site_subtype_2=None,
+                        cancer_site_subtype_3=None,
+                        metadata=[],
+                        variant_types=("missense",)):
 
         mutations = []
+
         if not self._valid_variant_types(variant_types):
             raise ValueError(f"Invalid variant_types: {variant_types}")
+
         variant_types = self._normalize_variant_types(variant_types)
 
-        out_metadata = dict(list(zip(metadata, [list() for i in range(len(metadata))])))
+        out_metadata = dict(
+            list(zip(metadata, [list() for i in range(len(metadata))]))
+        )
 
         do_cancer_type = False
         if 'cancer_type' in metadata:
             do_cancer_type = True
+
         do_genomic_coordinates = False
         if 'genomic_coordinates' in metadata:
             do_genomic_coordinates = True
+
         do_genomic_mutations = False
         if 'genomic_mutations' in metadata:
             do_genomic_mutations = True
+
         do_site = False
         if 'cancer_site' in metadata:
             out_metadata['cancer_site'] = []
             do_site = True
+
         do_histology = False
         if 'cancer_histology' in metadata:
             out_metadata['cancer_histology'] = []
             do_histology = True
 
         if self._df is not None:
-            df = self._df[(self._df['GENE_SYMBOL'] == gene_id)]
-
+            df = self._df
         else:
-            filtered_lines_t = []
-            filtered_lines_s = []
-            with open(self._targeted_database_file, "r", encoding=self._encoding) as t, open(self._screen_mutant_database_file, "r", encoding=self._encoding) as s:
+            df = self._load_db_files(lazy=True)
 
-                filtered_lines_t.append(t.readline())
-                filtered_lines_s.append(s.readline())
-                filtered_lines_t += [ line for line in t if line.startswith(f'{gene_id}\t') ]
-                filtered_lines_s += [ line for line in s if line.startswith(f'{gene_id}\t') ]
+        df = df.filter(
+            pl.col("GENE_SYMBOL") == gene_symbol
+        )
 
-            if len(filtered_lines_s) == 1 and len(filtered_lines_t) == 1:
-                raise ValueError(f"The given gene_id {gene_id} is not present in the database files")
+        self.log.info(
+            f"Filtering by transcript_accession={transcript_accession}"
+        )
 
-            filtered_targeted_database_file = StringIO("".join(filtered_lines_t))
-            filtered_screenmut_database_file = StringIO("".join(filtered_lines_s))
-
-            df = self._load_db_files(filtered_targeted_database_file, filtered_screenmut_database_file)
-
-
-        self.log.info(f"Filtering by transcript_accession={transcript_accession}")
-        df = df[df['TRANSCRIPT_ACCESSION'] == transcript_accession]
-        if df.empty:
-            self.log.warning(f"No COSMIC mutations for gene {gene_id} with TRANSCRIPT_ACCESSION={transcript_accession}; returning empty results")
-            return [], out_metadata
+        df = df.filter(
+            pl.col("TRANSCRIPT_ACCESSION") == transcript_accession
+        )
 
         if cancer_types is not None:
-            df = df[ df['PRIMARY_HISTOLOGY'].isin(cancer_types) ]
+            df = df.filter(
+                pl.col("PRIMARY_HISTOLOGY").is_in(cancer_types)
+            )
+
         if cancer_histology_subtype_1 is not None:
-            df = df[ df['HISTOLOGY_SUBTYPE_1'].isin(cancer_histology_subtype_1) ]
+            df = df.filter(
+                pl.col("HISTOLOGY_SUBTYPE_1").is_in(cancer_histology_subtype_1)
+            )
+
         if cancer_histology_subtype_2 is not None:
-            df = df[ df['HISTOLOGY_SUBTYPE_2'].isin(cancer_histology_subtype_2) ]
+            df = df.filter(
+                pl.col("HISTOLOGY_SUBTYPE_2").is_in(cancer_histology_subtype_2)
+            )
+
         if cancer_histology_subtype_3 is not None:
-            df = df[ df['HISTOLOGY_SUBTYPE_3'].isin(cancer_histology_subtype_3) ]
+            df = df.filter(
+                pl.col("HISTOLOGY_SUBTYPE_3").is_in(cancer_histology_subtype_3)
+            )
 
         if cancer_sites is not None:
-            df = df[ df['PRIMARY_SITE'].isin(cancer_sites) ]
+            df = df.filter(
+                pl.col("PRIMARY_SITE").is_in(cancer_sites)
+            )
+
         if cancer_site_subtype_1 is not None:
-            df = df[ df['SITE_SUBTYPE_1'].isin(cancer_site_subtype_1) ]
+            df = df.filter(
+                pl.col("SITE_SUBTYPE_1").is_in(cancer_site_subtype_1)
+            )
+
         if cancer_site_subtype_2 is not None:
-            df = df[ df['SITE_SUBTYPE_2'].isin(cancer_site_subtype_2) ]
+            df = df.filter(
+                pl.col("SITE_SUBTYPE_2").is_in(cancer_site_subtype_2)
+            )
+
         if cancer_site_subtype_3 is not None:
-            df = df[ df['SITE_SUBTYPE_3'].isin(cancer_site_subtype_3) ]
+            df = df.filter(
+                pl.col("SITE_SUBTYPE_3").is_in(cancer_site_subtype_3)
+            )
 
-        df = df[ df['MUTATION_AA'].notna() ]
+        df = df.filter(
+            pl.col("MUTATION_AA").is_not_null()
+        )
 
-        df = df[df['MUTATION_AA'].apply(lambda mutation: self._mutation_type(mutation) in variant_types)]
+        df = df.filter(
+            pl.col("MUTATION_AA").map_elements(
+                lambda mutation: self._mutation_type(mutation) in variant_types,
+                return_dtype=pl.Boolean,
+            )
+        )
 
-        for r in df.iterrows():
-            r = r[1]
-            mutations.append(r['MUTATION_AA'])
+        if isinstance(df, pl.LazyFrame):
+            df = df.collect()
+
+        if df.is_empty():
+            self.log.warning(
+                f"No COSMIC mutations found for gene {gene_symbol}, "
+                f"TRANSCRIPT_ACCESSION={transcript_accession}, "
+                f"and the requested filters; returning empty results"
+            )
+            return [], out_metadata
+
+        for r in df.iter_rows(named=True):
+            mutations.append(r["MUTATION_AA"])
             mutation_type = self._mutation_type(r['MUTATION_AA'])
 
             if do_cancer_type:
-                out_metadata['cancer_type'].append([r['PRIMARY_HISTOLOGY']])
+                out_metadata['cancer_type'].append(
+                    [r['PRIMARY_HISTOLOGY']]
+                )
 
             if do_genomic_coordinates or do_genomic_mutations:
                 gd = []
+
                 if not isinstance(genome_assembly_version, str):
-                    raise TypeError(f"Incorrect format for genome assembly version")
+                    raise TypeError("Incorrect format for genome assembly version")
+
                 grch = str(genome_assembly_version)
-                if grch == 'GRCh38'or grch == 'hg38':
+
+                if grch == 'GRCh38' or grch == 'hg38':
                     gd.append('hg38')
                 elif grch == 'GRCh37' or grch == 'hg19':
                     gd.append('hg19')
                 else:
-                    raise ValueError(f"Unsupported genome assembly version {grch}")
+                    raise ValueError(
+                        f"Unsupported genome assembly version {grch}"
+                    )
 
                 if mutation_type == "missense":
                     genomic_ref = r['MUTATION_CDS'][-3]
@@ -2037,13 +2106,13 @@ class COSMIC(DynamicMutationSource, object):
                 gd.append(genomic_ref)
 
             if do_genomic_coordinates:
-                if any(pd.isna(x) for x in gd[:4]):
+                if any(x is None for x in gd[:4]):
                     out_metadata['genomic_coordinates'].append(None)
                 else:
                     out_metadata['genomic_coordinates'].append(gd)
 
             if do_genomic_mutations:
-                if gd is None or pd.isna(r['HGVSG']):
+                if gd is None or r["HGVSG"] is None:
                     self.log.warning("couldn't annotate genomic mutation")
                     gm = None
                 else:
@@ -2052,78 +2121,135 @@ class COSMIC(DynamicMutationSource, object):
                 out_metadata['genomic_mutations'].append(gm)
 
             if do_site:
-                out_metadata['cancer_site'].append([r.__getitem__(a) for a in self._site_kwd])
+                out_metadata['cancer_site'].append(
+                    [r.__getitem__(a) for a in self._site_kwd]
+                )
 
             if do_histology:
-                out_metadata['cancer_histology'].append([r.__getitem__(a) for a in self._histology_kwd])
+                out_metadata['cancer_histology'].append(
+                    [r.__getitem__(a) for a in self._histology_kwd]
+                )
 
         return mutations, out_metadata
 
     def add_mutations(self, sequence, genome_assembly_version='GRCh38',
-                    cancer_types=None,
-                    cancer_histology_subtype_1=None,
-                    cancer_histology_subtype_2=None,
-                    cancer_histology_subtype_3=None,
-                    cancer_sites=None,
-                    cancer_site_subtype_1=None,
-                    cancer_site_subtype_2=None,
-                    cancer_site_subtype_3=None,
-                    use_alias=None, metadata=[],
-                    variant_types=("missense",)):
+                      cancer_types=None,
+                      cancer_histology_subtype_1=None,
+                      cancer_histology_subtype_2=None,
+                      cancer_histology_subtype_3=None,
+                      cancer_sites=None,
+                      cancer_site_subtype_1=None,
+                      cancer_site_subtype_2=None,
+                      cancer_site_subtype_3=None,
+                      use_alias=None, metadata=[],
+                      variant_types=("missense",)):
 
-        _cosmic_supported_metadata = ['cancer_type', 'genomic_coordinates', 'genomic_mutations', 'cancer_site', 'cancer_histology']
+        _cosmic_supported_metadata = [
+            'cancer_type',
+            'genomic_coordinates',
+            'genomic_mutations',
+            'cancer_site',
+            'cancer_histology'
+        ]
+
         if not self._valid_variant_types(variant_types):
             raise ValueError(f"Invalid variant_types: {variant_types}")
+
         variant_types = self._normalize_variant_types(variant_types)
 
         for md in metadata:
             if md not in _cosmic_supported_metadata:
-                self.log.error(f'{md} is not a valid metadata. Supported metadata are: {_cosmic_supported_metadata}')
-                raise ValueError(f'{md} is not a valid metadata. Supported metadata are: {_cosmic_supported_metadata}')
+                self.log.error(
+                    f'{md} is not a valid metadata. '
+                    f'Supported metadata are: {_cosmic_supported_metadata}'
+                )
+                raise ValueError(
+                    f'{md} is not a valid metadata. '
+                    f'Supported metadata are: {_cosmic_supported_metadata}'
+                )
 
         if cancer_types is None:
-            self.log.info("no cancer type specified; will use all of them")
+            self.log.info(
+                "no cancer type specified; will use all of them"
+            )
+
         if use_alias is not None:
-            gene_id = sequence.aliases[use_alias]
-            self.log.info("using alias %s as gene name" % sequence.aliases[use_alias])
+            gene_symbol = sequence.aliases[use_alias]
+            self.log.info(
+                "using alias %s as gene name" % sequence.aliases[use_alias]
+            )
         else:
-            gene_id = sequence.gene_id
+            gene_symbol = sequence.gene_id
 
-        transcript_accession = sequence.aliases.get('ensembl_transcript_id')
+        transcript_accession = sequence.aliases.get(
+            'ensembl_transcript_id'
+        )
+
         if not transcript_accession:
-            self.log.error("Missing required sequence.aliases['ensembl_transcript_id'] for COSMIC filtering")
-            raise ValueError("ensembl_transcript_id is required in sequence.aliases for COSMIC filtering")
-        self.log.info(f"Using Ensembl transcript for COSMIC filter: {transcript_accession}")
+            self.log.error(
+                "Missing required sequence.aliases['ensembl_transcript_id'] "
+                "for COSMIC filtering"
+            )
+            raise ValueError(
+                "ensembl_transcript_id is required in sequence.aliases "
+                "for COSMIC filtering"
+            )
 
-        raw_mutations, out_metadata = self._parse_db_files(gene_id, transcript_accession, genome_assembly_version = genome_assembly_version,
-                                                            cancer_types=cancer_types,
-                                                            cancer_histology_subtype_1=cancer_histology_subtype_1,
-                                                            cancer_histology_subtype_2=cancer_histology_subtype_2,
-                                                            cancer_histology_subtype_3=cancer_histology_subtype_3,
-                                                            cancer_sites=cancer_sites,
-                                                            cancer_site_subtype_1=cancer_site_subtype_1,
-                                                            cancer_site_subtype_2=cancer_site_subtype_2,
-                                                            cancer_site_subtype_3=cancer_site_subtype_3,
-                                                            metadata=metadata,
-                                                            variant_types=variant_types)
+        self.log.info(
+            f"Using Ensembl transcript for COSMIC filter: "
+            f"{transcript_accession}"
+        )
 
-        unique_mutations = sorted(set(raw_mutations), key=lambda m: (int(re.search(r"\d+", m).group()), m))
-        self.log.info("unique mutations found in %s: %s" % (self.name, ", ".join(unique_mutations)))
+        raw_mutations, out_metadata = self._parse_db_files(
+            gene_symbol,
+            transcript_accession,
+            genome_assembly_version=genome_assembly_version,
+            cancer_types=cancer_types,
+            cancer_histology_subtype_1=cancer_histology_subtype_1,
+            cancer_histology_subtype_2=cancer_histology_subtype_2,
+            cancer_histology_subtype_3=cancer_histology_subtype_3,
+            cancer_sites=cancer_sites,
+            cancer_site_subtype_1=cancer_site_subtype_1,
+            cancer_site_subtype_2=cancer_site_subtype_2,
+            cancer_site_subtype_3=cancer_site_subtype_3,
+            metadata=metadata,
+            variant_types=variant_types
+        )
+
+        unique_mutations = sorted(
+            set(raw_mutations),
+            key=lambda m: (int(re.search(r"\d+", m).group()), m)
+        )
+
+        self.log.info(
+            "unique mutations found in %s: %s"
+            % (self.name, ", ".join(unique_mutations))
+        )
 
         for m in unique_mutations:
-            mutation_indices = [i for i, x in enumerate(raw_mutations) if x == m]
+            mutation_indices = [
+                i for i, x in enumerate(raw_mutations) if x == m
+            ]
+
             try:
                 mutation_obj = self._protein_variant_parser(m, sequence)
+
                 for md in metadata:
                     mutation_obj.metadata[md] = []
+
                     for mi in mutation_indices:
                         if out_metadata[md][mi] is not None:
                             tmp_md = [self] + out_metadata[md][mi]
                             this_md = metadata_classes[md](*tmp_md)
                             mutation_obj.metadata[md].append(this_md)
+
                 sequence.add_variant(mutation_obj)
+
             except ValueError as e:
-                self.log.warning(f"mutation {m} could not be parsed/validated and will be skipped: {e}")
+                self.log.warning(
+                    f"mutation {m} could not be parsed/validated "
+                    f"and will be skipped: {e}"
+                )
                 continue
 
 class PhosphoSite(DynamicSource, object):
@@ -2705,39 +2831,6 @@ class RevelDatabase(StaticSource, object):
 
         self._revel_file = revel_file
         self._supported_metadata = {'revel_score': self._get_revel}
-        self._revel_cache_by_chr = {}
-
-    def _filter_revel_by_chromosomes(self, chrom):
-        file_path = self._revel_file
-
-        with open(file_path, "r") as f:
-            header_line = next(f).rstrip("\n")
-            header = header_line.split(",")
-
-            cols = ["chr","hg19_pos","grch38_pos","ref","alt",
-                "aaref","aaalt","REVEL","Ensembl_transcriptid"]
-
-            missing = [c for c in cols if c not in header]
-            if missing:
-                raise ValueError(f"[REVEL] Missing columns in file: {missing}")
-
-            prefix = f"{chrom},"
-
-            filtered_lines = []
-            for line in f:
-                if line.startswith(prefix):
-                    filtered_lines.append(line)
-
-        if not filtered_lines:
-            self.log.warning(f"[REVEL] No entries found for chromosomes {chrom}")
-            return pd.DataFrame(columns=cols)
-
-        buffer = StringIO()
-        buffer.write(header_line + "\n")
-        buffer.writelines(filtered_lines)
-        buffer.seek(0)
-
-        return pd.read_csv(buffer, dtype=str)
 
     def add_metadata(self, sequence, md_type=['revel_score']):
         if type(md_type) is str:
@@ -2769,31 +2862,93 @@ class RevelDatabase(StaticSource, object):
 
     def _get_revel(self, mutation_entries):
 
-        needed_chroms = set()
-        for _, gms, _ in mutation_entries:
-            for gm in gms:
-                if hasattr(gm, 'chr') and gm.chr is not None:
-                    needed_chroms.add(str(gm.chr))
+        cols = ["chr", "hg19_pos", "grch38_pos", "ref", "alt",
+                "aaref", "aaalt", "REVEL", "Ensembl_transcriptid"]
 
-        # Ensure the cache has all needed chromosome slices
-        for chrom in needed_chroms:
-            if chrom not in self._revel_cache_by_chr:
-                self._revel_cache_by_chr[chrom] = self._filter_revel_by_chromosomes(chrom)
+        # Lazily scan the REVEL database
+        lazy_df = pl.scan_csv(
+            self._revel_file,
+            schema_overrides={"chr": pl.String},
+            null_values=[".", "NA"]
+        )
 
-        # Build a working DataFrame from just the needed chromosomes
-        if needed_chroms:
-            df = pd.concat(
-                [self._revel_cache_by_chr[c] for c in needed_chroms],
-                ignore_index=True
-            )
-        else:
-            df = pd.DataFrame(columns=["chr", "hg19_pos", "grch38_pos", "ref", "alt",
-                                       "aaref", "aaalt", "REVEL", "Ensembl_transcriptid"])
+        # Check that all required columns are present
+        missing = [c for c in cols if c not in lazy_df.collect_schema().names()]
+        if missing:
+            raise ValueError(f"[REVEL] Missing columns in file: {missing}")
 
-        for mutation, gms, transcript_id in mutation_entries:
+        # Build one DataFrame containing all genomic mutations
+        mutation_rows = []
+
+        for mutation, _, _ in mutation_entries:
             mutation.metadata['revel_score'] = []
+
+        for mutation_idx, (mutation, gms, transcript_id) in enumerate(mutation_entries):
+            for gm_idx, gm in enumerate(gms):
+                if not all(
+                    hasattr(gm, attr)
+                    for attr in ["genome_build", "chr", "get_coord", "ref", "alt"]
+                ):
+                    continue
+
+                if gm.genome_build not in ("hg19", "hg38"):
+                    continue
+
+                mutation_rows.append({
+                    "mutation_idx": mutation_idx,
+                    "gm_idx": gm_idx,
+                    "chr": str(gm.chr),
+                    "coord": int(gm.get_coord()),
+                    "alt": gm.alt,
+                    "genome_build": gm.genome_build,
+                })
+
+        if not mutation_rows:
+            return
+
+        df_mutations = pl.DataFrame(mutation_rows)
+
+        mut_hg19 = df_mutations.filter(
+            pl.col("genome_build") == "hg19"
+        )
+
+        mut_hg38 = df_mutations.filter(
+            pl.col("genome_build") == "hg38"
+        )
+
+        revel_lf = lazy_df.select(cols)
+
+        joined_frames = []
+
+        if not mut_hg19.is_empty():
+            joined_frames.append(
+                mut_hg19.lazy()
+                .join(
+                    revel_lf,
+                    left_on=["chr", "coord", "alt"],
+                    right_on=["chr", "hg19_pos", "alt"],
+                    how="left",
+                )
+                .collect()
+            )
+
+        if not mut_hg38.is_empty():
+            joined_frames.append(
+                mut_hg38.lazy()
+                .join(
+                    revel_lf,
+                    left_on=["chr", "coord", "alt"],
+                    right_on=["chr", "grch38_pos", "alt"],
+                    how="left",
+                )
+                .collect()
+            )
+
+        df = pl.concat(joined_frames, how="diagonal")
+
+        for mutation_idx, (mutation, gms, transcript_id) in enumerate(mutation_entries):
             mutation_cache = {}
-            for gm in gms:
+            for gm_idx, gm in enumerate(gms):
                 if not all(hasattr(gm, attr) for attr in ['genome_build', 'chr', 'get_coord', 'ref', 'alt']):
                     self.log.warning(f"[REVEL] Skipping genomic mutation without complete coordinate information: {gm}")
                     continue
@@ -2812,71 +2967,79 @@ class RevelDatabase(StaticSource, object):
                         mutation.metadata['revel_score'].append(Revel(source=self, score=s))
                     continue
 
-                df_filtered = df[df[coord_col].astype(str) == str(gm.get_coord())]
-                df_filtered = df_filtered[df_filtered["chr"].astype(str) == str(gm.chr)]
-                df_filtered = df_filtered[df_filtered["alt"] == gm.alt]
+                df_filtered = df.filter(
+                    (pl.col("mutation_idx") == mutation_idx) &
+                    (pl.col("gm_idx") == gm_idx)
+                )
 
                 # Some rows have multiple IDs separated by ';', so we use a regex with:
                 #   (^|;) ensures the match is either at the start of the string or follows a semicolon
                 #   ($|;) ensures the match ends at the end of the string or is followed by a semicolon
-                df_filtered = df_filtered[df_filtered["Ensembl_transcriptid"].astype(str).str.contains(
-                    rf'(^|;){(transcript_id)}($|;)', na=False)]
+                df_filtered = df_filtered.filter(
+                    pl.col("Ensembl_transcriptid")
+                    .str.contains(rf'(^|;){transcript_id}($|;)'))
 
-                if df_filtered.empty:
+                if df_filtered.is_empty():
                     self.log.warning(f"[REVEL] No REVEL match at chr={gm.chr}, pos={gm.get_coord()}, alt={gm.alt}, "
                         f"transcript={transcript_id}")
                     mutation_cache[gm] = ()
                     continue
 
-                ref_mismatches = df_filtered[df_filtered["ref"] != gm.ref]
-                if not ref_mismatches.empty:
+                ref_mismatches = df_filtered.filter(pl.col("ref") != gm.ref)
+                if not ref_mismatches.is_empty():
                     self.log.warning(f"[REVEL] Reference base mismatch for {mutation}: expected {gm.ref}, "
-                        f"got {set(ref_mismatches['ref'])} at chr={gm.chr}, pos={gm.get_coord()} "
+                        f"got {ref_mismatches['ref'].unique().to_list()} at chr={gm.chr}, pos={gm.get_coord()} "
                         f"(transcript {transcript_id})")
                     mutation_cache[gm] = ()
                     continue
 
-                aa_mismatches = df_filtered[df_filtered["aaref"] != mutation.ref]
-                if not aa_mismatches.empty:
+                aa_mismatches = df_filtered.filter(pl.col("aaref") != mutation.ref)
+                if not aa_mismatches.is_empty():
                     self.log.warning(f"[REVEL] Amino acid reference mismatch for {mutation}: expected "
-                        f"{mutation.ref}, got {set(aa_mismatches['aaref'])} "
+                        f"{mutation.ref}, got {aa_mismatches['aaref'].unique().to_list()} "
                         f"at chr={gm.chr}, pos={gm.get_coord()} (transcript {transcript_id})")
                     mutation_cache[gm] = ()
                     continue
 
-                df_final = df_filtered[df_filtered["aaalt"] == mutation.alt]
-                if df_final.empty:
+                df_final = df_filtered.filter(pl.col("aaalt") == mutation.alt)
+                if df_final.is_empty():
                     self.log.warning(f"[REVEL] No match with expected alt amino acid {mutation.alt} "
                         f"for {mutation} at chr={gm.chr}, pos={gm.get_coord()}")
                     mutation_cache[gm] = ()
                     continue
 
-                if df_final["REVEL"].nunique(dropna=True) > 1:
+
+                if df_final["REVEL"].drop_nulls().n_unique() > 1:
                     self.log.warning(
                         f"[REVEL] Multiple REVEL scores found for {mutation} at chr={gm.chr}, "
-                        f"pos={gm.get_coord()}, transcript={transcript_id}: {df_final['REVEL'].unique().tolist()}"
-                    )
+                        f"pos={gm.get_coord()}, transcript={transcript_id}: "
+                        f"{df_final['REVEL'].unique().to_list()}"
+                        )
 
                 parsed_scores = []
-                for score_str in df_final["REVEL"].dropna():
-                    if score_str in [".", "NA"]:
-                        self.log.warning(f"[REVEL] Invalid REVEL score value '{score_str}' for {mutation} "
-                        f"at chr={gm.chr}, pos={gm.get_coord()}, transcript={transcript_id}")
+
+                for score in df_final["REVEL"]:
+                    if score is None:
+                        self.log.warning(
+                                f"[REVEL] Null REVEL score for {mutation} at chr={gm.chr}, "
+                                f"pos={gm.get_coord()}, transcript={transcript_id}"
+                                )
                         continue
 
-                    try:
-                        score = float(score_str)
-                        parsed_scores.append(score)
-                        self.log.info(
-                            f"[REVEL] Match for {mutation}: chr={gm.chr}, pos={gm.get_coord()}, "
-                            f"ref={gm.ref}, alt={gm.alt}, aaref={mutation.ref}, "
-                            f"aaalt={mutation.alt}, transcript={transcript_id}, score={score}")
-                    except ValueError:
-                        self.log.warning(f"[REVEL] Could not parse REVEL score '{score_str}' for {mutation}")
+                    parsed_scores.append(score)
+
+                    self.log.info(
+                        f"[REVEL] Match for {mutation}: chr={gm.chr}, pos={gm.get_coord()}, "
+                        f"ref={gm.ref}, alt={gm.alt}, aaref={mutation.ref}, "
+                        f"aaalt={mutation.alt}, transcript={transcript_id}, score={score}"
+                    )
 
                 mutation_cache[gm] = tuple(parsed_scores)
+
                 for s in parsed_scores:
-                    mutation.metadata['revel_score'].append(Revel(source=self, score=s))
+                    mutation.metadata['revel_score'].append(
+                        Revel(source=self, score=s)
+                    )
 
 class ELMDatabase(DynamicSource, object):
     def __init__(self):
@@ -3931,4 +4094,3 @@ class ManualAnnotation(StaticSource):
             else:
                 sequence.add_property(row['type'], positions=positions, sources=[self], name=row['name'], function=row['function'],
                                       reference=row['reference'])
-
