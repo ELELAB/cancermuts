@@ -351,15 +351,14 @@ Note that COSMIC supports non-canonical alternative isoforms.
 cosmic = COSMIC(targeted_database_file='/data/databases/cosmic-v102/Cosmic_CompleteTargetedScreensMutant_v102_GRCh38.tsv',
 screen_mutant_database_file='/data/databases/cosmic-v102/Cosmic_GenomeScreensMutant_v102_GRCh38.tsv',
 classification_database_file='/data/databases/cosmic-v102/Cosmic_Classification_v102_GRCh38.tsv',
-database_encoding='latin1', lazy_load_db= True)
+lazy_load_db= True)
 ```
 
 here the `targeted_database_file`, `screen_mutant_database_file`, `classification_database_file` argument are strings.
 Usually, the argument for this file would be the COSMIC files  that
 was downloaded as detailed in the Install section.
 
-Similarly, `database_encoding` defines the
-text file encoding for every file (it is `latin1` for COSMIC version 102).
+COSMIC database files are read as UTF-8.
 
 {% hint style='danger' %}
 As the default database files are rather large, we recommend creating the COSMIC data source object with `lazy_load_db = True`
