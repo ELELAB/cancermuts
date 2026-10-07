@@ -2384,9 +2384,14 @@ class dbPTM(DynamicSource, object):
         self._dbptm_data = {}
 
         for ptm_type in self._ptm_types:        
-            filepath = os.path.join(self._database_dir, database_files[ptm_type])        
-            df = pd.read_csv(filepath, sep="\t", header=None, names=["protein", "uniprot", "position", "ptm_type", "pmid", "sequence"], dtype={"position":int})                       
-            df = df[df["protein"].str.endswith("_HUMAN", na=False)]       
+            filepath = os.path.join(self._database_dir, database_files[ptm_type])
+            df = pl.scan_csv(filepath, separator="\t", 
+                    has_header=False,
+                    new_columns=["protein", "uniprot", "position", "ptm_type", "pmid", "sequence",],
+                    schema_overrides={"position": pl.Int64,"pmid": pl.String,},
+                    )
+
+            df = df.filter(pl.col("protein").str.ends_with("_HUMAN")).collect()
             self._dbptm_data[ptm_type] = df
 
     def add_sequence_properties(self, sequence, properties=None):
@@ -2399,7 +2404,7 @@ class dbPTM(DynamicSource, object):
 
         for ptm in properties:
             df = self._dbptm_data[ptm]    
-            df = df[df["uniprot"] == sequence.uniprot_ac]
+            df = df.filter(pl.col("uniprot") == sequence.uniprot_ac)
 
             for pos in df['position']:
                 site = int(pos)
