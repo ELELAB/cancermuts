@@ -8,6 +8,12 @@ The project uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 
 ### Added
 ### Changed
+### Fixed
+
+## [2.2.0] - 2026-10-07
+
+### Added
+### Changed
 - Improved performance of RevelDatabase module by switching database parsing from pandas to polars
 - Improved performance of dbPTM module: Replaced pandas with polars
 - Migrated COSMIC datasources from pandas to polars, with lazy loading and filtering support.
