@@ -5,6 +5,7 @@ All notable changes to this project should be documented in this file.
 The project uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 ## [Unreleased]
+- Ignore None values in cancer site and histology annotations to prevent metatable export errors.
 
 ### Added
 ### Changed
