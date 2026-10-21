@@ -3634,9 +3634,9 @@ class gnomAD(DynamicSource, object):
         if self._gnomad_version in self._exome_genome_support:
             for col in ['exome_ac', 'exome_an', 'genome_ac', 'genome_an']:
                 if col not in variants.columns:
-                    self.log.warning(f'gnomAD: {col} is missing for all variants of gene {gene_id}.'
+                    self.log.warning(f'gnomAD: {col} is missing for all variants of gene {gene_id}. '
                                      f'Affected allele frequencies will be reported as NA.')
-                    variants[col] = float('nan')
+                    variants[col] = pd.NA
 
             variants['total_ac'] = variants['exome_ac'] + variants['genome_ac']
             variants['total_an'] = variants['exome_an'] + variants['genome_an']
@@ -3646,6 +3646,12 @@ class gnomAD(DynamicSource, object):
             variants['total_af'] = variants['total_ac'] / variants['total_an']
 
         elif self._gnomad_version in self._genome_support:
+            for col in ['genome_ac', 'genome_an']:
+                if col not in variants.columns:
+                    self.log.warning(f'gnomAD: {col} is missing for all variants of gene {gene_id}. '
+                                     f'Affected allele frequencies will be reported as NA.')
+                    variants[col] = pd.NA
+
             variants['total_ac'] = pd.NA
             variants['total_an'] = pd.NA
 
