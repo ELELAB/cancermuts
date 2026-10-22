@@ -10,7 +10,6 @@ The project uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 ### Changed
 ### Fixed
 - Fixed gnomAD annotation when exome or genome allele count data are missing
-
 - Fixed COSMIC cancer site and histology metadata handling to filter out None values
 
 ## [2.2.0] - 2026-10-07
