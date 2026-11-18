@@ -242,7 +242,7 @@ class UniProt(DynamicSource, object):
         super(UniProt, self).__init__(name='UniProt', version='1.0', description=description)
         self._uniprot_service = bsUniProt()
 
-    def get_sequence(self, gene_id, upid=None, upac=None, isoform=None):
+    def get_sequence(self, gene_id, upid=None, upac=None, isoform=None, enst_id=None):
         if upac is not None:
             this_upac = upac
             self.log.info(f"The user-provided UniProt AC ({upac}) will be used")
@@ -346,8 +346,11 @@ class UniProt(DynamicSource, object):
         else:
             transcript_lookup_id = isoform
 
-        
-        ensembl_transcript = self._get_transcript_id(transcript_lookup_id)
+        if enst_id is not None:
+            ensembl_transcript = enst_id.split('.')[0]
+            self.log.info(f"Using user-provided Ensembl transcript ID: {ensembl_transcript}")
+        else:
+            ensembl_transcript = self._get_transcript_id(transcript_lookup_id)
 
         if ensembl_transcript:
             aliases['ensembl_transcript_id'] = ensembl_transcript
@@ -410,16 +413,26 @@ class UniProt(DynamicSource, object):
             self.log.warning(f"Could not fetch or parse UniProt JSON for {transcript_lookup_id}: {e}")
             return None
 
+        transcript_ids = []
         for xref in data.get('uniProtKBCrossReferences', []):
             if xref.get('database') == 'Ensembl':
                 transcript_id = xref.get('id')
                 if transcript_id:
                     transcript_id = transcript_id.split('.')[0]
-                    self.log.info(f"Resolved Ensembl transcript ID for {transcript_lookup_id}: {transcript_id}")
-                    return transcript_id
+                    if transcript_id not in transcript_ids:
+                        transcript_ids.append(transcript_id)
 
-        self.log.warning(f"No Ensembl transcript ID found for {transcript_lookup_id}")
-        return None
+        if not transcript_ids:
+            self.log.warning(f"No Ensembl transcript ID found for {transcript_lookup_id}")
+            return None
+        if len(transcript_ids) > 1:
+            self.log.warning(f"Multiple Ensembl transcript IDs found for {transcript_lookup_id}: "
+                             f"{', '.join(transcript_ids)}; will use {transcript_ids[0]}. "
+                              "Provide enst_id to get_sequence() to select one explicitly.")
+
+        self.log.info(f"Resolved Ensembl transcript ID for {transcript_lookup_id}: {transcript_ids[0]}")
+        return transcript_ids[0]
+
 
     def _get_aliases(self, gene_id, to, fr='UniProtKB_AC-ID'):
 
