@@ -7,6 +7,8 @@ The project uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 ## [Unreleased]
 
 ### Added
+- Added optional `enst_id` argument to `UniProt.get_sequence()` to specify the Ensembl transcript used for COSMIC and local REVEL filtering.
+- Added a warning when multiple  Ensembl transcript IDs are found, while retaining selection of the first.
 ### Changed
 ### Fixed
 

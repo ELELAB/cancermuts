@@ -155,7 +155,6 @@ a my_table_indels.pdf figure.
 
 ### The Sequence object
 
-Cancermuts works
 The first operation to be performed when starting to work with Cancermuts is creating
 a Sequence object. This object represents the protein sequence we want to consider for
 the analysis and links together all the information we are going to collect. In order to
@@ -204,10 +203,25 @@ Q9C0C7-3
 False
 ```
 
+An Ensembl transcript ID can optionally be provided using `enst_id`:
+
+```python
+>>> seq = up.get_sequence('MAP1LC3B', upid='MLP3B_HUMAN', enst_id='ENST00000650688')
+>>> print(seq.aliases['ensembl_transcript_id'])
+ENST00000650688
+```
+
 # Specify the desired RefSeq isoform for ClinVar parsing:
 ```py
 >>> seq.aliases["refseq"] = "NP_073729"
 ```
+
+If `enst_id` is omitted, Cancermuts retrieves the Ensembl transcript IDs
+from UniProt and selects the first. When multiple distinct IDs are found,
+it logs a warning listing the available IDs and indicating which was selected.
+
+The selected transcript is stored in `seq.aliases['ensembl_transcript_id']`
+and used for COSMIC and local REVEL database filtering.
 
 ### Collecting missense cancer mutations
 
